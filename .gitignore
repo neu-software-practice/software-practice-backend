@@ -16,9 +16,6 @@ his-seed
 coverage*
 cover.out
 
-# Generated swagger (regenerated via `make swag`)
-/internal/swagger/
-
 # Editor / OS
 .idea/
 .vscode/

@@ -14,7 +14,13 @@ type CatalogHandler struct{ svc *service.CatalogService }
 func NewCatalogHandler(svc *service.CatalogService) *CatalogHandler { return &CatalogHandler{svc: svc} }
 
 // Departments godoc
-// @Summary 科室列表 @Tags catalog @Produce json @Param type query string false "科室类型" @Success 200 {object} response.Body @Router /departments [get]
+// @Summary  科室列表
+// @Tags     catalog
+// @Produce  json
+// @Security BearerAuth
+// @Param    type  query     string  false  "科室类型(财务/门诊/检查/检验/药房/处置)"
+// @Success  200   {object}  response.Body
+// @Router   /departments [get]
 func (h *CatalogHandler) Departments(c *gin.Context) {
 	rows, err := h.svc.Departments(c.Request.Context(), c.Query("type"))
 	if err != nil {

@@ -21,7 +21,15 @@ func NewRegistrationHandler(svc *service.RegistrationService) *RegistrationHandl
 }
 
 // Register godoc
-// @Summary 窗口挂号 @Tags registration @Accept json @Produce json @Param body body dto.RegisterRequest true "挂号信息" @Success 201 {object} response.Body @Router /registers [post]
+// @Summary  窗口挂号
+// @Tags     registration
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    body  body      dto.RegisterRequest  true  "挂号信息"
+// @Success  201   {object}  response.Body
+// @Failure  404   {object}  response.Body
+// @Router   /registers [post]
 func (h *RegistrationHandler) Register(c *gin.Context) {
 	var in dto.RegisterRequest
 	if !bindJSON(c, &in) {

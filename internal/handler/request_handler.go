@@ -25,7 +25,15 @@ func NewRequestHandler[T any, PT repository.RequestPtr[T]](svc *service.RequestS
 	return &RequestHandler[T, PT]{svc: svc}
 }
 
-// Create opens a request (F2-3/F2-4/F2-10).
+// Create godoc
+// @Summary  开立检查/检验/处置申请 (F2-3/F2-4/F2-10, inspection/disposal 同构)
+// @Tags     request
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    body  body      dto.CreateRequestInput  true  "申请信息"
+// @Success  201   {object}  response.Body
+// @Router   /check-requests [post]
 func (h *RequestHandler[T, PT]) Create(c *gin.Context) {
 	var in dto.CreateRequestInput
 	if !bindJSON(c, &in) {

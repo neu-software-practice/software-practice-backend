@@ -16,7 +16,14 @@ type ChargeHandler struct{ svc *service.ChargeService }
 // NewChargeHandler builds the ChargeHandler.
 func NewChargeHandler(svc *service.ChargeService) *ChargeHandler { return &ChargeHandler{svc: svc} }
 
-// Pending lists a visit's payable items by case number (F1-3).
+// Pending godoc
+// @Summary  待缴费项目 (F1-3)
+// @Tags     charge
+// @Produce  json
+// @Security BearerAuth
+// @Param    case_number  query     string  true  "病历号"
+// @Success  200          {object}  response.Body
+// @Router   /charges/pending [get]
 func (h *ChargeHandler) Pending(c *gin.Context) {
 	caseNumber := c.Query("case_number")
 	if caseNumber == "" {
@@ -31,7 +38,15 @@ func (h *ChargeHandler) Pending(c *gin.Context) {
 	response.Success(c, resp)
 }
 
-// Charge settles selected items (F1-3).
+// Charge godoc
+// @Summary  收费结算 (F1-3)
+// @Tags     charge
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    body  body      dto.ChargeRequest  true  "结算项目"
+// @Success  200   {object}  response.Body
+// @Router   /charges [post]
 func (h *ChargeHandler) Charge(c *gin.Context) {
 	var in dto.ChargeRequest
 	if !bindJSON(c, &in) {

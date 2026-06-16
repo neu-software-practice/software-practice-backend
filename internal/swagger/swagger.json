@@ -1,0 +1,508 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "门诊全流程后端：挂号收费 / 门诊医生 / 检查 / 检验 / 处置 / 药房。",
+        "title": "东软云医院 HIS 门诊管理 API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api",
+    "paths": {
+        "/auth/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "登录",
+                "parameters": [
+                    {
+                        "description": "登录凭据",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "当前用户",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/charges": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "charge"
+                ],
+                "summary": "收费结算 (F1-3)",
+                "parameters": [
+                    {
+                        "description": "结算项目",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ChargeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/charges/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "charge"
+                ],
+                "summary": "待缴费项目 (F1-3)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check-requests": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "request"
+                ],
+                "summary": "开立检查/检验/处置申请 (F2-3/F2-4/F2-10, inspection/disposal 同构)",
+                "parameters": [
+                    {
+                        "description": "申请信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.CreateRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/departments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "科室列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "科室类型(财务/门诊/检查/检验/药房/处置)",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/pharmacy/prescriptions/{id}/dispense": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "药房发药 (F5-1)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "处方ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/registers/{id}/consult": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "创建病历开始看诊 (F2-1)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/registers": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "registration"
+                ],
+                "summary": "窗口挂号",
+                "parameters": [
+                    {
+                        "description": "挂号信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.ChargeItemRef": {
+            "type": "object",
+            "required": [
+                "id",
+                "item_type"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "item_type": {
+                    "description": "check/inspection/disposal/prescription",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.ChargeRequest": {
+            "type": "object",
+            "required": [
+                "case_number",
+                "items"
+            ],
+            "properties": {
+                "case_number": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ChargeItemRef"
+                    }
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.CreateRequestInput": {
+            "type": "object",
+            "required": [
+                "register_id",
+                "tech_id"
+            ],
+            "properties": {
+                "info": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "string"
+                },
+                "register_id": {
+                    "type": "integer"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "tech_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "deptment_id",
+                "employee_id",
+                "gender",
+                "real_name",
+                "regist_level_id",
+                "settle_category_id"
+            ],
+            "properties": {
+                "age": {
+                    "type": "integer"
+                },
+                "age_type": {
+                    "type": "string"
+                },
+                "birthdate": {
+                    "description": "YYYY-MM-DD",
+                    "type": "string"
+                },
+                "card_number": {
+                    "type": "string"
+                },
+                "deptment_id": {
+                    "type": "integer"
+                },
+                "employee_id": {
+                    "type": "integer"
+                },
+                "gender": {
+                    "type": "string"
+                },
+                "home_address": {
+                    "type": "string"
+                },
+                "is_book": {
+                    "type": "string"
+                },
+                "real_name": {
+                    "type": "string"
+                },
+                "regist_level_id": {
+                    "type": "integer"
+                },
+                "regist_method": {
+                    "type": "string"
+                },
+                "settle_category_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.ErrorBody"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Meta"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_pkg_response.ErrorBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Meta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

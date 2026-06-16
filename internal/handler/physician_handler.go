@@ -51,7 +51,14 @@ func (h *PhysicianHandler) Counts(c *gin.Context) {
 	response.Success(c, counts)
 }
 
-// Consult starts a consultation (F2-1 创建病历).
+// Consult godoc
+// @Summary  创建病历开始看诊 (F2-1)
+// @Tags     physician
+// @Produce  json
+// @Security BearerAuth
+// @Param    id   path      int  true  "挂号ID"
+// @Success  200  {object}  response.Body
+// @Router   /physician/registers/{id}/consult [post]
 func (h *PhysicianHandler) Consult(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {

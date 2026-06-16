@@ -33,7 +33,14 @@ func (h *PharmacyHandler) Prescriptions(c *gin.Context) {
 	response.Success(c, list)
 }
 
-// Dispense issues a paid prescription (F5-1).
+// Dispense godoc
+// @Summary  药房发药 (F5-1)
+// @Tags     pharmacy
+// @Produce  json
+// @Security BearerAuth
+// @Param    id   path      int  true  "处方ID"
+// @Success  200  {object}  response.Body
+// @Router   /pharmacy/prescriptions/{id}/dispense [post]
 func (h *PharmacyHandler) Dispense(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {

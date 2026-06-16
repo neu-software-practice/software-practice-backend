@@ -4,6 +4,8 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/neu-software-practice/software-practice-backend/internal/config"
 	"github.com/neu-software-practice/software-practice-backend/internal/handler"
@@ -13,6 +15,9 @@ import (
 	"github.com/neu-software-practice/software-practice-backend/internal/pkg/jwt"
 	"github.com/neu-software-practice/software-practice-backend/internal/pkg/response"
 	"github.com/neu-software-practice/software-practice-backend/internal/repository"
+
+	// Registers the generated OpenAPI spec with the swagger handler.
+	_ "github.com/neu-software-practice/software-practice-backend/internal/swagger"
 )
 
 // Deps carries everything the router needs. The app container populates it.
@@ -42,6 +47,9 @@ func New(d Deps) *gin.Engine {
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
+
+	// OpenAPI / Swagger UI at /swagger/index.html (SPEC §9.5).
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := r.Group("/api")
 	auth := func() gin.HandlerFunc { return middleware.Auth(d.Tokens) }
