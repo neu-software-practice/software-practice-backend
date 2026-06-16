@@ -1,0 +1,27 @@
+# Secrets & local env
+.env
+.env.local
+*.local
+
+# Build artifacts
+/bin/
+/dist/
+his-server
+his-migrate
+his-seed
+
+# Test & coverage
+*.out
+*.test
+coverage*
+cover.out
+
+# Generated swagger (regenerated via `make swag`)
+/internal/swagger/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+__debug_bin*
+*.db

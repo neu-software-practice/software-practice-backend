@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.4"
+          cache: true
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "${unformatted}" ]; then
+            echo "These files are not gofmt-clean:"; echo "${unformatted}"; exit 1
+          fi
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.6.0
+
+  test:
+    name: Test (MySQL 8) & Coverage
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: his
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -uroot -prootpw"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_DSN: "root:rootpw@tcp(127.0.0.1:3306)/his?charset=utf8mb4&parseTime=True&loc=Local&allowPublicKeyRetrieval=true"
+      JWT_SECRET: "ci-secret-change-me-0123456789-abcdef"
+      SEED_DEFAULT_PASSWORD: "Passw0rd!"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.4"
+          cache: true
+      - name: Validate migrations against real MySQL 8
+        run: make migrate
+      - name: Validate seed against real MySQL 8
+        run: make seed
+      - name: Test (race) with cross-package coverage
+        run: go test -race ./... -coverpkg=./... -coverprofile=cover.out -covermode=atomic
+      - name: Coverage gate (>= 80%)
+        run: bash scripts/coverage.sh cover.out 80

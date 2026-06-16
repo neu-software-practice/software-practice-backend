@@ -1,0 +1,38 @@
+# Full local stack: MySQL 8 + HIS backend. The backend reaches MySQL over the
+# compose network hostname `mysql`, so no host port forwarding is required.
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: his
+      MYSQL_USER: his
+      MYSQL_PASSWORD: hispw
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8080"
+      DATABASE_DSN: "his:hispw@tcp(mysql:3306)/his?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: "please-change-this-in-production-please-use-long-random"
+      JWT_TTL_HOURS: "12"
+      SEED_DEFAULT_PASSWORD: "Passw0rd!"
+      SEED_ON_START: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:

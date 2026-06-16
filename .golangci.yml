@@ -1,0 +1,22 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+# Default linters (errcheck, govet, ineffassign, staticcheck, unused) plus a few
+# high-signal extras. revive's exported-comment nagging is intentionally omitted.
+linters:
+  enable:
+    - misspell
+    - unconvert
+  exclusions:
+    rules:
+      # Tests favor brevity; unchecked errors there are acceptable.
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
