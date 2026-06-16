@@ -12,13 +12,16 @@ import (
 	"github.com/neu-software-practice/software-practice-backend/internal/repository"
 )
 
-// RegistrationService handles window registration (F1-1).
+// RegistrationService handles window registration, cancellation and the
+// registration record query (F1-1, F1-2).
 type RegistrationService struct {
 	registers   repository.RegisterRepository
 	levels      repository.RegistLevelRepository
 	departments repository.DepartmentRepository
 	settles     repository.SettleCategoryRepository
 	employees   repository.EmployeeRepository
+	charges     repository.ChargeRecordRepository
+	tx          repository.TxManager
 }
 
 // NewRegistrationService wires the RegistrationService.
@@ -28,14 +31,17 @@ func NewRegistrationService(
 	departments repository.DepartmentRepository,
 	settles repository.SettleCategoryRepository,
 	employees repository.EmployeeRepository,
+	charges repository.ChargeRecordRepository,
+	tx repository.TxManager,
 ) *RegistrationService {
-	return &RegistrationService{registers: registers, levels: levels, departments: departments, settles: settles, employees: employees}
+	return &RegistrationService{registers: registers, levels: levels, departments: departments, settles: settles, employees: employees, charges: charges, tx: tx}
 }
 
 // Register creates a visit (F1-1): the fee is taken from the chosen level, the
-// visit date/half-day are set server-side, and the case number is derived from
-// the new row's id to guarantee uniqueness. visit_state starts at 已挂号.
-func (s *RegistrationService) Register(ctx context.Context, in dto.RegisterRequest) (*model.Register, error) {
+// visit date/half-day are set server-side, the case number is derived from the
+// new row's id, and the registration fee is recorded in the financial ledger —
+// all atomically. visit_state starts at 已挂号.
+func (s *RegistrationService) Register(ctx context.Context, operatorID uint, in dto.RegisterRequest) (*model.Register, error) {
 	level, err := s.levels.FindByID(ctx, in.RegistLevelID)
 	if err != nil {
 		return nil, notFoundAs(err, apperr.ErrNotFound.WithMessage("挂号级别不存在"))
@@ -69,14 +75,59 @@ func (s *RegistrationService) Register(ctx context.Context, in dto.RegisterReque
 		VisitState: constant.VisitStateRegistered,
 	}
 
-	if err := s.registers.Create(ctx, reg); err != nil {
-		return nil, err
-	}
-	reg.CaseNumber = fmt.Sprintf("MR%08d", reg.ID)
-	if err := s.registers.Save(ctx, reg); err != nil {
+	err = s.tx.Do(ctx, func(ctx context.Context) error {
+		if err := s.registers.Create(ctx, reg); err != nil {
+			return err
+		}
+		reg.CaseNumber = fmt.Sprintf("MR%08d", reg.ID)
+		if err := s.registers.Save(ctx, reg); err != nil {
+			return err
+		}
+		return s.charges.Create(ctx, &model.ChargeRecord{
+			RegisterID: reg.ID, ItemType: constant.ChargeItemRegister, ItemID: reg.ID, ItemName: "挂号费(" + level.RegistName + ")",
+			Amount: level.RegistFee, Action: constant.ChargeActionPay, OperatorID: operatorID, CreatedAt: now,
+		})
+	})
+	if err != nil {
 		return nil, err
 	}
 	return reg, nil
+}
+
+// Cancel voids an un-consulted registration (F1-2): visit_state → 已退号 and the
+// registration fee is refunded in the ledger.
+func (s *RegistrationService) Cancel(ctx context.Context, operatorID, registerID uint) (*model.Register, error) {
+	reg, err := s.registers.FindByID(ctx, registerID)
+	if err != nil {
+		return nil, notFoundAs(err, apperr.ErrRegisterNotFound)
+	}
+	if reg.VisitState != constant.VisitStateRegistered {
+		return nil, apperr.ErrRegisterState.WithMessage("仅可对未接诊的挂号退号")
+	}
+
+	err = s.tx.Do(ctx, func(ctx context.Context) error {
+		if err := s.registers.UpdateState(ctx, registerID, constant.VisitStateCanceled); err != nil {
+			return err
+		}
+		return s.charges.Create(ctx, &model.ChargeRecord{
+			RegisterID: reg.ID, ItemType: constant.ChargeItemRegister, ItemID: reg.ID, ItemName: "挂号费退号",
+			Amount: reg.RegistMoney, Action: constant.ChargeActionRefund, OperatorID: operatorID, CreatedAt: time.Now(),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	reg.VisitState = constant.VisitStateCanceled
+	return reg, nil
+}
+
+// List queries registration records (F1-2 查询).
+func (s *RegistrationService) List(ctx context.Context, f repository.RegisterFilter, page repository.Page) ([]dto.RegisterBrief, int64, error) {
+	rows, total, err := s.registers.List(ctx, f, page)
+	if err != nil {
+		return nil, 0, err
+	}
+	return dto.NewRegisterBriefs(rows), total, nil
 }
 
 func currentNoon(t time.Time) string {

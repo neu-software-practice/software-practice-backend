@@ -92,6 +92,21 @@ func (h *RequestHandler[T, PT]) Results(c *gin.Context) {
 	response.Success(c, views)
 }
 
+// Manage lists all of a patient's requests regardless of state (F3-4/F4-4/F6-4).
+func (h *RequestHandler[T, PT]) Manage(c *gin.Context) {
+	registerID := parseUintQuery(c, "register_id")
+	if registerID == 0 {
+		response.Error(c, apperr.ErrBadRequest.WithMessage("缺少 register_id 参数"))
+		return
+	}
+	views, err := h.svc.ByRegister(c.Request.Context(), registerID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, views)
+}
+
 // Execute assigns an executor (F3-2/F4-2/F6-2). Defaults executor to current user.
 func (h *RequestHandler[T, PT]) Execute(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")

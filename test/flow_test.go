@@ -201,8 +201,8 @@ func TestMainLineFlow(t *testing.T) {
 	assert.Equal(t, drug.DrugStock-2, refreshed.DrugStock, "stock must drop by dispensed quantity")
 
 	var chargeRows int64
-	require.NoError(t, db.Model(&model.ChargeRecord{}).Where("register_id = ?", regID).Count(&chargeRows).Error)
-	assert.EqualValues(t, 3, chargeRows, "check + inspection + prescription = 3 ledger rows")
+	require.NoError(t, db.Model(&model.ChargeRecord{}).Where("register_id = ? AND action = ?", regID, constant.ChargeActionPay).Count(&chargeRows).Error)
+	assert.EqualValues(t, 4, chargeRows, "挂号费 + check + inspection + prescription = 4 收费 ledger rows")
 
 	var txnRows int64
 	require.NoError(t, db.Model(&model.DrugTransaction{}).Where("register_id = ? AND action = ?", regID, "发药").Count(&txnRows).Error)

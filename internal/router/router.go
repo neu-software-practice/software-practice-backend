@@ -61,12 +61,17 @@ func New(d Deps) *gin.Engine {
 		cat.GET("/drugs", d.Catalog.Drugs)
 	}
 
-	// 财务: 挂号 + 收费.
+	// 财务: 挂号/退号 + 收费/退费 + 费用记录.
 	fin := api.Group("", auth(), dept(constant.DeptTypeFinance))
 	{
 		fin.POST("/registers", d.Registration.Register)
+		fin.GET("/registers", d.Registration.List)
+		fin.POST("/registers/:id/cancel", d.Registration.Cancel)
 		fin.GET("/charges/pending", d.Charge.Pending)
 		fin.POST("/charges", d.Charge.Charge)
+		fin.GET("/charges/refund-pending", d.Charge.RefundPending)
+		fin.POST("/charges/refund", d.Charge.Refund)
+		fin.GET("/charge-records", d.Charge.Records)
 	}
 
 	// 门诊医生: 诊疗.
@@ -80,6 +85,7 @@ func New(d Deps) *gin.Engine {
 		phy.PUT("/registers/:id/medical-record", d.Physician.SaveMedicalRecord)
 		phy.PUT("/registers/:id/diagnosis", d.Physician.Diagnose)
 		phy.POST("/registers/:id/prescriptions", d.Physician.WritePrescription)
+		phy.GET("/charge-records", d.Charge.Records) // F2-11 费用查询
 	}
 	// 门诊医生: 开立检查/检验/处置 + 查看结果.
 	orders := api.Group("", auth(), dept(constant.DeptTypeOutpatient))
@@ -97,11 +103,17 @@ func New(d Deps) *gin.Engine {
 	registerTechRoutes(api, "inspection", d.Inspection, auth(), dept(constant.DeptTypeInspection))
 	registerTechRoutes(api, "disposal", d.Disposal, auth(), dept(constant.DeptTypeDisposal))
 
-	// 药房: 发药.
+	// 药房: 发药/退药 + 药库管理 + 交易记录.
 	ph := api.Group("/pharmacy", auth(), dept(constant.DeptTypePharmacy))
 	{
 		ph.GET("/prescriptions", d.Pharmacy.Prescriptions)
 		ph.POST("/prescriptions/:id/dispense", d.Pharmacy.Dispense)
+		ph.POST("/prescriptions/:id/refund", d.Pharmacy.Refund)
+		ph.GET("/transactions", d.Pharmacy.Transactions)
+		ph.POST("/drugs", d.Pharmacy.CreateDrug)
+		ph.PUT("/drugs/:id", d.Pharmacy.UpdateDrug)
+		ph.DELETE("/drugs/:id", d.Pharmacy.DeleteDrug)
+		ph.POST("/drugs/:id/restock", d.Pharmacy.Restock)
 	}
 
 	return r
@@ -121,6 +133,7 @@ func registerTechRoutes[T any, PT repository.RequestPtr[T]](api *gin.RouterGroup
 	g.GET("/"+prefix+"/pending", h.PendingPatients)
 	g.GET("/"+prefix+"/counts", h.Counts)
 	g.GET("/"+prefix+"-requests", h.PatientRequests)
+	g.GET("/"+prefix+"-requests/manage", h.Manage)
 	g.POST("/"+prefix+"-requests/:id/execute", h.Execute)
 	g.POST("/"+prefix+"-requests/:id/result", h.RecordResult)
 }

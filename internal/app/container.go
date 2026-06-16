@@ -64,7 +64,7 @@ func NewContainer(db *gorm.DB, cfg *config.Config) *Container {
 	// Services.
 	authSvc := service.NewAuthService(employees, tokens)
 	catalogSvc := service.NewCatalogService(departments, levels, settles, employees, techs, diseases, drugs)
-	regSvc := service.NewRegistrationService(registers, levels, departments, settles, employees)
+	regSvc := service.NewRegistrationService(registers, levels, departments, settles, employees, charges, tx)
 	chargeSvc := service.NewChargeService(registers, prescriptions, charges, tx, checkSvc, inspSvc, dispSvc)
 	physSvc := service.NewPhysicianService(registers, records, prescriptions, drugs, tx)
 	pharmSvc := service.NewPharmacyService(prescriptions, registers, drugs, drugTxns, tx)

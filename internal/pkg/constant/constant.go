@@ -58,10 +58,23 @@ const (
 // Charge item categories used by the charging module (F1-3/F1-4) to address a
 // pending payable item across the heterogeneous request/prescription tables.
 const (
+	ChargeItemRegister     = "register" // 挂号费
 	ChargeItemCheck        = "check"
 	ChargeItemInspection   = "inspection"
 	ChargeItemDisposal     = "disposal"
 	ChargeItemPrescription = "prescription"
+)
+
+// Charge actions (charge_record.action).
+const (
+	ChargeActionPay    = "收费"
+	ChargeActionRefund = "退费"
+)
+
+// Drug transaction actions (drug_transaction.action).
+const (
+	DrugActionDispense = "发药"
+	DrugActionReturn   = "退药"
 )
 
 // DelmarkActive / DelmarkDeleted are the soft-delete sentinels (delmark column).

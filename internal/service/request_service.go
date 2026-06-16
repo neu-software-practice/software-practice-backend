@@ -98,6 +98,16 @@ func (s *RequestService[T, PT]) Results(ctx context.Context, registerID uint) ([
 	return s.PatientRequests(ctx, registerID, constant.RequestStateCompleted)
 }
 
+// ByRegister lists every request of a visit regardless of state (F3-4/F4-4/F6-4
+// 管理/历史).
+func (s *RequestService[T, PT]) ByRegister(ctx context.Context, registerID uint) ([]dto.RequestView, error) {
+	rows, err := s.repo.ListByRegister(ctx, registerID)
+	if err != nil {
+		return nil, err
+	}
+	return s.views(rows), nil
+}
+
 // Execute assigns an executor and moves a paid request into 执行中 (F3-2/F4-2/F6-2).
 func (s *RequestService[T, PT]) Execute(ctx context.Context, requestID, executorID uint) (dto.RequestView, error) {
 	p, err := s.repo.FindByID(ctx, requestID)
@@ -134,9 +144,10 @@ func (s *RequestService[T, PT]) RecordResult(ctx context.Context, requestID, inp
 
 // --- RequestCharger implementation (consumed by ChargeService) ---
 
-// PendingViews lists this family's not-yet-paid items for a visit (F1-3).
-func (s *RequestService[T, PT]) PendingViews(ctx context.Context, registerID uint) ([]dto.PendingItem, error) {
-	rows, err := s.repo.ListByRegisterAndState(ctx, registerID, constant.RequestStateCreated)
+// BillableViews lists this family's items for a visit in a billing-relevant
+// state (已开立 for charging F1-3, 已缴费 for refunding F1-4).
+func (s *RequestService[T, PT]) BillableViews(ctx context.Context, registerID uint, state string) ([]dto.PendingItem, error) {
+	rows, err := s.repo.ListByRegisterAndState(ctx, registerID, state)
 	if err != nil {
 		return nil, err
 	}
