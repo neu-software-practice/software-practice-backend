@@ -8,10 +8,11 @@ import (
 	"github.com/neu-software-practice/software-practice-backend/internal/model"
 )
 
-// requestPtr binds a pointer type *T that satisfies model.MedTechRequest, the
+// RequestPtr binds a pointer type *T that satisfies model.MedTechRequest, the
 // classic two-type-parameter generics trick so the repo can allocate new(T)
-// while still calling the interface methods.
-type requestPtr[T any] interface {
+// while still calling the interface methods. Exported so the service layer can
+// build matching generic services.
+type RequestPtr[T any] interface {
 	*T
 	model.MedTechRequest
 }
@@ -19,12 +20,12 @@ type requestPtr[T any] interface {
 // RequestRepository is a generic data-access layer shared by check_request,
 // inspection_request and disposal_request. State-column differences are resolved
 // at runtime via the StateColumn()/TableName() accessors.
-type RequestRepository[T any, PT requestPtr[T]] struct {
+type RequestRepository[T any, PT RequestPtr[T]] struct {
 	base
 }
 
 // NewRequestRepository builds a generic RequestRepository for entity T.
-func NewRequestRepository[T any, PT requestPtr[T]](db *gorm.DB) *RequestRepository[T, PT] {
+func NewRequestRepository[T any, PT RequestPtr[T]](db *gorm.DB) *RequestRepository[T, PT] {
 	return &RequestRepository[T, PT]{base{db}}
 }
 

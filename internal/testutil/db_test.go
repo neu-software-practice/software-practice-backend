@@ -18,7 +18,7 @@ func TestNewDB_RoundTrip(t *testing.T) {
 		CaseNumber:  "MR0001",
 		RealName:    "张三",
 		Gender:      "男",
-		Birthdate:   birth,
+		Birthdate:   &birth,
 		Age:         36,
 		VisitDate:   visit,
 		RegistMoney: 12.50,
@@ -38,7 +38,7 @@ func TestNewDB_RoundTrip(t *testing.T) {
 	if got.RealName != "张三" || got.RegistMoney != 12.50 || got.VisitState != 1 {
 		t.Fatalf("round-trip mismatch: %+v", got)
 	}
-	if got.Birthdate.Year() != 1990 || got.Birthdate.Month() != time.May {
+	if got.Birthdate == nil || got.Birthdate.Year() != 1990 || got.Birthdate.Month() != time.May {
 		t.Fatalf("birthdate not preserved: %v", got.Birthdate)
 	}
 }

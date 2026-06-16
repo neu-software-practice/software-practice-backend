@@ -50,7 +50,11 @@ func (r *medicalRecordRepository) Upsert(ctx context.Context, rec *model.Medical
 	err := db.Where("register_id = ?", rec.RegisterID).First(&existing).Error
 	switch {
 	case err == nil:
+		// Preserve fields owned by F2-8 (门诊确诊) so a F2-2 re-save never wipes
+		// a previously recorded diagnosis/handling opinion.
 		rec.ID = existing.ID
+		rec.Diagnosis = existing.Diagnosis
+		rec.Cure = existing.Cure
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		rec.ID = 0
 	default:

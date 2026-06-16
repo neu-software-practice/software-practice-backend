@@ -32,8 +32,9 @@ func seedFixtures(t *testing.T, db *gorm.DB) (dept model.Department, doctor mode
 
 func newRegister(t *testing.T, db *gorm.DB, repo repository.RegisterRepository, doctor model.Employee, dept model.Department, level model.RegistLevel, caseNo string, state int) model.Register {
 	t.Helper()
+	bd := time.Now().AddDate(-30, 0, 0)
 	reg := model.Register{
-		CaseNumber: caseNo, RealName: "张三", Gender: "男", Birthdate: time.Now().AddDate(-30, 0, 0),
+		CaseNumber: caseNo, RealName: "张三", Gender: "男", Birthdate: &bd,
 		Age: 30, AgeType: "年", VisitDate: time.Now(), Noon: constant.NoonMorning,
 		DeptmentID: dept.ID, EmployeeID: doctor.ID, RegistLevelID: level.ID, SettleCategoryID: 1,
 		RegistMoney: level.RegistFee, VisitState: state,
