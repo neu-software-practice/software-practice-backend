@@ -210,7 +210,7 @@ func TestDrugInfoRepository(t *testing.T) {
 	db := testutil.NewDB(t)
 	repo := repository.NewDrugInfoRepository(db)
 
-	drug := &model.DrugInfo{DrugCode: "YP1", DrugName: "阿莫西林", DrugPrice: 18.5, DrugStock: 100, MnemonicCode: "AMXL", Delmark: 1}
+	drug := &model.DrugInfo{DrugCode: "YP1", DrugName: "阿莫西林", DrugPrice: 18.5, DrugStock: 100, MnemonicCode: "AMXL", Delmark: 1, CreationDate: time.Now()}
 	require.NoError(t, repo.Create(ctx(), drug))
 
 	rows, total, err := repo.Search(ctx(), "阿莫", repository.Page{})
@@ -284,7 +284,7 @@ func TestPrescriptionRepository(t *testing.T) {
 	dept, doctor, level := seedFixtures(t, db)
 	regRepo := repository.NewRegisterRepository(db)
 	reg := newRegister(t, db, regRepo, doctor, dept, level, "MR200", constant.VisitStateInConsult)
-	drug := model.DrugInfo{DrugCode: "YP1", DrugName: "阿莫西林", DrugPrice: 18.5, DrugStock: 100, Delmark: 1}
+	drug := model.DrugInfo{DrugCode: "YP1", DrugName: "阿莫西林", DrugPrice: 18.5, DrugStock: 100, Delmark: 1, CreationDate: time.Now()}
 	require.NoError(t, db.Create(&drug).Error)
 
 	repo := repository.NewPrescriptionRepository(db)
@@ -382,7 +382,7 @@ func TestTxManager_CommitAndRollback(t *testing.T) {
 
 	// Commit path.
 	err := tm.Do(ctx(), func(c context.Context) error {
-		return drugs.Create(c, &model.DrugInfo{DrugCode: "T1", DrugName: "药A", Delmark: 1})
+		return drugs.Create(c, &model.DrugInfo{DrugCode: "T1", DrugName: "药A", Delmark: 1, CreationDate: time.Now()})
 	})
 	require.NoError(t, err)
 	_, total, _ := drugs.Search(ctx(), "药A", repository.Page{})
@@ -391,7 +391,7 @@ func TestTxManager_CommitAndRollback(t *testing.T) {
 	// Rollback path: returning an error must undo the insert.
 	sentinel := errors.New("boom")
 	err = tm.Do(ctx(), func(c context.Context) error {
-		require.NoError(t, drugs.Create(c, &model.DrugInfo{DrugCode: "T2", DrugName: "药B", Delmark: 1}))
+		require.NoError(t, drugs.Create(c, &model.DrugInfo{DrugCode: "T2", DrugName: "药B", Delmark: 1, CreationDate: time.Now()}))
 		return sentinel
 	})
 	assert.ErrorIs(t, err, sentinel)

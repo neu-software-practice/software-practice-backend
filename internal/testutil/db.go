@@ -1,78 +1,120 @@
 // Package testutil provides shared helpers for the test suite. NewDB returns a
 // fresh, isolated database so integration tests exercise the real
-// handler→service→repository→DB stack (PLAN §5).
+// handler→service→repository→DB stack against MySQL.
 //
-// By default it uses an in-memory-style SQLite file (pure Go, no CGO, perfectly
-// isolated per test). When TEST_DATABASE_DSN is set — e.g. the CI MySQL service
-// job — it runs the real golang-migrate migrations against MySQL instead, so the
-// production schema is exercised end-to-end.
+// Each call creates an isolated temporary database on the MySQL instance
+// specified by TEST_DATABASE_DSN, applies the production golang-migrate
+// migrations, and drops the database on test cleanup.
 package testutil
 
 import (
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/glebarez/sqlite"
-	"gorm.io/driver/mysql"
+	"github.com/go-sql-driver/mysql"
+	gmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
 	"github.com/neu-software-practice/software-practice-backend/internal/migrate"
-	"github.com/neu-software-practice/software-practice-backend/internal/model"
 )
 
-// NewDB returns a ready-to-use, empty test database.
+// NewDB returns a ready-to-use, empty test database on a real MySQL instance.
+// TEST_DATABASE_DSN must be set (e.g. root:rootpw@tcp(127.0.0.1:3307)/mysql?...).
+// The database named in the DSN is used only for bootstrap (CREATE / DROP
+// DATABASE); the actual test data lives in a temporary database that is
+// dropped on t.Cleanup.
 func NewDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	if dsn := os.Getenv("TEST_DATABASE_DSN"); dsn != "" {
-		return newMySQLDB(t, dsn)
+	dsn := os.Getenv("TEST_DATABASE_DSN")
+	if dsn == "" {
+		t.Fatal("TEST_DATABASE_DSN is required for MySQL integration tests; start the test MySQL container with 'make test-mysql-up' or 'docker compose -f docker-compose.test.yml up -d'")
 	}
-	return newSQLiteDB(t)
+	return newMySQLDB(t, dsn)
 }
 
-func newSQLiteDB(t *testing.T) *gorm.DB {
+func newMySQLDB(t *testing.T, baseDSN string) *gorm.DB {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "his_test.db")
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+
+	cfg, err := mysql.ParseDSN(baseDSN)
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("parse TEST_DATABASE_DSN: %v", err)
 	}
-	if err := db.AutoMigrate(model.All()...); err != nil {
-		t.Fatalf("automigrate: %v", err)
-	}
-	return db
-}
 
-func newMySQLDB(t *testing.T, dsn string) *gorm.DB {
-	t.Helper()
-	if err := migrate.Up(dsn); err != nil {
-		t.Fatalf("migrate up: %v", err)
-	}
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+	suffix, err := randomSuffix()
 	if err != nil {
-		t.Fatalf("open mysql: %v", err)
+		t.Fatalf("generate random suffix: %v", err)
 	}
-	truncateAll(t, db)
-	return db
-}
+	dbName := "his_test_" + suffix
 
-// truncateAll empties every table so MySQL-backed tests start clean. There are
-// no FK constraints (only indexes), so order is irrelevant; the FK-check toggle
-// is kept defensive.
-func truncateAll(t *testing.T, db *gorm.DB) {
-	t.Helper()
-	db.Exec("SET FOREIGN_KEY_CHECKS = 0")
-	for _, m := range model.All() {
-		stmt := &gorm.Statement{DB: db}
-		if err := stmt.Parse(m); err != nil {
-			t.Fatalf("parse model %T: %v", m, err)
+	// Bootstrap: connect to the mysql system database to CREATE / DROP databases.
+	bootCfg := *cfg
+	bootCfg.DBName = "mysql"
+	bootDB, err := sql.Open("mysql", bootCfg.FormatDSN())
+	if err != nil {
+		t.Fatalf("open bootstrap connection: %v", err)
+	}
+	defer func() { _ = bootDB.Close() }()
+	if err := bootDB.Ping(); err != nil {
+		t.Fatalf("ping bootstrap connection (is test MySQL running?): %v", err)
+	}
+
+	if _, err := bootDB.Exec(fmt.Sprintf(
+		"CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbName,
+	)); err != nil {
+		t.Fatalf("create test database %s: %v", dbName, err)
+	}
+
+	// Register cleanup immediately after CREATE DATABASE succeeds, so the
+	// database is always dropped even if migrate.Up or gorm.Open fails.
+	// t.Cleanup callbacks run in LIFO order, so connection close (registered
+	// later) runs before database drop.
+	t.Cleanup(func() {
+		dropDB, err := sql.Open("mysql", bootCfg.FormatDSN())
+		if err != nil {
+			t.Logf("cleanup: open bootstrap for DROP DATABASE: %v", err)
+			return
 		}
-		db.Exec("TRUNCATE TABLE " + stmt.Schema.Table)
+		defer func() { _ = dropDB.Close() }()
+		if _, err := dropDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName)); err != nil {
+			t.Logf("cleanup: drop %s: %v", dbName, err)
+		}
+	})
+
+	// Build DSN pointing to the new database and run migrations.
+	testCfg := *cfg
+	testCfg.DBName = dbName
+	testDSN := testCfg.FormatDSN()
+	if err := migrate.Up(testDSN); err != nil {
+		t.Fatalf("migrate up on %s: %v", dbName, err)
 	}
-	db.Exec("SET FOREIGN_KEY_CHECKS = 1")
+
+	db, err := gorm.Open(gmysql.Open(testDSN), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		t.Fatalf("open gorm on %s: %v", dbName, err)
+	}
+
+	// Close the GORM connection before the database is dropped (LIFO).
+	t.Cleanup(func() {
+		sqlDB, _ := db.DB()
+		if sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	})
+
+	return db
+}
+
+func randomSuffix() (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
