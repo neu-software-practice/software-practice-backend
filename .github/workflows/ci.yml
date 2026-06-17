@@ -65,3 +65,62 @@ jobs:
         run: go test -race ./... -coverpkg=./... -coverprofile=cover.out -covermode=atomic
       - name: Coverage gate (>= 80%)
         run: bash scripts/coverage.sh cover.out 80
+
+  smoke-test:
+    name: Smoke Test (Newman + Docker Stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Newman
+        run: npm install -g newman
+
+      - name: Build and start Docker stack
+        run: docker compose up -d --build
+
+      - name: Wait for backend health
+        timeout-minutes: 5
+        run: |
+          echo "Waiting for backend to become healthy..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/health >/dev/null 2>&1; then
+              echo "Backend is ready after $((i * 5)) seconds"
+              curl -s http://localhost:8080/api/health
+              break
+            fi
+            printf "  ... %s/60\n" "$i"
+            sleep 5
+          done
+          # Final check — fail if still not ready
+          curl -sf http://localhost:8080/api/health
+
+      - name: Run Newman smoke tests
+        run: |
+          newman run test/smoke/his_smoke.postman_collection.json \
+            --env-var "base_url=http://localhost:8080" \
+            --iteration-count 1 \
+            --delay-request 100 \
+            --timeout-request 10000 \
+            --reporters cli,junit \
+            --reporter-junit-export smoke-results.xml
+
+      - name: Publish smoke test results
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Smoke Test Results
+          path: smoke-results.xml
+          reporter: java-junit
+
+      - name: Dump backend logs (on failure)
+        if: failure()
+        run: docker compose logs backend --tail=80
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
