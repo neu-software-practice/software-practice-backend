@@ -58,7 +58,7 @@ func newMySQLDB(t *testing.T, baseDSN string) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open bootstrap connection: %v", err)
 	}
-	defer bootDB.Close()
+	defer func() { _ = bootDB.Close() }()
 	if err := bootDB.Ping(); err != nil {
 		t.Fatalf("ping bootstrap connection (is test MySQL running?): %v", err)
 	}
@@ -79,7 +79,7 @@ func newMySQLDB(t *testing.T, baseDSN string) *gorm.DB {
 			t.Logf("cleanup: open bootstrap for DROP DATABASE: %v", err)
 			return
 		}
-		defer dropDB.Close()
+		defer func() { _ = dropDB.Close() }()
 		if _, err := dropDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName)); err != nil {
 			t.Logf("cleanup: drop %s: %v", dbName, err)
 		}
@@ -104,7 +104,7 @@ func newMySQLDB(t *testing.T, baseDSN string) *gorm.DB {
 	t.Cleanup(func() {
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {
-			sqlDB.Close()
+			_ = sqlDB.Close()
 		}
 	})
 
