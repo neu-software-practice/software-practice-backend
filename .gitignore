@@ -22,3 +22,6 @@ cover.out
 .DS_Store
 __debug_bin*
 *.db
+
+# Smoke test results
+test/smoke/results/

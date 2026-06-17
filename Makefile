@@ -55,3 +55,9 @@ test-mysql-up: ## Start the test-only MySQL container (port 3307)
 
 test-mysql-down: ## Stop and remove the test MySQL container
 	docker compose -f docker-compose.test.yml down -v
+
+smoke-test: ## Run Newman smoke tests against the full Docker stack
+	@test/smoke/run_smoke.sh
+
+smoke-test-no-teardown: ## Run smoke tests and leave the stack running
+	@test/smoke/run_smoke.sh --no-teardown

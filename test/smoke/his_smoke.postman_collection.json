@@ -1,0 +1,1524 @@
+{
+  "info": {
+    "name": "HIS Backend Smoke Tests",
+    "description": "端到端冒烟测试套件，覆盖 HIS 系统完整主线闭环（挂号→看病→缴费→发药）及异常边界场景。需先启动全 Docker 栈（docker compose up -d --build）。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1 - Authentication",
+      "description": "7 角色登录、token 验证、鉴权边界测试",
+      "item": [
+        {
+          "name": "1.1 Login - finance (收费员)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Token returned', () => { pm.expect(d.success).to.be.true; pm.expect(d.data.token).to.not.be.empty; });",
+                "pm.test('DeptType is 财务', () => { pm.expect(d.data.user.dept_type).to.eql('财务'); });",
+                "pm.collectionVariables.set('finance_token', d.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"finance\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.2 Login - doctor (门诊医生)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Token returned', () => { pm.expect(d.success).to.be.true; pm.expect(d.data.token).to.not.be.empty; });",
+                "pm.test('DeptType is 门诊', () => { pm.expect(d.data.user.dept_type).to.eql('门诊'); });",
+                "pm.collectionVariables.set('doctor_token', d.data.token);",
+                "pm.collectionVariables.set('doctor_user_id', d.data.user.id.toString());",
+                "pm.collectionVariables.set('doctor_dept_id', d.data.user.dept_id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"doctor\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.3 Login - checker (检查医生)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('DeptType is 检查', () => { pm.expect(d.data.user.dept_type).to.eql('检查'); });",
+                "pm.collectionVariables.set('checker_token', d.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"checker\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.4 Login - inspector (检验医生)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('DeptType is 检验', () => { pm.expect(d.data.user.dept_type).to.eql('检验'); });",
+                "pm.collectionVariables.set('inspector_token', d.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"inspector\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.5 Login - pharmacist (药房管理员)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('DeptType is 药房', () => { pm.expect(d.data.user.dept_type).to.eql('药房'); });",
+                "pm.collectionVariables.set('pharmacist_token', d.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"pharmacist\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.6 Login - disposer (处置医生)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('DeptType is 处置', () => { pm.expect(d.data.user.dept_type).to.eql('处置'); });",
+                "pm.collectionVariables.set('disposer_token', d.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"disposer\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.7 Login - root (系统管理员)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('DeptType is root', () => { pm.expect(d.data.user.dept_type).to.eql('root'); });",
+                "pm.collectionVariables.set('root_token', d.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"root\",\"password\":\"{{seed_password}}\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.8 Auth - me (valid token)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Username is doctor', () => { pm.expect(d.data.username).to.eql('doctor'); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "1.9 Auth - wrong password",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 401', () => { pm.response.to.have.status(401); });",
+                "pm.test('Error code INVALID_CREDENTIALS', () => { pm.expect(d.error.code).to.eql('INVALID_CREDENTIALS'); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"doctor\",\"password\":\"wrongpassword\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "1.10 Auth - tampered token",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 401', () => { pm.response.to.have.status(401); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer garbage.token.value" }],
+            "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "1.11 Auth - no token",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 401', () => { pm.response.to.have.status(401); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Reference Data",
+      "description": "获取挂号级别、结算类别、医技项目、疾病、药品的 ID 供后续流程使用",
+      "item": [
+        {
+          "name": "2.1 Get Registration Levels",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Returns array', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });",
+                "pm.collectionVariables.set('regist_level_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/regist-levels", "host": ["{{base_url}}"], "path": ["api", "regist-levels"] }
+          }
+        },
+        {
+          "name": "2.2 Get Settle Categories",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Returns array', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });",
+                "pm.collectionVariables.set('settle_category_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/settle-categories", "host": ["{{base_url}}"], "path": ["api", "settle-categories"] }
+          }
+        },
+        {
+          "name": "2.3 Get Medical Tech (检查)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Returns array', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });",
+                "pm.collectionVariables.set('check_tech_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/medical-technologies?type={{tech_type_check}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "medical-technologies"],
+              "query": [{ "key": "type", "value": "{{tech_type_check}}" }]
+            }
+          }
+        },
+        {
+          "name": "2.4 Get Medical Tech (检验)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Returns array', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });",
+                "pm.collectionVariables.set('insp_tech_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/medical-technologies?type={{tech_type_inspection}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "medical-technologies"],
+              "query": [{ "key": "type", "value": "{{tech_type_inspection}}" }]
+            }
+          }
+        },
+        {
+          "name": "2.5 Get Diseases",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Returns array', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });",
+                "pm.collectionVariables.set('disease_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/diseases", "host": ["{{base_url}}"], "path": ["api", "diseases"] }
+          }
+        },
+        {
+          "name": "2.6 Get Drugs",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Returns array', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });",
+                "const drug = d.data[0];",
+                "pm.collectionVariables.set('drug_id', drug.id.toString());",
+                "pm.collectionVariables.set('drug_name', drug.drug_name);",
+                "pm.collectionVariables.set('drug_price', drug.drug_price.toString());",
+                "pm.collectionVariables.set('drug_stock', drug.drug_stock.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/drugs", "host": ["{{base_url}}"], "path": ["api", "drugs"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Registration (Finance)",
+      "description": "财务角色：窗口挂号 (F1-1)、退号 (F1-2)、异常测试",
+      "item": [
+        {
+          "name": "3.1 List initial registers",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "const d = pm.response.json();",
+                "pm.test('Response success', () => { pm.expect(d.success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{finance_token}}" }],
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        },
+        {
+          "name": "3.2 Register Patient A (F1-1)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 201', () => { pm.response.to.have.status(201); });",
+                "pm.test('Case number generated', () => { pm.expect(d.data.case_number).to.not.be.empty; });",
+                "pm.test('Visit state = 1 (已挂号)', () => { pm.expect(d.data.visit_state).to.eql(1); });",
+                "pm.collectionVariables.set('register_a_id', d.data.id.toString());",
+                "pm.collectionVariables.set('case_number_a', d.data.case_number);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"real_name\":\"李雷\",\"gender\":\"男\",\"birthdate\":\"1990-01-01\",\"age\":36,\"deptment_id\":{{doctor_dept_id}},\"employee_id\":{{doctor_user_id}},\"regist_level_id\":{{regist_level_id}},\"settle_category_id\":{{settle_category_id}},\"regist_method\":\"现金\"}" },
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        },
+        {
+          "name": "3.3 Get register by case number",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Case number matches', () => { pm.expect(d.data[0].case_number).to.eql(pm.collectionVariables.get('case_number_a')); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{finance_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/registers?case_number={{case_number_a}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "registers"],
+              "query": [{ "key": "case_number", "value": "{{case_number_a}}" }]
+            }
+          }
+        },
+        {
+          "name": "3.4 Cancel Registration A (F1-2)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Visit state = 4 (已退号)', () => { pm.expect(d.data.visit_state).to.eql(4); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/registers/{{register_a_id}}/cancel", "host": ["{{base_url}}"], "path": ["api", "registers", "{{register_a_id}}", "cancel"] }
+          }
+        },
+        {
+          "name": "3.5 Cancel already-cancelled (409)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 409', () => { pm.response.to.have.status(409); });",
+                "pm.test('Response failure', () => { pm.expect(pm.response.json().success).to.be.false; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/registers/{{register_a_id}}/cancel", "host": ["{{base_url}}"], "path": ["api", "registers", "{{register_a_id}}", "cancel"] }
+          }
+        },
+        {
+          "name": "3.6 Register Patient B (for mainline)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 201', () => { pm.response.to.have.status(201); });",
+                "pm.test('Case number generated', () => { pm.expect(d.data.case_number).to.not.be.empty; });",
+                "pm.test('Visit state = 1', () => { pm.expect(d.data.visit_state).to.eql(1); });",
+                "pm.collectionVariables.set('register_id', d.data.id.toString());",
+                "pm.collectionVariables.set('case_number', d.data.case_number);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"real_name\":\"韩梅梅\",\"gender\":\"女\",\"birthdate\":\"1992-06-15\",\"age\":34,\"deptment_id\":{{doctor_dept_id}},\"employee_id\":{{doctor_user_id}},\"regist_level_id\":{{regist_level_id}},\"settle_category_id\":{{settle_category_id}},\"regist_method\":\"医保\"}" },
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Physician (Consult & Medical Record)",
+      "description": "门诊医生：患者查看、接诊 (F2-1)、病历首页 (F2-2)",
+      "item": [
+        {
+          "name": "4.1 Get patient counts",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Has queued/seen', () => { pm.expect(d.data).to.have.property('queued'); pm.expect(d.data).to.have.property('seen'); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/physician/patients/counts", "host": ["{{base_url}}"], "path": ["api", "physician", "patients", "counts"] }
+          }
+        },
+        {
+          "name": "4.2 List physician patients",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Has patients', () => { pm.expect(d.data).to.be.an('array'); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/physician/patients", "host": ["{{base_url}}"], "path": ["api", "physician", "patients"] }
+          }
+        },
+        {
+          "name": "4.3 Consult patient (F2-1)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Visit state = 2 (接诊)', () => { pm.expect(d.data.visit_state).to.eql(2); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/consult", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "consult"] }
+          }
+        },
+        {
+          "name": "4.4 Double consult (409)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 409', () => { pm.response.to.have.status(409); });",
+                "pm.test('Response failure', () => { pm.expect(pm.response.json().success).to.be.false; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/consult", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "consult"] }
+          }
+        },
+        {
+          "name": "4.5 Save medical record (F2-2)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Response success', () => { pm.expect(pm.response.json().success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"readme\":\"咳嗽三天，伴有咽痛\",\"present\":\"无发热，无呼吸困难\",\"present_treat\":\"自行服用感冒药无效\",\"history\":\"既往体健\",\"allergy\":\"无\",\"physique\":\"T37.2 P80 R20 BP120/80\",\"proposal\":\"建议完善相关检查\",\"disease_ids\":[{{disease_id}}]}" },
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/medical-record", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "medical-record"] }
+          }
+        },
+        {
+          "name": "4.6 Get medical record (F2-2)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Readme matches', () => { pm.expect(d.data.readme).to.include('咳嗽'); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/medical-record", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "medical-record"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Physician (Orders)",
+      "description": "门诊医生：检查申请 (F2-3)、检验申请 (F2-4)",
+      "item": [
+        {
+          "name": "5.1 Create check request (F2-3)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 201', () => { pm.response.to.have.status(201); });",
+                "pm.expect(d.success).to.be.true;",
+                "pm.collectionVariables.set('check_req_id', d.data.id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"register_id\":{{register_id}},\"tech_id\":{{check_tech_id}},\"info\":\"排查肺炎\",\"position\":\"胸部\"}" },
+            "url": { "raw": "{{base_url}}/api/check-requests", "host": ["{{base_url}}"], "path": ["api", "check-requests"] }
+          }
+        },
+        {
+          "name": "5.2 Create inspection request (F2-4)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 201', () => { pm.response.to.have.status(201); });",
+                "pm.expect(d.success).to.be.true;",
+                "pm.collectionVariables.set('insp_req_id', d.data.id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"register_id\":{{register_id}},\"tech_id\":{{insp_tech_id}},\"info\":\"常规检验\"}" },
+            "url": { "raw": "{{base_url}}/api/inspection-requests", "host": ["{{base_url}}"], "path": ["api", "inspection-requests"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Charge (Finance) - Round 1",
+      "description": "财务角色：查询待缴费 → 收费结算检查+检验 (F1-3)",
+      "item": [
+        {
+          "name": "6.1 Get pending charges (check+inspection)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('2 items pending', () => { pm.expect(d.data.items).to.be.an('array').with.lengthOf.at.least(2); });",
+                "pm.test('Total > 0', () => { pm.expect(d.data.total).to.be.above(0); });",
+                "const refs = d.data.items.map(i => ({item_type: i.item_type, id: i.id}));",
+                "pm.collectionVariables.set('pending_items_json', JSON.stringify(refs));"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{finance_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/charges/pending?case_number={{case_number}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "charges", "pending"],
+              "query": [{ "key": "case_number", "value": "{{case_number}}" }]
+            }
+          }
+        },
+        {
+          "name": "6.2 Charge for check + inspection (F1-3)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const items = JSON.parse(pm.collectionVariables.get('pending_items_json') || '[]');",
+                  "const body = {case_number: pm.collectionVariables.get('case_number'), items: items};",
+                  "pm.request.body.update({mode: 'raw', raw: JSON.stringify(body)});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "pm.test('Charged 2 items', () => { pm.expect(d.data.count).to.be.at.least(2); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{base_url}}/api/charges", "host": ["{{base_url}}"], "path": ["api", "charges"] }
+          }
+        },
+        {
+          "name": "6.3 Check charge records",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Records exist', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{finance_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/charge-records?case_number={{case_number}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "charge-records"],
+              "query": [{ "key": "case_number", "value": "{{case_number}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Tech Doctor Flow (Check & Inspection)",
+      "description": "检查/检验医生：受理 (F3-1/F4-1) → 执行 (F3-2/F4-2) → 结果录入 (F3-3/F4-3)",
+      "item": [
+        {
+          "name": "7.1 Check - pending patients",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Has pending', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{checker_token}}" }],
+            "url": { "raw": "{{base_url}}/api/check/pending", "host": ["{{base_url}}"], "path": ["api", "check", "pending"] }
+          }
+        },
+        {
+          "name": "7.2 Check - list requests",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('1 check request with 已缴费', () => { pm.expect(d.data).to.be.an('array').with.lengthOf.at.least(1); pm.expect(d.data[0].state).to.eql('已缴费'); });",
+                "pm.collectionVariables.set('check_req_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{checker_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/check-requests?register_id={{register_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "check-requests"],
+              "query": [{ "key": "register_id", "value": "{{register_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "7.3 Check - execute (F3-2)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Response success', () => { pm.expect(pm.response.json().success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{checker_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/check-requests/{{check_req_id}}/execute", "host": ["{{base_url}}"], "path": ["api", "check-requests", "{{check_req_id}}", "execute"] }
+          }
+        },
+        {
+          "name": "7.4 Check - record result (F3-3)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Response success', () => { pm.expect(pm.response.json().success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{checker_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"result\":\"双肺纹理清晰，未见明显异常\"}" },
+            "url": { "raw": "{{base_url}}/api/check-requests/{{check_req_id}}/result", "host": ["{{base_url}}"], "path": ["api", "check-requests", "{{check_req_id}}", "result"] }
+          }
+        },
+        {
+          "name": "7.5 Inspection - pending patients",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Has pending', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{inspector_token}}" }],
+            "url": { "raw": "{{base_url}}/api/inspection/pending", "host": ["{{base_url}}"], "path": ["api", "inspection", "pending"] }
+          }
+        },
+        {
+          "name": "7.6 Inspection - list requests",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('1 inspection request with 已缴费', () => { pm.expect(d.data).to.be.an('array').with.lengthOf.at.least(1); pm.expect(d.data[0].state).to.eql('已缴费'); });",
+                "pm.collectionVariables.set('insp_req_id', d.data[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{inspector_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/inspection-requests?register_id={{register_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "inspection-requests"],
+              "query": [{ "key": "register_id", "value": "{{register_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "7.7 Inspection - execute (F4-2)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Response success', () => { pm.expect(pm.response.json().success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{inspector_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/inspection-requests/{{insp_req_id}}/execute", "host": ["{{base_url}}"], "path": ["api", "inspection-requests", "{{insp_req_id}}", "execute"] }
+          }
+        },
+        {
+          "name": "7.8 Inspection - record result (F4-3)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Response success', () => { pm.expect(pm.response.json().success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{inspector_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"result\":\"白细胞正常，各项指标均在参考范围内\"}" },
+            "url": { "raw": "{{base_url}}/api/inspection-requests/{{insp_req_id}}/result", "host": ["{{base_url}}"], "path": ["api", "inspection-requests", "{{insp_req_id}}", "result"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 - Physician (Results, Diagnosis, Prescription)",
+      "description": "门诊医生：查看结果 (F2-6/F2-7)、确诊 (F2-8)、开立处方 (F2-9)",
+      "item": [
+        {
+          "name": "8.1 View check results (F2-6)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('State is 已出结果', () => { pm.expect(d.data[0].state).to.eql('已出结果'); });",
+                "pm.test('Result not empty', () => { pm.expect(d.data[0].result).to.not.be.empty; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/check-requests/results?register_id={{register_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "check-requests", "results"],
+              "query": [{ "key": "register_id", "value": "{{register_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "8.2 View inspection results (F2-7)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('State is 已出结果', () => { pm.expect(d.data[0].state).to.eql('已出结果'); });",
+                "pm.test('Result not empty', () => { pm.expect(d.data[0].result).to.not.be.empty; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/inspection-requests/results?register_id={{register_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "inspection-requests", "results"],
+              "query": [{ "key": "register_id", "value": "{{register_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "8.3 Diagnose patient (F2-8)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Visit state = 3 (看诊结束)', () => { pm.expect(pm.response.json().data.visit_state).to.eql(3); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"diagnosis\":\"急性上呼吸道感染\",\"cure\":\"多休息多饮水，清淡饮食\",\"finish\":true}" },
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/diagnosis", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "diagnosis"] }
+          }
+        },
+        {
+          "name": "8.4 Write prescription (F2-9)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 201', () => { pm.response.to.have.status(201); });",
+                "pm.test('Prescription count >= 1', () => { pm.expect(d.data.count).to.be.at.least(1); });",
+                "pm.test('Total = price * count', () => { pm.expect(d.data.total).to.be.closeTo(parseFloat(pm.collectionVariables.get('drug_price')) * 2, 0.01); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"items\":[{\"drug_id\":{{drug_id}},\"drug_usage\":\"口服 一日三次\",\"drug_number\":2}]}" },
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/prescriptions", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "prescriptions"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 - Prescription Charge & Pharmacy",
+      "description": "处方收费 (F1-3) + 药房发药 (F5-1) + 交易记录 (F5-4)",
+      "item": [
+        {
+          "name": "9.1 Get pending charges (prescription)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('1 item: prescription', () => { pm.expect(d.data.items).to.be.an('array').with.lengthOf(1); pm.expect(d.data.items[0].item_type).to.eql('prescription'); });",
+                "const refs = d.data.items.map(i => ({item_type: i.item_type, id: i.id}));",
+                "pm.collectionVariables.set('pending_items_json', JSON.stringify(refs));"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{finance_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/charges/pending?case_number={{case_number}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "charges", "pending"],
+              "query": [{ "key": "case_number", "value": "{{case_number}}" }]
+            }
+          }
+        },
+        {
+          "name": "9.2 Charge for prescription (F1-3)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const items = JSON.parse(pm.collectionVariables.get('pending_items_json') || '[]');",
+                  "const body = {case_number: pm.collectionVariables.get('case_number'), items: items};",
+                  "pm.request.body.update({mode: 'raw', raw: JSON.stringify(body)});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                  "pm.test('Charged 1 item', () => { pm.expect(d.data.count).to.eql(1); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{base_url}}/api/charges", "host": ["{{base_url}}"], "path": ["api", "charges"] }
+          }
+        },
+        {
+          "name": "9.3 Pharmacy - list prescriptions (F5-1)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Drug state = 已缴费', () => { pm.expect(d.data.items[0].drug_state).to.eql('已缴费'); });",
+                "pm.collectionVariables.set('prescription_id', d.data.items[0].id.toString());"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{pharmacist_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/pharmacy/prescriptions?case_number={{case_number}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pharmacy", "prescriptions"],
+              "query": [{ "key": "case_number", "value": "{{case_number}}" }]
+            }
+          }
+        },
+        {
+          "name": "9.4 Pharmacy - dispense (F5-1)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Response success', () => { pm.expect(pm.response.json().success).to.be.true; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{pharmacist_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/pharmacy/prescriptions/{{prescription_id}}/dispense", "host": ["{{base_url}}"], "path": ["api", "pharmacy", "prescriptions", "{{prescription_id}}", "dispense"] }
+          }
+        },
+        {
+          "name": "9.5 Pharmacy - transactions (F5-4)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const d = pm.response.json();",
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });",
+                "pm.test('Transactions exist', () => { pm.expect(d.data).to.be.an('array').that.is.not.empty; });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{pharmacist_token}}" }],
+            "url": { "raw": "{{base_url}}/api/pharmacy/transactions", "host": ["{{base_url}}"], "path": ["api", "pharmacy", "transactions"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Error & Edge Cases",
+      "description": "RBAC 跨角色鉴权、参数校验、边界条件",
+      "item": [
+        {
+          "name": "10.1 Doctor cannot register patient (403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 403', () => { pm.response.to.have.status(403); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"real_name\":\"测试\",\"gender\":\"男\",\"deptment_id\":1,\"employee_id\":1,\"regist_level_id\":1,\"settle_category_id\":1}" },
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        },
+        {
+          "name": "10.2 Finance cannot consult (403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 403', () => { pm.response.to.have.status(403); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/consult", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "consult"] }
+          }
+        },
+        {
+          "name": "10.3 Checker cannot charge (403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 403', () => { pm.response.to.have.status(403); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{checker_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"case_number\":\"MR0001\",\"items\":[]}" },
+            "url": { "raw": "{{base_url}}/api/charges", "host": ["{{base_url}}"], "path": ["api", "charges"] }
+          }
+        },
+        {
+          "name": "10.4 Doctor cannot view pending checks (403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 403', () => { pm.response.to.have.status(403); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctor_token}}" }],
+            "url": { "raw": "{{base_url}}/api/check/pending", "host": ["{{base_url}}"], "path": ["api", "check", "pending"] }
+          }
+        },
+        {
+          "name": "10.5 Finance cannot dispense (403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 403', () => { pm.response.to.have.status(403); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/pharmacy/prescriptions/1/dispense", "host": ["{{base_url}}"], "path": ["api", "pharmacy", "prescriptions", "1", "dispense"] }
+          }
+        },
+        {
+          "name": "10.6 Root can GET (read-only OK)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => { pm.response.to.have.status(200); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{root_token}}" }],
+            "url": { "raw": "{{base_url}}/api/departments", "host": ["{{base_url}}"], "path": ["api", "departments"] }
+          }
+        },
+        {
+          "name": "10.7 Root cannot POST (403)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 403', () => { pm.response.to.have.status(403); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{root_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"real_name\":\"x\",\"gender\":\"男\",\"deptment_id\":1,\"employee_id\":1,\"regist_level_id\":1,\"settle_category_id\":1}" },
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        },
+        {
+          "name": "10.8 Unauthenticated access (401)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 401', () => { pm.response.to.have.status(401); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/departments", "host": ["{{base_url}}"], "path": ["api", "departments"] }
+          }
+        },
+        {
+          "name": "10.9 Register missing fields (422)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 422', () => { pm.response.to.have.status(422); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"real_name\":\"仅姓名\"}" },
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        },
+        {
+          "name": "10.10 Register unknown level (404)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 404', () => { pm.response.to.have.status(404); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"real_name\":\"测试\",\"gender\":\"男\",\"deptment_id\":{{doctor_dept_id}},\"employee_id\":{{doctor_user_id}},\"regist_level_id\":99999,\"settle_category_id\":{{settle_category_id}}}" },
+            "url": { "raw": "{{base_url}}/api/registers", "host": ["{{base_url}}"], "path": ["api", "registers"] }
+          }
+        },
+        {
+          "name": "10.11 Charge: unknown patient (404)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 404', () => { pm.response.to.have.status(404); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{finance_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/charges/pending?case_number=NONEXISTENT",
+              "host": ["{{base_url}}"],
+              "path": ["api", "charges", "pending"],
+              "query": [{ "key": "case_number", "value": "NONEXISTENT" }]
+            }
+          }
+        },
+        {
+          "name": "10.12 Charge: empty items (422)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 422', () => { pm.response.to.have.status(422); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{finance_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"case_number\":\"MR0001\",\"items\":[]}" },
+            "url": { "raw": "{{base_url}}/api/charges", "host": ["{{base_url}}"], "path": ["api", "charges"] }
+          }
+        },
+        {
+          "name": "10.13 Dispense: non-existent prescription (404)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 404', () => { pm.response.to.have.status(404); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{pharmacist_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/pharmacy/prescriptions/99999/dispense", "host": ["{{base_url}}"], "path": ["api", "pharmacy", "prescriptions", "99999", "dispense"] }
+          }
+        },
+        {
+          "name": "10.14 Prescription: unknown drug (404)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 404', () => { pm.response.to.have.status(404); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"items\":[{\"drug_id\":99999,\"drug_usage\":\"口服\",\"drug_number\":1}]}" },
+            "url": { "raw": "{{base_url}}/api/physician/registers/{{register_id}}/prescriptions", "host": ["{{base_url}}"], "path": ["api", "physician", "registers", "{{register_id}}", "prescriptions"] }
+          }
+        },
+        {
+          "name": "10.15 Tech type mismatch (422)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 422', () => { pm.response.to.have.status(422); });"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"register_id\":{{register_id}},\"tech_id\":{{insp_tech_id}},\"info\":\"错误类型\"}" },
+            "url": { "raw": "{{base_url}}/api/check-requests", "host": ["{{base_url}}"], "path": ["api", "check-requests"] }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "seed_password", "value": "Passw0rd!", "type": "string" },
+    { "key": "tech_type_check", "value": "检查", "type": "string" },
+    { "key": "tech_type_inspection", "value": "检验", "type": "string" }
+  ]
+}
