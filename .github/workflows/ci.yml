@@ -28,6 +28,11 @@ jobs:
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.6.0
+          # Compile golangci-lint with the runner's Go toolchain (1.26.x). The
+          # released v2.6.0 binary is built with Go 1.25 and refuses to lint a
+          # module whose go directive targets 1.26 ("language version ... lower
+          # than the targeted Go version").
+          install-mode: goinstall
 
   test:
     name: Test (MySQL 8) & Coverage
