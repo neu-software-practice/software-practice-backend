@@ -25,9 +25,14 @@ jobs:
             echo "These files are not gofmt-clean:"; echo "${unformatted}"; exit 1
           fi
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.6.0
+          # Compile golangci-lint with the runner's Go toolchain (1.26.x). The
+          # released v2.6.0 binary is built with Go 1.25 and refuses to lint a
+          # module whose go directive targets 1.26 ("language version ... lower
+          # than the targeted Go version").
+          install-mode: goinstall
 
   test:
     name: Test (MySQL 8) & Coverage
@@ -46,7 +51,7 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_DSN: "root:rootpw@tcp(127.0.0.1:3306)/his?charset=utf8mb4&parseTime=True&loc=Local&allowPublicKeyRetrieval=true"
+      DATABASE_DSN: "root:rootpw@tcp(127.0.0.1:3306)/his?charset=utf8mb4&parseTime=True&loc=Local"
       JWT_SECRET: "ci-secret-change-me-0123456789-abcdef"
       SEED_DEFAULT_PASSWORD: "Passw0rd!"
     steps:

@@ -10,10 +10,10 @@ his-server
 his-migrate
 his-seed
 
-# Test & coverage
+# Test & coverage (generated artifacts at repo root only — keep scripts/coverage.sh tracked)
 *.out
 *.test
-coverage*
+/coverage*
 cover.out
 
 # Editor / OS
