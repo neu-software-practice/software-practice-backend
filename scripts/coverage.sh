@@ -2,9 +2,11 @@
 # Fail if total coverage in the given profile is below the threshold.
 # Usage: scripts/coverage.sh cover.out 80
 #
-# Excluded from the gate: process entrypoints (cmd/*) and the live-MySQL adapters
-# (internal/migrate, internal/pkg/database). These need a real database and are
-# validated by the CI `make migrate` / `make seed` steps instead of unit tests.
+# Excluded from the gate: process entrypoints (cmd/*), the live-MySQL adapters
+# (internal/migrate — exercised by every integration test via testutil.NewDB but
+# cross-package coverage instrumentation does not capture it; validated by all
+# tests passing), the database factory (internal/pkg/database — validated by CI
+# `make seed`), and generated Swagger docs (internal/swagger).
 set -euo pipefail
 
 profile="${1:-cover.out}"

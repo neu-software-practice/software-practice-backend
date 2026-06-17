@@ -7,8 +7,9 @@ import (
 	"github.com/neu-software-practice/software-practice-backend/internal/model"
 )
 
-// TestNewDB_RoundTrip is a smoke test for the harness: it must auto-migrate all
-// tables and round-trip a row carrying date/datetime/decimal columns.
+// TestNewDB_RoundTrip is a smoke test for the harness: it must create an isolated
+// MySQL database, apply golang-migrate migrations, and round-trip a row carrying
+// date/datetime/decimal columns.
 func TestNewDB_RoundTrip(t *testing.T) {
 	db := NewDB(t)
 

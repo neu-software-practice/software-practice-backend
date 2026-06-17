@@ -1,0 +1,17 @@
+# Dedicated MySQL 8 instance for integration tests.
+# Exposed on port 3307 to avoid conflicting with the development MySQL on 3306
+# (docker-compose.yml). Uses tmpfs so no test data persists across runs.
+services:
+  mysql-test:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+    ports:
+      - "3307:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
