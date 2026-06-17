@@ -43,7 +43,15 @@ func (h *RegistrationHandler) Register(c *gin.Context) {
 	response.Created(c, dto.NewRegisterBrief(reg))
 }
 
-// Cancel voids an un-consulted registration (F1-2 退号).
+// Cancel godoc
+// @Summary  窗口退号 (F1-2)
+// @Tags     registration
+// @Produce  json
+// @Security BearerAuth
+// @Param    id   path      int  true  "挂号ID"
+// @Success  200  {object}  response.Body
+// @Failure  409  {object}  response.Body
+// @Router   /registers/{id}/cancel [post]
 func (h *RegistrationHandler) Cancel(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {
@@ -57,7 +65,18 @@ func (h *RegistrationHandler) Cancel(c *gin.Context) {
 	response.Success(c, dto.NewRegisterBrief(reg))
 }
 
-// List queries registration records (F1-2 查询).
+// List godoc
+// @Summary  挂号记录查询 (F1-2)
+// @Tags     registration
+// @Produce  json
+// @Security BearerAuth
+// @Param    case_number  query     string  false  "病历号"
+// @Param    name         query     string  false  "姓名"
+// @Param    state        query     int     false  "看诊状态(1已挂号/2接诊/3结束/4退号)"
+// @Param    page         query     int     false  "页码"
+// @Param    limit        query     int     false  "每页条数"
+// @Success  200          {object}  response.Body
+// @Router   /registers [get]
 func (h *RegistrationHandler) List(c *gin.Context) {
 	page := parsePage(c)
 	f := repository.RegisterFilter{CaseNumber: c.Query("case_number"), Name: c.Query("name")}

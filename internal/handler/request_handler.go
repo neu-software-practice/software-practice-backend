@@ -25,15 +25,9 @@ func NewRequestHandler[T any, PT repository.RequestPtr[T]](svc *service.RequestS
 	return &RequestHandler[T, PT]{svc: svc}
 }
 
-// Create godoc
-// @Summary  开立检查/检验/处置申请 (F2-3/F2-4/F2-10, inspection/disposal 同构)
-// @Tags     request
-// @Accept   json
-// @Produce  json
-// @Security BearerAuth
-// @Param    body  body      dto.CreateRequestInput  true  "申请信息"
-// @Success  201   {object}  response.Body
-// @Router   /check-requests [post]
+// Create opens a request (F2-3/F2-4/F2-10). The three concrete paths
+// (/check-requests, /inspection-requests, /disposal-requests) are documented in
+// api_docs.go since one generic method cannot carry three @Router annotations.
 func (h *RequestHandler[T, PT]) Create(c *gin.Context) {
 	var in dto.CreateRequestInput
 	if !bindJSON(c, &in) {

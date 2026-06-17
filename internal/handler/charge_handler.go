@@ -60,7 +60,14 @@ func (h *ChargeHandler) Charge(c *gin.Context) {
 	response.Success(c, res)
 }
 
-// RefundPending lists a visit's refundable (paid) items (F1-4).
+// RefundPending godoc
+// @Summary  可退费项目 (F1-4)
+// @Tags     charge
+// @Produce  json
+// @Security BearerAuth
+// @Param    case_number  query     string  true  "病历号"
+// @Success  200          {object}  response.Body
+// @Router   /charges/refund-pending [get]
 func (h *ChargeHandler) RefundPending(c *gin.Context) {
 	caseNumber := c.Query("case_number")
 	if caseNumber == "" {
@@ -75,7 +82,15 @@ func (h *ChargeHandler) RefundPending(c *gin.Context) {
 	response.Success(c, resp)
 }
 
-// Refund reverses selected paid items (F1-4).
+// Refund godoc
+// @Summary  退费 (F1-4)
+// @Tags     charge
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    body  body      dto.RefundRequest  true  "退费项目"
+// @Success  200   {object}  response.Body
+// @Router   /charges/refund [post]
 func (h *ChargeHandler) Refund(c *gin.Context) {
 	var in dto.RefundRequest
 	if !bindJSON(c, &in) {
@@ -89,7 +104,18 @@ func (h *ChargeHandler) Refund(c *gin.Context) {
 	response.Success(c, res)
 }
 
-// Records lists the financial ledger for a visit (F1-5 / F2-11).
+// Records godoc
+// @Summary  费用记录查询 (F1-5 财务 / F2-11 门诊)
+// @Tags     charge
+// @Produce  json
+// @Security BearerAuth
+// @Param    case_number  query     string  false  "病历号"
+// @Param    register_id  query     int     false  "挂号ID"
+// @Param    action       query     string  false  "动作(收费/退费)"
+// @Param    page         query     int     false  "页码"
+// @Param    limit        query     int     false  "每页条数"
+// @Success  200          {object}  response.Body
+// @Router   /charge-records [get]
 func (h *ChargeHandler) Records(c *gin.Context) {
 	page := parsePage(c)
 	rows, total, err := h.svc.Records(c.Request.Context(), c.Query("case_number"), parseUintQuery(c, "register_id"), c.Query("action"), page)

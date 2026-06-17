@@ -40,6 +40,50 @@ definitions:
     - register_id
     - tech_id
     type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.DiagnoseRequest:
+    properties:
+      cure:
+        type: string
+      diagnosis:
+        type: string
+      finish:
+        type: boolean
+    required:
+    - diagnosis
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.DrugRequest:
+    properties:
+      drug_code:
+        type: string
+      drug_dosage:
+        type: string
+      drug_format:
+        type: string
+      drug_name:
+        type: string
+      drug_price:
+        minimum: 0
+        type: number
+      drug_stock:
+        minimum: 0
+        type: integer
+      drug_type:
+        type: string
+      drug_unit:
+        type: string
+      manufacturer:
+        type: string
+      mnemonic_code:
+        type: string
+    required:
+    - drug_code
+    - drug_name
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput:
+    properties:
+      executor_id:
+        type: integer
+    type: object
   github_com_neu-software-practice_software-practice-backend_internal_dto.LoginRequest:
     properties:
       password:
@@ -49,6 +93,65 @@ definitions:
     required:
     - password
     - username
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.MedicalRecordRequest:
+    properties:
+      allergy:
+        type: string
+      careful:
+        type: string
+      disease_ids:
+        items:
+          type: integer
+        type: array
+      history:
+        type: string
+      physique:
+        type: string
+      present:
+        type: string
+      present_treat:
+        type: string
+      proposal:
+        type: string
+      readme:
+        type: string
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionItemInput:
+    properties:
+      drug_id:
+        type: integer
+      drug_number:
+        minimum: 1
+        type: integer
+      drug_usage:
+        type: string
+    required:
+    - drug_id
+    - drug_number
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionItemInput'
+        minItems: 1
+        type: array
+    required:
+    - items
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.RefundRequest:
+    properties:
+      case_number:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ChargeItemRef'
+        minItems: 1
+        type: array
+    required:
+    - case_number
+    - items
     type: object
   github_com_neu-software-practice_software-practice-backend_internal_dto.RegisterRequest:
     properties:
@@ -86,6 +189,22 @@ definitions:
     - real_name
     - regist_level_id
     - settle_category_id
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput:
+    properties:
+      inputter_id:
+        type: integer
+      result:
+        type: string
+    required:
+    - result
+    type: object
+  github_com_neu-software-practice_software-practice-backend_internal_dto.StockRequest:
+    properties:
+      delta:
+        type: integer
+    required:
+    - delta
     type: object
   github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body:
     properties:
@@ -162,6 +281,41 @@ paths:
       summary: 当前用户
       tags:
       - auth
+  /charge-records:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 挂号ID
+        in: query
+        name: register_id
+        type: integer
+      - description: 动作(收费/退费)
+        in: query
+        name: action
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 费用记录查询 (F1-5 财务 / F2-11 门诊)
+      tags:
+      - charge
   /charges:
     post:
       consumes:
@@ -205,12 +359,78 @@ paths:
       summary: 待缴费项目 (F1-3)
       tags:
       - charge
-  /check-requests:
+  /charges/refund:
     post:
       consumes:
       - application/json
       parameters:
-      - description: 申请信息
+      - description: 退费项目
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.RefundRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 退费 (F1-4)
+      tags:
+      - charge
+  /charges/refund-pending:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 可退费项目 (F1-4)
+      tags:
+      - charge
+  /check-requests:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      - description: 状态(默认 已缴费)
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 患者检查项目 (F3-2)
+      tags:
+      - check
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 检查申请
         in: body
         name: body
         required: true
@@ -225,9 +445,149 @@ paths:
             $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
       security:
       - BearerAuth: []
-      summary: 开立检查/检验/处置申请 (F2-3/F2-4/F2-10, inspection/disposal 同构)
+      summary: 开立检查申请 (F2-3)
       tags:
-      - request
+      - check
+  /check-requests/{id}/execute:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 检查申请ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 执行医生(默认当前用户)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检查患者录入-分配执行医生 (F3-2)
+      tags:
+      - check
+  /check-requests/{id}/result:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 检查申请ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 检查结果
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检查结果录入 (F3-3)
+      tags:
+      - check
+  /check-requests/manage:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检查管理-患者全部检查申请 (F3-4)
+      tags:
+      - check
+  /check-requests/results:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 查看检查结果 (F2-6)
+      tags:
+      - physician
+  /check/counts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检查统计 (已检查/排队, F3-1)
+      tags:
+      - check
+  /check/pending:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 姓名
+        in: query
+        name: name
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检查申请受理-待检查患者 (F3-1)
+      tags:
+      - check
   /departments:
     get:
       parameters:
@@ -247,6 +607,608 @@ paths:
       summary: 科室列表
       tags:
       - catalog
+  /diseases:
+    get:
+      parameters:
+      - description: 编码/名称/ICD 关键字
+        in: query
+        name: keyword
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 疾病检索 (F2-2)
+      tags:
+      - catalog
+  /disposal-requests:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      - description: 状态(默认 已缴费)
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 患者处置项目 (F6-2)
+      tags:
+      - disposal
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 处置申请
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.CreateRequestInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 开立处置申请 (F2-10)
+      tags:
+      - disposal
+  /disposal-requests/{id}/execute:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 处置申请ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 执行医生(默认当前用户)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 处置患者录入-分配执行医生 (F6-2)
+      tags:
+      - disposal
+  /disposal-requests/{id}/result:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 处置申请ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 处置结果
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 处置结果录入 (F6-3)
+      tags:
+      - disposal
+  /disposal-requests/manage:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 处置管理-患者全部处置申请 (F6-4)
+      tags:
+      - disposal
+  /disposal-requests/results:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 查看处置结果
+      tags:
+      - physician
+  /disposal/counts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 处置统计 (已处置/排队, F6-1)
+      tags:
+      - disposal
+  /disposal/pending:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 姓名
+        in: query
+        name: name
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 处置申请受理-待处置患者 (F6-1)
+      tags:
+      - disposal
+  /doctors:
+    get:
+      parameters:
+      - description: 挂号科室ID
+        in: query
+        name: dept_id
+        type: integer
+      - description: 挂号级别ID
+        in: query
+        name: regist_level_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 出诊医生列表 (F1-1)
+      tags:
+      - catalog
+  /drugs:
+    get:
+      parameters:
+      - description: 编码/名称/拼音码关键字
+        in: query
+        name: keyword
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 药品检索 (F2-9/F5-1)
+      tags:
+      - catalog
+  /inspection-requests:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      - description: 状态(默认 已缴费)
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 患者检验项目 (F4-2)
+      tags:
+      - inspection
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 检验申请
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.CreateRequestInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 开立检验申请 (F2-4)
+      tags:
+      - inspection
+  /inspection-requests/{id}/execute:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 检验申请ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 执行医生(默认当前用户)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检验患者录入-分配执行医生 (F4-2)
+      tags:
+      - inspection
+  /inspection-requests/{id}/result:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 检验申请ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 检验结果
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检验结果录入 (F4-3)
+      tags:
+      - inspection
+  /inspection-requests/manage:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检验管理-患者全部检验申请 (F4-4)
+      tags:
+      - inspection
+  /inspection-requests/results:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 查看检验结果 (F2-7)
+      tags:
+      - physician
+  /inspection/counts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检验统计 (已检验/排队, F4-1)
+      tags:
+      - inspection
+  /inspection/pending:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 姓名
+        in: query
+        name: name
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 检验申请受理-待检验患者 (F4-1)
+      tags:
+      - inspection
+  /medical-technologies:
+    get:
+      parameters:
+      - description: 编码/名称关键字
+        in: query
+        name: keyword
+        type: string
+      - description: 类型(检查/检验/处置)
+        in: query
+        name: type
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 医技项目检索 (F2-3/F2-4/F2-10)
+      tags:
+      - catalog
+  /pharmacy/drugs:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 药品信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.DrugRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 药品入库/新增 (F5-3)
+      tags:
+      - pharmacy
+  /pharmacy/drugs/{id}:
+    delete:
+      parameters:
+      - description: 药品ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 药品删除 (F5-3)
+      tags:
+      - pharmacy
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 药品ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 药品信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.DrugRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 药品信息维护 (F5-3)
+      tags:
+      - pharmacy
+  /pharmacy/drugs/{id}/restock:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 药品ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 库存增量(正数入库)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.StockRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 库存调整/入库 (F5-3)
+      tags:
+      - pharmacy
+  /pharmacy/prescriptions:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        required: true
+        type: string
+      - description: 处方状态(默认 已缴费)
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 待发药/处方查询 (F5-1)
+      tags:
+      - pharmacy
   /pharmacy/prescriptions/{id}/dispense:
     post:
       parameters:
@@ -267,6 +1229,160 @@ paths:
       summary: 药房发药 (F5-1)
       tags:
       - pharmacy
+  /pharmacy/prescriptions/{id}/refund:
+    post:
+      parameters:
+      - description: 处方ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 药房退药 (F5-2)
+      tags:
+      - pharmacy
+  /pharmacy/transactions:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 动作(发药/退药)
+        in: query
+        name: action
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 药品交易记录 (F5-4)
+      tags:
+      - pharmacy
+  /physician/charge-records:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: query
+        name: register_id
+        type: integer
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 费用查询 (F2-11)
+      tags:
+      - physician
+  /physician/history:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 姓名
+        in: query
+        name: name
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 看诊记录 (F2-5)
+      tags:
+      - physician
+  /physician/patients:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 姓名
+        in: query
+        name: name
+        type: string
+      - description: 看诊状态
+        in: query
+        name: state
+        type: integer
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 患者查看 (F2-1)
+      tags:
+      - physician
+  /physician/patients/counts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 患者统计 (排队/已看诊, F2-1)
+      tags:
+      - physician
   /physician/registers/{id}/consult:
     post:
       parameters:
@@ -287,7 +1403,158 @@ paths:
       summary: 创建病历开始看诊 (F2-1)
       tags:
       - physician
+  /physician/registers/{id}/diagnosis:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 挂号ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 诊断结果
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.DiagnoseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 门诊确诊 (F2-8)
+      tags:
+      - physician
+  /physician/registers/{id}/medical-record:
+    get:
+      parameters:
+      - description: 挂号ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 读取病历首页 (F2-2)
+      tags:
+      - physician
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 挂号ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 病历内容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.MedicalRecordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 保存病历首页 (F2-2)
+      tags:
+      - physician
+  /physician/registers/{id}/prescriptions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 挂号ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 处方明细
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 开立处方 (F2-9)
+      tags:
+      - physician
+  /regist-levels:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 挂号级别列表
+      tags:
+      - catalog
   /registers:
+    get:
+      parameters:
+      - description: 病历号
+        in: query
+        name: case_number
+        type: string
+      - description: 姓名
+        in: query
+        name: name
+        type: string
+      - description: 看诊状态(1已挂号/2接诊/3结束/4退号)
+        in: query
+        name: state
+        type: integer
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 挂号记录查询 (F1-2)
+      tags:
+      - registration
     post:
       consumes:
       - application/json
@@ -314,6 +1581,44 @@ paths:
       summary: 窗口挂号
       tags:
       - registration
+  /registers/{id}/cancel:
+    post:
+      parameters:
+      - description: 挂号ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 窗口退号 (F1-2)
+      tags:
+      - registration
+  /settle-categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 结算类别列表
+      tags:
+      - catalog
 securityDefinitions:
   BearerAuth:
     in: header

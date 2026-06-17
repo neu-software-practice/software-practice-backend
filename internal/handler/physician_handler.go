@@ -30,7 +30,18 @@ func (h *PhysicianHandler) listFilter(c *gin.Context) repository.RegisterFilter 
 	return f
 }
 
-// Patients lists the logged-in doctor's patients (F2-1).
+// Patients godoc
+// @Summary  患者查看 (F2-1)
+// @Tags     physician
+// @Produce  json
+// @Security BearerAuth
+// @Param    case_number  query     string  false  "病历号"
+// @Param    name         query     string  false  "姓名"
+// @Param    state        query     int     false  "看诊状态"
+// @Param    page         query     int     false  "页码"
+// @Param    limit        query     int     false  "每页条数"
+// @Success  200          {object}  response.Body
+// @Router   /physician/patients [get]
 func (h *PhysicianHandler) Patients(c *gin.Context) {
 	page := parsePage(c)
 	briefs, total, err := h.svc.Patients(c.Request.Context(), middleware.CurrentEmployeeID(c), h.listFilter(c), page)
@@ -41,7 +52,13 @@ func (h *PhysicianHandler) Patients(c *gin.Context) {
 	response.List(c, briefs, metaFor(page, total))
 }
 
-// Counts returns the F2-1 header counters.
+// Counts godoc
+// @Summary  患者统计 (排队/已看诊, F2-1)
+// @Tags     physician
+// @Produce  json
+// @Security BearerAuth
+// @Success  200  {object}  response.Body
+// @Router   /physician/patients/counts [get]
 func (h *PhysicianHandler) Counts(c *gin.Context) {
 	counts, err := h.svc.PatientCounts(c.Request.Context(), middleware.CurrentEmployeeID(c))
 	if err != nil {
@@ -72,7 +89,14 @@ func (h *PhysicianHandler) Consult(c *gin.Context) {
 	response.Success(c, dto.NewRegisterBrief(reg))
 }
 
-// GetMedicalRecord loads a visit's record (F2-2).
+// GetMedicalRecord godoc
+// @Summary  读取病历首页 (F2-2)
+// @Tags     physician
+// @Produce  json
+// @Security BearerAuth
+// @Param    id   path      int  true  "挂号ID"
+// @Success  200  {object}  response.Body
+// @Router   /physician/registers/{id}/medical-record [get]
 func (h *PhysicianHandler) GetMedicalRecord(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {
@@ -86,7 +110,16 @@ func (h *PhysicianHandler) GetMedicalRecord(c *gin.Context) {
 	response.Success(c, rec)
 }
 
-// SaveMedicalRecord upserts a visit's record (F2-2).
+// SaveMedicalRecord godoc
+// @Summary  保存病历首页 (F2-2)
+// @Tags     physician
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      int                       true  "挂号ID"
+// @Param    body  body      dto.MedicalRecordRequest  true  "病历内容"
+// @Success  200   {object}  response.Body
+// @Router   /physician/registers/{id}/medical-record [put]
 func (h *PhysicianHandler) SaveMedicalRecord(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {
@@ -104,7 +137,17 @@ func (h *PhysicianHandler) SaveMedicalRecord(c *gin.Context) {
 	response.Success(c, rec)
 }
 
-// History lists the doctor's consulted patients (F2-5).
+// History godoc
+// @Summary  看诊记录 (F2-5)
+// @Tags     physician
+// @Produce  json
+// @Security BearerAuth
+// @Param    case_number  query     string  false  "病历号"
+// @Param    name         query     string  false  "姓名"
+// @Param    page         query     int     false  "页码"
+// @Param    limit        query     int     false  "每页条数"
+// @Success  200          {object}  response.Body
+// @Router   /physician/history [get]
 func (h *PhysicianHandler) History(c *gin.Context) {
 	page := parsePage(c)
 	briefs, total, err := h.svc.History(c.Request.Context(), middleware.CurrentEmployeeID(c), h.listFilter(c), page)
@@ -115,7 +158,16 @@ func (h *PhysicianHandler) History(c *gin.Context) {
 	response.List(c, briefs, metaFor(page, total))
 }
 
-// Diagnose records the diagnosis and optionally ends the visit (F2-8).
+// Diagnose godoc
+// @Summary  门诊确诊 (F2-8)
+// @Tags     physician
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      int                  true  "挂号ID"
+// @Param    body  body      dto.DiagnoseRequest  true  "诊断结果"
+// @Success  200   {object}  response.Body
+// @Router   /physician/registers/{id}/diagnosis [put]
 func (h *PhysicianHandler) Diagnose(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {
@@ -133,7 +185,16 @@ func (h *PhysicianHandler) Diagnose(c *gin.Context) {
 	response.Success(c, dto.NewRegisterBrief(reg))
 }
 
-// WritePrescription opens prescription lines (F2-9).
+// WritePrescription godoc
+// @Summary  开立处方 (F2-9)
+// @Tags     physician
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      int                      true  "挂号ID"
+// @Param    body  body      dto.PrescriptionRequest  true  "处方明细"
+// @Success  201   {object}  response.Body
+// @Router   /physician/registers/{id}/prescriptions [post]
 func (h *PhysicianHandler) WritePrescription(c *gin.Context) {
 	id, ok := parseIDParam(c, "id")
 	if !ok {

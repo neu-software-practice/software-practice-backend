@@ -84,6 +84,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/charge-records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "charge"
+                ],
+                "summary": "费用记录查询 (F1-5 财务 / F2-11 门诊)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "动作(收费/退费)",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/charges": {
             "post": {
                 "security": [
@@ -155,7 +211,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/check-requests": {
+        "/charges/refund": {
             "post": {
                 "security": [
                     {
@@ -169,12 +225,120 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "request"
+                    "charge"
                 ],
-                "summary": "开立检查/检验/处置申请 (F2-3/F2-4/F2-10, inspection/disposal 同构)",
+                "summary": "退费 (F1-4)",
                 "parameters": [
                     {
-                        "description": "申请信息",
+                        "description": "退费项目",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.RefundRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/charges/refund-pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "charge"
+                ],
+                "summary": "可退费项目 (F1-4)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "患者检查项目 (F3-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态(默认 已缴费)",
+                        "name": "state",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "开立检查申请 (F2-3)",
+                "parameters": [
+                    {
+                        "description": "检查申请",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -186,6 +350,235 @@ const docTemplate = `{
                 "responses": {
                     "201": {
                         "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check-requests/manage": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "检查管理-患者全部检查申请 (F3-4)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check-requests/results": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "查看检查结果 (F2-6)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check-requests/{id}/execute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "检查患者录入-分配执行医生 (F3-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "检查申请ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "执行医生(默认当前用户)",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check-requests/{id}/result": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "检查结果录入 (F3-3)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "检查申请ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "检查结果",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check/counts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "检查统计 (已检查/排队, F3-1)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/check/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "check"
+                ],
+                "summary": "检查申请受理-待检查患者 (F3-1)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "姓名",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
                         }
@@ -212,6 +605,988 @@ const docTemplate = `{
                         "type": "string",
                         "description": "科室类型(财务/门诊/检查/检验/药房/处置)",
                         "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/diseases": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "疾病检索 (F2-2)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "编码/名称/ICD 关键字",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "患者处置项目 (F6-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态(默认 已缴费)",
+                        "name": "state",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "开立处置申请 (F2-10)",
+                "parameters": [
+                    {
+                        "description": "处置申请",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.CreateRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal-requests/manage": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "处置管理-患者全部处置申请 (F6-4)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal-requests/results": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "查看处置结果",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal-requests/{id}/execute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "处置患者录入-分配执行医生 (F6-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "处置申请ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "执行医生(默认当前用户)",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal-requests/{id}/result": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "处置结果录入 (F6-3)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "处置申请ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "处置结果",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal/counts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "处置统计 (已处置/排队, F6-1)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/disposal/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "disposal"
+                ],
+                "summary": "处置申请受理-待处置患者 (F6-1)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "姓名",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/doctors": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "出诊医生列表 (F1-1)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号科室ID",
+                        "name": "dept_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "挂号级别ID",
+                        "name": "regist_level_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/drugs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "药品检索 (F2-9/F5-1)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "编码/名称/拼音码关键字",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "患者检验项目 (F4-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态(默认 已缴费)",
+                        "name": "state",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "开立检验申请 (F2-4)",
+                "parameters": [
+                    {
+                        "description": "检验申请",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.CreateRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection-requests/manage": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "检验管理-患者全部检验申请 (F4-4)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection-requests/results": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "查看检验结果 (F2-7)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection-requests/{id}/execute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "检验患者录入-分配执行医生 (F4-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "检验申请ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "执行医生(默认当前用户)",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection-requests/{id}/result": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "检验结果录入 (F4-3)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "检验申请ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "检验结果",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection/counts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "检验统计 (已检验/排队, F4-1)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/inspection/pending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inspection"
+                ],
+                "summary": "检验申请受理-待检验患者 (F4-1)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "姓名",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/medical-technologies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "医技项目检索 (F2-3/F2-4/F2-10)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "编码/名称关键字",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "类型(检查/检验/处置)",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/pharmacy/drugs": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "药品入库/新增 (F5-3)",
+                "parameters": [
+                    {
+                        "description": "药品信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.DrugRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/pharmacy/drugs/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "药品信息维护 (F5-3)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "药品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "药品信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.DrugRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "药品删除 (F5-3)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "药品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/pharmacy/drugs/{id}/restock": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "库存调整/入库 (F5-3)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "药品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "库存增量(正数入库)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.StockRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/pharmacy/prescriptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "待发药/处方查询 (F5-1)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "处方状态(默认 已缴费)",
+                        "name": "state",
                         "in": "query"
                     }
                 ],
@@ -258,6 +1633,257 @@ const docTemplate = `{
                 }
             }
         },
+        "/pharmacy/prescriptions/{id}/refund": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "药房退药 (F5-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "处方ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/pharmacy/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pharmacy"
+                ],
+                "summary": "药品交易记录 (F5-4)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "动作(发药/退药)",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/charge-records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "费用查询 (F2-11)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "register_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "看诊记录 (F2-5)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "姓名",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/patients": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "患者查看 (F2-1)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "姓名",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "看诊状态",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/patients/counts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "患者统计 (排队/已看诊, F2-1)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/physician/registers/{id}/consult": {
             "post": {
                 "security": [
@@ -291,7 +1917,251 @@ const docTemplate = `{
                 }
             }
         },
+        "/physician/registers/{id}/diagnosis": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "门诊确诊 (F2-8)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "诊断结果",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.DiagnoseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/registers/{id}/medical-record": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "读取病历首页 (F2-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "保存病历首页 (F2-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "病历内容",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.MedicalRecordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/physician/registers/{id}/prescriptions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "physician"
+                ],
+                "summary": "开立处方 (F2-9)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "处方明细",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/regist-levels": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "挂号级别列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/registers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "registration"
+                ],
+                "summary": "挂号记录查询 (F1-2)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "病历号",
+                        "name": "case_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "姓名",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "看诊状态(1已挂号/2接诊/3结束/4退号)",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -328,6 +2198,69 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/registers/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "registration"
+                ],
+                "summary": "窗口退号 (F1-2)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "挂号ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settle-categories": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "summary": "结算类别列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_pkg_response.Body"
                         }
@@ -396,6 +2329,72 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.DiagnoseRequest": {
+            "type": "object",
+            "required": [
+                "diagnosis"
+            ],
+            "properties": {
+                "cure": {
+                    "type": "string"
+                },
+                "diagnosis": {
+                    "type": "string"
+                },
+                "finish": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.DrugRequest": {
+            "type": "object",
+            "required": [
+                "drug_code",
+                "drug_name"
+            ],
+            "properties": {
+                "drug_code": {
+                    "type": "string"
+                },
+                "drug_dosage": {
+                    "type": "string"
+                },
+                "drug_format": {
+                    "type": "string"
+                },
+                "drug_name": {
+                    "type": "string"
+                },
+                "drug_price": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "drug_stock": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "drug_type": {
+                    "type": "string"
+                },
+                "drug_unit": {
+                    "type": "string"
+                },
+                "manufacturer": {
+                    "type": "string"
+                },
+                "mnemonic_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.ExecuteRequestInput": {
+            "type": "object",
+            "properties": {
+                "executor_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_neu-software-practice_software-practice-backend_internal_dto.LoginRequest": {
             "type": "object",
             "required": [
@@ -408,6 +2407,94 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.MedicalRecordRequest": {
+            "type": "object",
+            "properties": {
+                "allergy": {
+                    "type": "string"
+                },
+                "careful": {
+                    "type": "string"
+                },
+                "disease_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "history": {
+                    "type": "string"
+                },
+                "physique": {
+                    "type": "string"
+                },
+                "present": {
+                    "type": "string"
+                },
+                "present_treat": {
+                    "type": "string"
+                },
+                "proposal": {
+                    "type": "string"
+                },
+                "readme": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionItemInput": {
+            "type": "object",
+            "required": [
+                "drug_id",
+                "drug_number"
+            ],
+            "properties": {
+                "drug_id": {
+                    "type": "integer"
+                },
+                "drug_number": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "drug_usage": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionRequest": {
+            "type": "object",
+            "required": [
+                "items"
+            ],
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.PrescriptionItemInput"
+                    }
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.RefundRequest": {
+            "type": "object",
+            "required": [
+                "case_number",
+                "items"
+            ],
+            "properties": {
+                "case_number": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/github_com_neu-software-practice_software-practice-backend_internal_dto.ChargeItemRef"
+                    }
                 }
             }
         },
@@ -460,6 +2547,31 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "settle_category_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.ResultRequestInput": {
+            "type": "object",
+            "required": [
+                "result"
+            ],
+            "properties": {
+                "inputter_id": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_neu-software-practice_software-practice-backend_internal_dto.StockRequest": {
+            "type": "object",
+            "required": [
+                "delta"
+            ],
+            "properties": {
+                "delta": {
                     "type": "integer"
                 }
             }
