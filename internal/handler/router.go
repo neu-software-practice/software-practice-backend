@@ -5,6 +5,7 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/config"
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
+	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
@@ -15,6 +16,7 @@ type Router struct {
 	Patient   *PatientHandler
 	Visit     *VisitHandler
 	Workbench *WorkbenchHandler
+	Auth      *AuthHandler
 }
 
 // NewRouter creates a new Router.
@@ -22,11 +24,13 @@ func NewRouter(
 	patientSvc *patientsvc.Service,
 	visitSvc *visitsvc.Service,
 	workbenchSvc *wbsvc.Service,
+	authSvc *authsvc.Service,
 ) *Router {
 	return &Router{
 		Patient:   NewPatientHandler(patientSvc),
 		Visit:     NewVisitHandler(visitSvc),
 		Workbench: NewWorkbenchHandler(workbenchSvc),
+		Auth:      NewAuthHandler(authSvc),
 	}
 }
 
@@ -38,6 +42,16 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 	})
 
 	api := engine.Group("/api")
+
+	// Auth routes (public, stricter rate limit: 5 req/min/IP)
+	authGroup := api.Group("/auth")
+	authGroup.Use(middleware.RateLimitMiddleware(5.0/60.0, 5))
+	{
+		authGroup.POST("/register", router.Auth.Register)
+		authGroup.POST("/login", router.Auth.Login)
+		authGroup.POST("/refresh", router.Auth.Refresh)
+		authGroup.POST("/logout", router.Auth.Logout)
+	}
 
 	// Public routes (no auth)
 	api.POST("/patients/verify", router.Patient.VerifyIdentity)

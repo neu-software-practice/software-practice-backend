@@ -45,6 +45,7 @@ func createPatient(ctx context.Context, t *testing.T, repo repository.PatientRep
 		Allergies:           []string{},
 		ChronicDiseases:     []string{},
 		LongTermMedications: []string{},
+		MedicalHistory:      []string{},
 	}
 	if err := repo.Create(ctx, p); err != nil {
 		t.Fatalf("createPatient: %v", err)
@@ -687,4 +688,248 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 			t.Error("card2 not found in ListBySession results")
 		}
 	})
+}
+
+// ---------------------------------------------------------------------------
+// User repository tests
+// ---------------------------------------------------------------------------
+
+func TestUserRepo_CRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	db, cleanup := setupDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	patientRepo := repository.NewPatientRepository(db)
+	userRepo := repository.NewUserRepository(db)
+
+	p := createPatient(ctx, t, patientRepo)
+
+	t.Run("create and find by phone", func(t *testing.T) {
+		user := &model.User{
+			ID:           uuid.New().String(),
+			Phone:        "13800001111",
+			PasswordHash: "$2a$12$fakehashvalue",
+			RealName:     "张三",
+			PatientID:    p.ID,
+		}
+		if err := userRepo.Create(ctx, user); err != nil {
+			t.Fatalf("Create user: %v", err)
+		}
+
+		found, err := userRepo.FindByPhone(ctx, "13800001111")
+		if err != nil {
+			t.Fatalf("FindByPhone: %v", err)
+		}
+		if found.ID != user.ID {
+			t.Errorf("ID = %s, want %s", found.ID, user.ID)
+		}
+		if found.RealName != "张三" {
+			t.Errorf("RealName = %s, want 张三", found.RealName)
+		}
+		if found.PatientID != p.ID {
+			t.Errorf("PatientID = %s, want %s", found.PatientID, p.ID)
+		}
+	})
+
+	t.Run("find by id", func(t *testing.T) {
+		user := &model.User{
+			ID:           uuid.New().String(),
+			Phone:        "13800002222",
+			PasswordHash: "$2a$12$fakehashvalue2",
+			RealName:     "李四",
+			PatientID:    p.ID,
+		}
+		if err := userRepo.Create(ctx, user); err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		found, err := userRepo.FindByID(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("FindByID: %v", err)
+		}
+		if found.Phone != "13800002222" {
+			t.Errorf("Phone = %s, want 13800002222", found.Phone)
+		}
+	})
+
+	t.Run("duplicate phone returns error", func(t *testing.T) {
+		user := &model.User{
+			ID:           uuid.New().String(),
+			Phone:        "13800001111",
+			PasswordHash: "$2a$12$duplicate",
+			PatientID:    p.ID,
+		}
+		err := userRepo.Create(ctx, user)
+		if err == nil {
+			t.Error("expected error for duplicate phone")
+		}
+	})
+
+	t.Run("not found returns ErrUserNotFound", func(t *testing.T) {
+		_, err := userRepo.FindByPhone(ctx, "19999999999")
+		if err != model.ErrUserNotFound {
+			t.Errorf("err = %v, want ErrUserNotFound", err)
+		}
+
+		_, err = userRepo.FindByID(ctx, "nonexistent-id")
+		if err != model.ErrUserNotFound {
+			t.Errorf("err = %v, want ErrUserNotFound", err)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Refresh token repository tests
+// ---------------------------------------------------------------------------
+
+func TestRefreshTokenRepo_CRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	db, cleanup := setupDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	patientRepo := repository.NewPatientRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	tokenRepo := repository.NewRefreshTokenRepository(db)
+
+	p := createPatient(ctx, t, patientRepo)
+	user := &model.User{
+		ID:           uuid.New().String(),
+		Phone:        "13800009999",
+		PasswordHash: "$2a$12$testhash",
+		PatientID:    p.ID,
+	}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("Create user: %v", err)
+	}
+
+	t.Run("create and find by hash", func(t *testing.T) {
+		rt := &model.RefreshToken{
+			ID:        uuid.New().String(),
+			TokenHash: "sha256hashvalue1",
+			UserID:    user.ID,
+			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		}
+		if err := tokenRepo.Create(ctx, rt); err != nil {
+			t.Fatalf("Create token: %v", err)
+		}
+
+		found, err := tokenRepo.FindByTokenHash(ctx, "sha256hashvalue1")
+		if err != nil {
+			t.Fatalf("FindByTokenHash: %v", err)
+		}
+		if found.UserID != user.ID {
+			t.Errorf("UserID = %s, want %s", found.UserID, user.ID)
+		}
+		if found.UsedAt != nil {
+			t.Error("UsedAt should be nil for new token")
+		}
+	})
+
+	t.Run("mark used", func(t *testing.T) {
+		rt := &model.RefreshToken{
+			ID:        uuid.New().String(),
+			TokenHash: "sha256hashvalue2",
+			UserID:    user.ID,
+			ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		}
+		if err := tokenRepo.Create(ctx, rt); err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		if err := tokenRepo.MarkUsed(ctx, rt.ID); err != nil {
+			t.Fatalf("MarkUsed: %v", err)
+		}
+
+		found, err := tokenRepo.FindByTokenHash(ctx, "sha256hashvalue2")
+		if err != nil {
+			t.Fatalf("FindByTokenHash after mark: %v", err)
+		}
+		if found.UsedAt == nil {
+			t.Error("UsedAt should not be nil after MarkUsed")
+		}
+	})
+
+	t.Run("revoke all by user", func(t *testing.T) {
+		for i := 0; i < 3; i++ {
+			rt := &model.RefreshToken{
+				ID:        uuid.New().String(),
+				TokenHash: uuid.New().String(),
+				UserID:    user.ID,
+				ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+			}
+			if err := tokenRepo.Create(ctx, rt); err != nil {
+				t.Fatalf("Create token %d: %v", i, err)
+			}
+		}
+
+		if err := tokenRepo.RevokeAllByUserID(ctx, user.ID); err != nil {
+			t.Fatalf("RevokeAllByUserID: %v", err)
+		}
+
+		// All tokens for this user should be gone
+		_, err := tokenRepo.FindByTokenHash(ctx, "sha256hashvalue1")
+		if err != model.ErrRefreshTokenInvalid {
+			t.Errorf("after revoke, err = %v, want ErrRefreshTokenInvalid", err)
+		}
+	})
+
+	t.Run("not found returns ErrRefreshTokenInvalid", func(t *testing.T) {
+		_, err := tokenRepo.FindByTokenHash(ctx, "nonexistent-hash")
+		if err != model.ErrRefreshTokenInvalid {
+			t.Errorf("err = %v, want ErrRefreshTokenInvalid", err)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Patient medical_history field tests
+// ---------------------------------------------------------------------------
+
+func TestPatientRepo_MedicalHistory(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	db, cleanup := setupDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	repo := repository.NewPatientRepository(db)
+
+	p := &model.PatientProfile{
+		ID:             uuid.New().String(),
+		Name:           "测试既往病史",
+		Gender:         "male",
+		Age:            40,
+		MedicalHistory: []string{"慢性咽炎3年", "2024年阑尾炎手术"},
+	}
+	if err := repo.Create(ctx, p); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	found, err := repo.FindByID(ctx, p.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if len(found.MedicalHistory) != 2 {
+		t.Fatalf("MedicalHistory len = %d, want 2", len(found.MedicalHistory))
+	}
+	if found.MedicalHistory[0] != "慢性咽炎3年" {
+		t.Errorf("MedicalHistory[0] = %s", found.MedicalHistory[0])
+	}
+
+	updated, err := repo.UpdateProfile(ctx, p.ID, model.ProfileUpdateInput{
+		MedicalHistory: []string{"更新后的病史"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+	if len(updated.MedicalHistory) != 1 || updated.MedicalHistory[0] != "更新后的病史" {
+		t.Errorf("updated MedicalHistory = %v", updated.MedicalHistory)
+	}
 }

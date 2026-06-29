@@ -21,10 +21,10 @@ func NewPatientRepository(db *sql.DB) PatientRepository {
 
 func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
 	var p model.PatientProfile
-	var allergiesJSON, chronicJSON, medsJSON string
+	var allergiesJSON, chronicJSON, medsJSON, medHistJSON string
 
 	query := `SELECT id, name, gender, age, phone_masked, id_card_masked,
-		allergies, chronic_diseases, long_term_medications, updated_at
+		allergies, chronic_diseases, long_term_medications, medical_history, updated_at
 		FROM patients WHERE `
 
 	switch credType {
@@ -38,7 +38,7 @@ func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, crede
 
 	err := r.db.QueryRowContext(ctx, query, credential).Scan(
 		&p.ID, &p.Name, &p.Gender, &p.Age, &p.PhoneMasked, &p.IDCardMasked,
-		&allergiesJSON, &chronicJSON, &medsJSON, &p.UpdatedAt,
+		&allergiesJSON, &chronicJSON, &medsJSON, &medHistJSON, &p.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, model.ErrPatientNotFound
@@ -50,20 +50,21 @@ func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, crede
 	p.Allergies = parseJSONStringArray(allergiesJSON)
 	p.ChronicDiseases = parseJSONStringArray(chronicJSON)
 	p.LongTermMedications = parseJSONStringArray(medsJSON)
+	p.MedicalHistory = parseJSONStringArray(medHistJSON)
 
 	return &p, nil
 }
 
 func (r *patientMySQLRepo) FindByID(ctx context.Context, id string) (*model.PatientProfile, error) {
 	var p model.PatientProfile
-	var allergiesJSON, chronicJSON, medsJSON string
+	var allergiesJSON, chronicJSON, medsJSON, medHistJSON string
 
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, name, gender, age, phone_masked, id_card_masked,
-		allergies, chronic_diseases, long_term_medications, updated_at
+		allergies, chronic_diseases, long_term_medications, medical_history, updated_at
 		FROM patients WHERE id = ?`, id,
 	).Scan(&p.ID, &p.Name, &p.Gender, &p.Age, &p.PhoneMasked, &p.IDCardMasked,
-		&allergiesJSON, &chronicJSON, &medsJSON, &p.UpdatedAt)
+		&allergiesJSON, &chronicJSON, &medsJSON, &medHistJSON, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, model.ErrPatientNotFound
 	}
@@ -74,6 +75,7 @@ func (r *patientMySQLRepo) FindByID(ctx context.Context, id string) (*model.Pati
 	p.Allergies = parseJSONStringArray(allergiesJSON)
 	p.ChronicDiseases = parseJSONStringArray(chronicJSON)
 	p.LongTermMedications = parseJSONStringArray(medsJSON)
+	p.MedicalHistory = parseJSONStringArray(medHistJSON)
 
 	return &p, nil
 }
@@ -82,6 +84,7 @@ func (r *patientMySQLRepo) Create(ctx context.Context, patient *model.PatientPro
 	allergiesJSON, _ := json.Marshal(patient.Allergies)
 	chronicJSON, _ := json.Marshal(patient.ChronicDiseases)
 	medsJSON, _ := json.Marshal(patient.LongTermMedications)
+	medHistJSON, _ := json.Marshal(patient.MedicalHistory)
 
 	now := time.Now()
 	patient.CreatedAt = now
@@ -89,11 +92,11 @@ func (r *patientMySQLRepo) Create(ctx context.Context, patient *model.PatientPro
 
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO patients (id, name, gender, age, phone_masked, id_card_masked,
-		allergies, chronic_diseases, long_term_medications, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		allergies, chronic_diseases, long_term_medications, medical_history, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		patient.ID, patient.Name, patient.Gender, patient.Age,
 		patient.PhoneMasked, patient.IDCardMasked,
-		string(allergiesJSON), string(chronicJSON), string(medsJSON),
+		string(allergiesJSON), string(chronicJSON), string(medsJSON), string(medHistJSON),
 		patient.CreatedAt, patient.UpdatedAt,
 	)
 	if err != nil {
@@ -117,14 +120,18 @@ func (r *patientMySQLRepo) UpdateProfile(ctx context.Context, id string, input m
 	if input.LongTermMedications != nil {
 		p.LongTermMedications = input.LongTermMedications
 	}
+	if input.MedicalHistory != nil {
+		p.MedicalHistory = input.MedicalHistory
+	}
 
 	allergiesJSON, _ := json.Marshal(p.Allergies)
 	chronicJSON, _ := json.Marshal(p.ChronicDiseases)
 	medsJSON, _ := json.Marshal(p.LongTermMedications)
+	medHistJSON, _ := json.Marshal(p.MedicalHistory)
 
 	_, err = r.db.ExecContext(ctx,
-		`UPDATE patients SET allergies=?, chronic_diseases=?, long_term_medications=?, updated_at=? WHERE id=?`,
-		string(allergiesJSON), string(chronicJSON), string(medsJSON), time.Now(), id,
+		`UPDATE patients SET allergies=?, chronic_diseases=?, long_term_medications=?, medical_history=?, updated_at=? WHERE id=?`,
+		string(allergiesJSON), string(chronicJSON), string(medsJSON), string(medHistJSON), time.Now(), id,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("update patient profile: %w", err)

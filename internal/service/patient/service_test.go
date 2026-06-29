@@ -322,6 +322,7 @@ func TestGetContext(t *testing.T) {
 				Allergies:           []string{"青霉素"},
 				ChronicDiseases:     []string{"高血压"},
 				LongTermMedications: []string{"阿司匹林"},
+				MedicalHistory:      []string{"腰椎间盘突出"},
 				UpdatedAt:           time.Now(),
 			}, nil
 		},
@@ -347,9 +348,8 @@ func TestGetContext(t *testing.T) {
 	if ctx2.PriorVisit != nil {
 		t.Error("expected PriorVisit to be nil")
 	}
-	// Verify MedicalHistory is populated from ChronicDiseases
-	if len(ctx2.MedicalHistory) != 1 || ctx2.MedicalHistory[0] != "高血压" {
-		t.Errorf("MedicalHistory = %v, want [高血压]", ctx2.MedicalHistory)
+	if len(ctx2.MedicalHistory) != 1 || ctx2.MedicalHistory[0] != "腰椎间盘突出" {
+		t.Errorf("MedicalHistory = %v, want [腰椎间盘突出]", ctx2.MedicalHistory)
 	}
 	if len(ctx2.LongTermMedications) != 1 || ctx2.LongTermMedications[0] != "阿司匹林" {
 		t.Errorf("LongTermMedications = %v, want [阿司匹林]", ctx2.LongTermMedications)
@@ -490,6 +490,7 @@ func TestGetContext_ListError(t *testing.T) {
 				Allergies:           []string{"青霉素"},
 				ChronicDiseases:     []string{"高血压"},
 				LongTermMedications: []string{"阿司匹林"},
+				MedicalHistory:      []string{"2024年阑尾炎手术"},
 				UpdatedAt:           time.Now(),
 			}, nil
 		},
@@ -516,8 +517,8 @@ func TestGetContext_ListError(t *testing.T) {
 	if len(ctx2.Allergies) != 1 || ctx2.Allergies[0] != "青霉素" {
 		t.Errorf("allergies = %v, want [青霉素]", ctx2.Allergies)
 	}
-	if len(ctx2.MedicalHistory) != 1 || ctx2.MedicalHistory[0] != "高血压" {
-		t.Errorf("MedicalHistory = %v, want [高血压]", ctx2.MedicalHistory)
+	if len(ctx2.MedicalHistory) != 1 || ctx2.MedicalHistory[0] != "2024年阑尾炎手术" {
+		t.Errorf("MedicalHistory = %v, want [2024年阑尾炎手术]", ctx2.MedicalHistory)
 	}
 }
 
@@ -599,6 +600,9 @@ func TestUpdateProfile_NilSlices(t *testing.T) {
 			if input.LongTermMedications != nil {
 				t.Error("LongTermMedications should be nil")
 			}
+			if input.MedicalHistory != nil {
+				t.Error("MedicalHistory should be nil")
+			}
 			return &model.PatientProfile{
 				ID:                  id,
 				Name:                "张三",
@@ -624,5 +628,89 @@ func TestUpdateProfile_NilSlices(t *testing.T) {
 	}
 	if result.ID != "p001" {
 		t.Errorf("id = %s, want p001", result.ID)
+	}
+}
+
+func TestUpdateProfile_MedicalHistory(t *testing.T) {
+	ctx := context.Background()
+
+	patientRepo := &mockPatientRepo{
+		updateFunc: func(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
+			return &model.PatientProfile{
+				ID:             id,
+				Name:           "张三",
+				MedicalHistory: input.MedicalHistory,
+				UpdatedAt:      time.Now(),
+			}, nil
+		},
+	}
+	visitRepo := &mockVisitRepo{}
+
+	svc := patient.NewService(patientRepo, visitRepo)
+
+	t.Run("set medical history", func(t *testing.T) {
+		input := model.ProfileUpdateInput{
+			PatientID:      "p001",
+			MedicalHistory: []string{"慢性咽炎病史3年", "2024年阑尾炎手术"},
+		}
+		result, err := svc.UpdateProfile(ctx, "p001", input)
+		if err != nil {
+			t.Fatalf("UpdateProfile: %v", err)
+		}
+		if len(result.MedicalHistory) != 2 {
+			t.Errorf("MedicalHistory len = %d, want 2", len(result.MedicalHistory))
+		}
+	})
+
+	t.Run("clear medical history", func(t *testing.T) {
+		input := model.ProfileUpdateInput{
+			PatientID:      "p001",
+			MedicalHistory: []string{},
+		}
+		result, err := svc.UpdateProfile(ctx, "p001", input)
+		if err != nil {
+			t.Fatalf("UpdateProfile: %v", err)
+		}
+		if len(result.MedicalHistory) != 0 {
+			t.Errorf("MedicalHistory len = %d, want 0", len(result.MedicalHistory))
+		}
+	})
+}
+
+func TestVerifyIdentity_NewPatient_EmptyMedicalHistory(t *testing.T) {
+	ctx := context.Background()
+
+	var created *model.PatientProfile
+	patientRepo := &mockPatientRepo{
+		findByCredFunc: func(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+		createFunc: func(ctx context.Context, p *model.PatientProfile) error {
+			created = p
+			return nil
+		},
+	}
+	visitRepo := &mockVisitRepo{}
+
+	svc := patient.NewService(patientRepo, visitRepo)
+
+	input := model.VerifyIdentityInput{
+		CredentialType: "phone",
+		Credential:     "13900001111",
+		Name:           "新患者",
+	}
+
+	_, err := svc.VerifyIdentity(ctx, input)
+	if err != nil {
+		t.Fatalf("VerifyIdentity: %v", err)
+	}
+	if created == nil {
+		t.Fatal("patient was not created")
+	}
+	if created.MedicalHistory == nil {
+		t.Error("MedicalHistory should not be nil")
+	}
+	if len(created.MedicalHistory) != 0 {
+		t.Errorf("MedicalHistory = %v, want empty slice", created.MedicalHistory)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/handler"
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
+	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
@@ -631,11 +632,42 @@ func (m *mockFlowCardRepo) ListBySession(ctx context.Context, sid string) ([]mod
 func (m *mockFlowCardRepo) UpdateStatus(ctx context.Context, id, status string) error { return nil }
 func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) error    { return nil }
 
+type mockUserRepo struct{}
+
+func (m *mockUserRepo) Create(ctx context.Context, user *model.User) error { return nil }
+func (m *mockUserRepo) FindByPhone(ctx context.Context, phone string) (*model.User, error) {
+	return nil, model.ErrUserNotFound
+}
+func (m *mockUserRepo) FindByID(ctx context.Context, id string) (*model.User, error) {
+	return nil, model.ErrUserNotFound
+}
+
+type mockRefreshTokenRepo struct{}
+
+func (m *mockRefreshTokenRepo) Create(ctx context.Context, token *model.RefreshToken) error {
+	return nil
+}
+func (m *mockRefreshTokenRepo) FindByTokenHash(ctx context.Context, hash string) (*model.RefreshToken, error) {
+	return nil, model.ErrRefreshTokenInvalid
+}
+func (m *mockRefreshTokenRepo) MarkUsed(ctx context.Context, id string) error { return nil }
+func (m *mockRefreshTokenRepo) RevokeAllByUserID(ctx context.Context, userID string) error {
+	return nil
+}
+
 // Verify repository interface compliance
 var _ repository.PatientRepository = (*mockPatientRepo)(nil)
 var _ repository.VisitRepository = (*mockVisitRepo)(nil)
 var _ repository.TimelineRepository = (*mockTimelineRepo)(nil)
 var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
+var _ repository.UserRepository = (*mockUserRepo)(nil)
+var _ repository.RefreshTokenRepository = (*mockRefreshTokenRepo)(nil)
+
+const handlerTestSecret = "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
+
+func newTestAuthService() *authsvc.Service {
+	return authsvc.NewService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{}, handlerTestSecret)
+}
 
 // ---------------------------------------------------------------------------
 // Patient Handler tests
@@ -986,8 +1018,9 @@ func TestNewRouter(t *testing.T) {
 	patientSvc := patientsvc.NewService(&mockPatientRepo{}, &mockVisitRepo{})
 	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
 	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{})
+	authSvc := newTestAuthService()
 
-	router := handler.NewRouter(patientSvc, visitSvc, wbSvc)
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc)
 	if router.Patient == nil {
 		t.Error("Patient handler should not be nil")
 	}
@@ -997,6 +1030,9 @@ func TestNewRouter(t *testing.T) {
 	if router.Workbench == nil {
 		t.Error("Workbench handler should not be nil")
 	}
+	if router.Auth == nil {
+		t.Error("Auth handler should not be nil")
+	}
 }
 
 func TestSetupRoutes(t *testing.T) {
@@ -1005,7 +1041,8 @@ func TestSetupRoutes(t *testing.T) {
 	patientSvc := patientsvc.NewService(&mockPatientRepo{}, &mockVisitRepo{})
 	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
 	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{})
-	router := handler.NewRouter(patientSvc, visitSvc, wbSvc)
+	authSvc := newTestAuthService()
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc)
 
 	cfg := &config.Config{
 		ServerMode:         "test",
@@ -1033,6 +1070,10 @@ func TestSetupRoutes(t *testing.T) {
 		"GET /api/visits/:sessionId",
 		"GET /api/visits/:sessionId/snapshot",
 		"POST /api/visits/:sessionId/follow-up",
+		"POST /api/auth/register",
+		"POST /api/auth/login",
+		"POST /api/auth/refresh",
+		"POST /api/auth/logout",
 	}
 
 	for _, expected := range expectedRoutes {

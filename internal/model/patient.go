@@ -15,6 +15,7 @@ type PatientProfile struct {
 	Allergies           []string  `json:"allergies"`
 	ChronicDiseases     []string  `json:"chronicDiseases"`
 	LongTermMedications []string  `json:"longTermMedications"`
+	MedicalHistory      []string  `json:"medicalHistory"`
 	CreatedAt           time.Time `json:"createdAt,omitempty"`
 	UpdatedAt           time.Time `json:"updatedAt"`
 }
@@ -49,6 +50,7 @@ type ProfileUpdateInput struct {
 	Allergies           []string `json:"allergies,omitempty"`
 	ChronicDiseases     []string `json:"chronicDiseases,omitempty"`
 	LongTermMedications []string `json:"longTermMedications,omitempty"`
+	MedicalHistory      []string `json:"medicalHistory,omitempty"`
 }
 
 // VerifyIdentityInput represents the request body for patient identity verification.
