@@ -394,3 +394,97 @@ func TestGetPatientIDNone(t *testing.T) {
 		t.Errorf("got %s, want empty", id)
 	}
 }
+
+func TestGenerateAccessToken(t *testing.T) {
+	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
+	token, err := middleware.GenerateAccessToken("u001", "p001", "13800001111", secret)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken: %v", err)
+	}
+	if token == "" {
+		t.Error("token should not be empty")
+	}
+}
+
+func TestAuthMiddleware_NewTokenFormat(t *testing.T) {
+	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
+
+	token, err := middleware.GenerateAccessToken("u001", "p001", "13800001111", secret)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken: %v", err)
+	}
+
+	r := setupRouter()
+	r.Use(middleware.AuthMiddleware(secret))
+	r.GET("/test", func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		patientID := middleware.GetPatientID(c)
+		if userID != "u001" {
+			t.Errorf("userId = %s, want u001", userID)
+		}
+		if patientID != "p001" {
+			t.Errorf("patientId = %s, want p001", patientID)
+		}
+		c.String(200, "ok")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestAuthMiddleware_LegacyTokenBackwardCompat(t *testing.T) {
+	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
+
+	token, err := middleware.GenerateToken("p001", secret)
+	if err != nil {
+		t.Fatalf("GenerateToken: %v", err)
+	}
+
+	r := setupRouter()
+	r.Use(middleware.AuthMiddleware(secret))
+	r.GET("/test", func(c *gin.Context) {
+		patientID := middleware.GetPatientID(c)
+		if patientID != "p001" {
+			t.Errorf("patientId = %s, want p001", patientID)
+		}
+		c.String(200, "ok")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestGetUserID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("with userId", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Set("userId", "u001")
+
+		id := middleware.GetUserID(c)
+		if id != "u001" {
+			t.Errorf("got %s, want u001", id)
+		}
+	})
+
+	t.Run("without userId", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+		id := middleware.GetUserID(c)
+		if id != "" {
+			t.Errorf("got %s, want empty", id)
+		}
+	})
+}

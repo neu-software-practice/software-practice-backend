@@ -38,6 +38,7 @@ func (s *Service) VerifyIdentity(ctx context.Context, input model.VerifyIdentity
 			Allergies:           []string{},
 			ChronicDiseases:     []string{},
 			LongTermMedications: []string{},
+			MedicalHistory:      []string{},
 			UpdatedAt:           time.Now(),
 		}
 		if input.CredentialType == "phone" {
@@ -70,7 +71,7 @@ func (s *Service) GetContext(ctx context.Context, patientID string) (*model.Pati
 
 	ctx2 := &model.PatientContext{
 		Patient:             *patient,
-		MedicalHistory:      patient.ChronicDiseases,
+		MedicalHistory:      patient.MedicalHistory,
 		Allergies:           patient.Allergies,
 		LongTermMedications: patient.LongTermMedications,
 	}

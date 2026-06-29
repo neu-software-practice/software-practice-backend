@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -36,7 +37,15 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			apperrors.WriteUnauthorized(c, "invalid or expired token")
+			if TokenExpired(err) {
+				apperrors.WriteError(c, apperrors.NewApiError(
+					apperrors.CodeAuthTokenExpired,
+					"access token expired",
+					401,
+				))
+			} else {
+				apperrors.WriteUnauthorized(c, "invalid or expired token")
+			}
 			return
 		}
 
@@ -46,13 +55,23 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		patientID, _ := claims["sub"].(string)
+		userID, _ := claims["sub"].(string)
+
+		patientID, _ := claims["patientId"].(string)
 		if patientID == "" {
-			apperrors.WriteUnauthorized(c, "token missing subject claim")
+			patientID = userID
+		}
+
+		if patientID == "" {
+			apperrors.WriteUnauthorized(c, "token missing required claims")
 			return
 		}
 
+		c.Set("userId", userID)
 		c.Set("patientId", patientID)
+		if phone, ok := claims["phone"].(string); ok {
+			c.Set("phone", phone)
+		}
 		c.Next()
 	}
 }
@@ -77,10 +96,15 @@ func RequirePatientID() gin.HandlerFunc {
 	}
 }
 
-// GenerateToken creates a JWT token for a patient.
-func GenerateToken(patientID, secret string) (string, error) {
+// GenerateAccessToken creates a JWT access token with full claims.
+func GenerateAccessToken(userID, patientID, phone, secret string) (string, error) {
+	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": patientID,
+		"sub":       userID,
+		"patientId": patientID,
+		"phone":     phone,
+		"iat":       now.Unix(),
+		"exp":       now.Add(900 * time.Second).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(secret))
@@ -88,6 +112,20 @@ func GenerateToken(patientID, secret string) (string, error) {
 		return "", fmt.Errorf("generate token: %w", err)
 	}
 	return tokenString, nil
+}
+
+// GenerateToken creates a JWT token for a patient (legacy, used in tests).
+func GenerateToken(patientID, secret string) (string, error) {
+	return GenerateAccessToken(patientID, patientID, "", secret)
+}
+
+// GetUserID extracts the user ID from the Gin context.
+func GetUserID(c *gin.Context) string {
+	id, _ := c.Get("userId")
+	if id == nil {
+		return ""
+	}
+	return id.(string)
 }
 
 // TokenExpired checks if the error is due to token expiration.
