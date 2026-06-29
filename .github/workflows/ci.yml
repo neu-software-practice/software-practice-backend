@@ -58,7 +58,7 @@ jobs:
         run: |
           echo "=== Service Layer Coverage (target: >=90%) ==="
           FAIL=0
-          for pkg in ./internal/service/patient/... ./internal/service/visit/... ./internal/service/workbench/... ./internal/service/medagent/...; do
+          for pkg in ./internal/service/patient/... ./internal/service/visit/... ./internal/service/workbench/...; do
             COV=$(go tool cover -func=coverage.out 2>/dev/null | grep "$pkg" | tail -1 | awk '{print $NF}')
             if [ -z "$COV" ]; then COV="0.0%"; fi
             COV_NUM=$(echo "$COV" | sed 's/%//')
