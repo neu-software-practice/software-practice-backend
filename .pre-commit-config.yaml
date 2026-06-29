@@ -2,8 +2,8 @@ repos:
   - repo: local
     hooks:
       - id: go-test-cover
-        name: Go Test Cover (>=80%)
-        entry: bash -c 'go test -race -cover -short ./...'
+        name: Go Test Cover (service>=90%, total>=80%)
+        entry: bash scripts/precommit-check.sh
         language: system
         pass_filenames: false
         types: [go]
