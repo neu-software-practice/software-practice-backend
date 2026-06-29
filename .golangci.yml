@@ -10,27 +10,25 @@ linters:
     - gosec
     - misspell
     - unconvert
-
-linters-settings:
-  gosec:
-    excludes:
-      - G104
+  settings:
+    gosec:
+      excludes:
+        - G104
+  exclusions:
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - gosec
+      - path: 'tests/'
+        linters:
+          - gosec
+    paths:
+      - tests/
 
 formatters:
   enable:
     - gofmt
     - goimports
-
-issues:
-  exclude-rules:
-    - path: '(.+)_test\.go'
-      linters:
-        - gosec
-    - path: 'tests/'
-      linters:
-        - gosec
-  exclude-dirs:
-    - tests
 
 run:
   timeout: 5m
