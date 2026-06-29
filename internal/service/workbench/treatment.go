@@ -39,7 +39,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		card.Status = string(model.FlowCardStatusProcessing)
 		future := now.Add(30 * time.Minute)
 		card.AppointmentAt = &future
-		s.flowCardRepo.Update(ctx, card)
+		_ = s.flowCardRepo.Update(ctx, card)
 
 		result.Status = session.Status
 		result.Card = card
@@ -47,7 +47,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	case "confirm_arrival":
 		card.ExecutionStatus = string(model.ExecutionStatusArrived)
-		s.flowCardRepo.Update(ctx, card)
+		_ = s.flowCardRepo.Update(ctx, card)
 
 		result.Status = session.Status
 		result.Card = card
@@ -55,7 +55,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	case "start":
 		card.ExecutionStatus = string(model.ExecutionStatusInProgress)
-		s.flowCardRepo.Update(ctx, card)
+		_ = s.flowCardRepo.Update(ctx, card)
 
 		result.Status = session.Status
 		result.Card = card
@@ -65,7 +65,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		card.ExecutionStatus = string(model.ExecutionStatusCompleted)
 		card.Status = string(model.FlowCardStatusCompleted)
 		card.HandledAt = &now
-		s.flowCardRepo.Update(ctx, card)
+		_ = s.flowCardRepo.Update(ctx, card)
 
 		// Complete the session
 		reason := "completed"
@@ -96,7 +96,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 			"治疗完成",
 			"治疗已全部完成，就诊结束",
 		)
-		s.timelineRepo.Append(ctx, &termTL)
+		_ = s.timelineRepo.Append(ctx, &termTL)
 
 		result.Status = string(model.VisitStatusCompleted)
 		result.Card = card
@@ -107,7 +107,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		card.ExecutionStatus = string(model.ExecutionStatusCanceled)
 		card.Status = string(model.FlowCardStatusInvalidated)
 		card.HandledAt = &now
-		s.flowCardRepo.Update(ctx, card)
+		_ = s.flowCardRepo.Update(ctx, card)
 
 		// Return to treatment decision
 		session.Status = string(model.VisitStatusTreatment)
@@ -128,7 +128,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		"治疗进度",
 		fmt.Sprintf("操作：%s", input.Action),
 	)
-	s.timelineRepo.Append(ctx, &actionTL)
+	_ = s.timelineRepo.Append(ctx, &actionTL)
 	result.TimelineItems = append(result.TimelineItems, actionTL)
 
 	return result, nil
@@ -155,7 +155,7 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 	now := time.Now()
 	card.Status = string(model.FlowCardStatusCompleted)
 	card.HandledAt = &now
-	s.flowCardRepo.Update(ctx, card)
+	_ = s.flowCardRepo.Update(ctx, card)
 
 	// Complete session
 	reason := "completed"
@@ -184,14 +184,14 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 		"医嘱已确认",
 		"患者已确认医嘱",
 	)
-	s.timelineRepo.Append(ctx, &ackTL)
+	_ = s.timelineRepo.Append(ctx, &ackTL)
 
 	termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
 		"completed",
 		"就诊完成",
 		"医嘱确认完成，就诊结束",
 	)
-	s.timelineRepo.Append(ctx, &termTL)
+	_ = s.timelineRepo.Append(ctx, &termTL)
 
 	return &model.FlowActionResult{
 		SessionID:     input.SessionID,

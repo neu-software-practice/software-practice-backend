@@ -92,7 +92,7 @@ func TestApiErrorJSON(t *testing.T) {
 	b, _ := json.Marshal(err)
 
 	var parsed map[string]interface{}
-	json.Unmarshal(b, &parsed)
+	_ = json.Unmarshal(b, &parsed)
 
 	if parsed["code"] != "SESSION_NOT_FOUND" {
 		t.Error("code mismatch")

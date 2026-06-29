@@ -61,7 +61,7 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 			"体征异常",
 			result.Message,
 		)
-		s.timelineRepo.Append(ctx, &emergencyTL)
+		_ = s.timelineRepo.Append(ctx, &emergencyTL)
 
 		// Check if we should terminate
 		if severity == string(model.EmergencySeverityCritical) {
@@ -72,14 +72,14 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 				session.Status = string(model.VisitStatusEmergencyTerminated)
 				session.EndedAt = &now
 				session.TerminalReason = &reason
-				s.visitRepo.Update(ctx, session)
+				_ = s.visitRepo.Update(ctx, session)
 
 				termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
 					string(model.TerminalReasonEmergency),
 					"急症终止",
 					result.Message,
 				)
-				s.timelineRepo.Append(ctx, &termTL)
+				_ = s.timelineRepo.Append(ctx, &termTL)
 			}
 		}
 
@@ -111,7 +111,7 @@ func (s *Service) DismissEmergency(ctx context.Context, input DismissEmergencyIn
 	session.Status = string(model.VisitStatusChatting)
 	session.TerminalReason = nil
 	session.EndedAt = nil
-	s.visitRepo.Update(ctx, session)
+	_ = s.visitRepo.Update(ctx, session)
 
 	// Create dismissal timeline event
 	dismissTL := adapter.BuildSystemEventTimelineItem(input.SessionID,
@@ -119,7 +119,7 @@ func (s *Service) DismissEmergency(ctx context.Context, input DismissEmergencyIn
 		"急症已解除",
 		"误报申诉通过，急症态已解除",
 	)
-	s.timelineRepo.Append(ctx, &dismissTL)
+	_ = s.timelineRepo.Append(ctx, &dismissTL)
 
 	return session, &dismissTL, nil
 }

@@ -74,17 +74,17 @@ func TestLoadErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear all env vars Load() reads for full isolation
-			os.Unsetenv("DATABASE_DSN")
-			os.Unsetenv("JWT_SECRET")
-			os.Unsetenv("SERVER_MODE")
-			os.Unsetenv("CORS_ALLOWED_ORIGINS")
-			os.Unsetenv("SERVER_ADDR")
-			os.Unsetenv("MEDAGENT_MODE")
-			os.Unsetenv("MEDAGENT_BASE_URL")
-			os.Unsetenv("MEDAGENT_API_KEY")
-			os.Unsetenv("MEDAGENT_PROVIDER")
-			os.Unsetenv("MEDAGENT_MODEL")
-			os.Unsetenv("LOG_LEVEL")
+			_ = os.Unsetenv("DATABASE_DSN")
+			_ = os.Unsetenv("JWT_SECRET")
+			_ = os.Unsetenv("SERVER_MODE")
+			_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
+			_ = os.Unsetenv("SERVER_ADDR")
+			_ = os.Unsetenv("MEDAGENT_MODE")
+			_ = os.Unsetenv("MEDAGENT_BASE_URL")
+			_ = os.Unsetenv("MEDAGENT_API_KEY")
+			_ = os.Unsetenv("MEDAGENT_PROVIDER")
+			_ = os.Unsetenv("MEDAGENT_MODEL")
+			_ = os.Unsetenv("LOG_LEVEL")
 
 			tt.setup(t)
 

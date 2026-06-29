@@ -50,7 +50,7 @@ func NewDBTest(t *testing.T, baseDSN, migrationsDir string) *DBTest {
 	}
 
 	t.Cleanup(func() {
-		testDB.Close()
+		_ = testDB.Close()
 		if _, err := baseDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName)); err != nil {
 			t.Logf("failed to drop test database %s: %v", dbName, err)
 		}

@@ -58,9 +58,10 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		"支付成功",
 		fmt.Sprintf("%s 费用已支付 ¥%.2f", input.Purpose, card.TotalAmount),
 	)
-	s.timelineRepo.Append(ctx, &payTL)
+	_ = s.timelineRepo.Append(ctx, &payTL)
 
-	if input.Purpose == "lab" {
+	switch input.Purpose {
+	case "lab":
 		// After lab payment, simulate lab results and advance to lab execution
 		_ = string(model.VisitMachineStateLabExecution) // transition recorded
 		status := string(model.VisitStatusDiagnosis)
@@ -81,7 +82,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		result.Status = status
 		result.Message = "检验费支付成功，检验进行中"
 
-	} else if input.Purpose == "medication" {
+	case "medication":
 		// After medication payment, go to medication fulfillment
 		_ = string(model.VisitMachineStateMedicationFulfillment) // transition recorded
 		status := string(model.VisitStatusBlocked)

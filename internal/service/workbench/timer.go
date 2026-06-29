@@ -17,7 +17,7 @@ func (s *Service) PauseTimer(ctx context.Context, sessionID string) (*model.Visi
 	now := time.Now()
 	session.TimerPaused = true
 	session.PausedAt = &now
-	s.visitRepo.Update(ctx, session)
+	_ = s.visitRepo.Update(ctx, session)
 
 	return session, nil
 }
@@ -31,7 +31,7 @@ func (s *Service) ResumeTimer(ctx context.Context, sessionID string) (*model.Vis
 
 	session.TimerPaused = false
 	session.PausedAt = nil
-	s.visitRepo.Update(ctx, session)
+	_ = s.visitRepo.Update(ctx, session)
 
 	return session, nil
 }

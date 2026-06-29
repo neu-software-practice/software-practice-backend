@@ -68,10 +68,10 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 			"检验决定",
 			fmt.Sprintf("患者选择：%s", input.Decision),
 		)
-		s.timelineRepo.Append(ctx, &decisionTL)
+		_ = s.timelineRepo.Append(ctx, &decisionTL)
 
 		cardTL := adapter.BuildFlowCardTimelineItem(input.SessionID, paymentCard)
-		s.timelineRepo.Append(ctx, &cardTL)
+		_ = s.timelineRepo.Append(ctx, &cardTL)
 		result.TimelineItems = []model.TimelineItem{decisionTL, cardTL}
 
 	case "skipped":
@@ -93,7 +93,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 			"跳过检验",
 			"患者选择不进行检验",
 		)
-		s.timelineRepo.Append(ctx, &skipTL)
+		_ = s.timelineRepo.Append(ctx, &skipTL)
 		result.TimelineItems = []model.TimelineItem{skipTL}
 
 	case "vetoed":
@@ -115,7 +115,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 			"暂不决定",
 			"患者选择暂不决定是否检验",
 		)
-		s.timelineRepo.Append(ctx, &vetoTL)
+		_ = s.timelineRepo.Append(ctx, &vetoTL)
 		result.TimelineItems = []model.TimelineItem{vetoTL}
 
 	default:

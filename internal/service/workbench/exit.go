@@ -40,8 +40,8 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 		consequence.Text,
 	)
 
-	s.timelineRepo.Append(ctx, &exitTL)
-	s.timelineRepo.Append(ctx, &terminalTL)
+	_ = s.timelineRepo.Append(ctx, &exitTL)
+	_ = s.timelineRepo.Append(ctx, &terminalTL)
 
 	return &model.ExitSettlementResult{
 		SessionID:      input.SessionID,

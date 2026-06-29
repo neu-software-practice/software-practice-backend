@@ -27,8 +27,8 @@ func (s *Service) ClassifyIntent(ctx context.Context, input ClassifyIntentInput)
 	// Simple keyword-based classification
 	content := input.Content
 
-	intent := "uncertain"
-	confidence := 0.3
+	var intent string
+	var confidence float64
 	reason := ""
 
 	if containsAny(content, []string{"复查", "复诊", "再看", "还有症状", "没好"}) {
@@ -78,7 +78,7 @@ func (s *Service) StreamConsultationReply(ctx context.Context, sessionID, conten
 
 	// Create message item
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", reply)
-	s.timelineRepo.Append(ctx, &msgItem)
+	_ = s.timelineRepo.Append(ctx, &msgItem)
 
 	// Message final
 	_ = callback(model.AssistantStreamEvent{
@@ -117,7 +117,7 @@ func (s *Service) AskLockedQuestion(ctx context.Context, sessionID, cardID, cont
 	})
 
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", reply)
-	s.timelineRepo.Append(ctx, &msgItem)
+	_ = s.timelineRepo.Append(ctx, &msgItem)
 
 	_ = callback(model.AssistantStreamEvent{
 		Type:      "message_final",

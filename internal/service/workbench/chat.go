@@ -2,7 +2,6 @@ package workbench
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -507,7 +506,3 @@ func (s *Service) handleOK(ctx context.Context, sessionID, requestID string, ses
 }
 
 // Helper to stringify interface for medAgent messages
-func toJSON(v interface{}) string {
-	b, _ := json.Marshal(v)
-	return string(b)
-}

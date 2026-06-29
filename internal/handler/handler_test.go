@@ -17,10 +17,8 @@ func init() {
 }
 
 // mockPatientService implements the patient service interface for testing
-type mockPatientService struct{}
 
 // mockVisitService implements the visit service interface for testing
-type mockVisitService struct{}
 
 // We test handler helper functions directly since full handler tests need wired services.
 
@@ -89,7 +87,7 @@ func TestWriteSuccess(t *testing.T) {
 	}
 
 	var resp api.ApiResponse[map[string]interface{}]
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if !resp.Success {
 		t.Error("expected success=true")
 	}
@@ -319,7 +317,7 @@ func TestWriteSuccess_StatusCode(t *testing.T) {
 			}
 
 			var resp api.ApiResponse[map[string]interface{}]
-			json.Unmarshal(w.Body.Bytes(), &resp)
+			_ = json.Unmarshal(w.Body.Bytes(), &resp)
 			if !resp.Success {
 				t.Error("expected success=true")
 			}
@@ -341,7 +339,7 @@ func TestWritePageResult_NoMore(t *testing.T) {
 	}
 
 	var resp api.ApiResponse[api.PageResult[string]]
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if !resp.Success {
 		t.Error("expected success=true")
 	}

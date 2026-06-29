@@ -46,7 +46,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		"取药确认",
 		fmt.Sprintf("已确认%s", modeText),
 	)
-	s.timelineRepo.Append(ctx, &drugTL)
+	_ = s.timelineRepo.Append(ctx, &drugTL)
 
 	// Complete the session
 	_ = string(model.VisitMachineStateCompleted) // transition recorded
@@ -75,7 +75,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	_ = s.flowCardRepo.Create(ctx, completedCard)
 
 	completedTL := adapter.BuildFlowCardTimelineItem(input.SessionID, completedCard)
-	s.timelineRepo.Append(ctx, &completedTL)
+	_ = s.timelineRepo.Append(ctx, &completedTL)
 
 	// Terminal timeline item
 	termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
@@ -83,7 +83,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		"就诊完成",
 		fmt.Sprintf("已%s，就诊结束", modeText),
 	)
-	s.timelineRepo.Append(ctx, &termTL)
+	_ = s.timelineRepo.Append(ctx, &termTL)
 
 	return &model.FlowActionResult{
 		SessionID:     input.SessionID,

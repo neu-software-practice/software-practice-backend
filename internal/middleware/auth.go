@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -141,26 +140,4 @@ func WriteJSONError(c *gin.Context, status int, code, message string) {
 			Message: message,
 		},
 	})
-}
-
-// Parse error and respond appropriately to HTTP clients.
-func handleAuthError(c *gin.Context, err error) {
-	status := http.StatusUnauthorized
-	message := "authentication failed"
-	code := "AUTH_ERROR"
-
-	switch {
-	case strings.Contains(err.Error(), "expired"):
-		message = "token has expired"
-		code = "TOKEN_EXPIRED"
-	case strings.Contains(err.Error(), "signing method"):
-		message = "invalid token signing method"
-		code = "INVALID_SIGNING_METHOD"
-	case strings.Contains(err.Error(), "malformed"):
-		message = "malformed token"
-		code = "MALFORMED_TOKEN"
-	}
-
-	WriteJSONError(c, status, code, message)
-	c.Abort()
 }
