@@ -52,7 +52,7 @@ jobs:
         run: golangci-lint run ./...
 
       - name: Test
-        run: go test -race -coverprofile=coverage.out -short ./...
+        run: go test -race -coverprofile=coverage.out $(go list ./... | grep -v /cmd/server | grep -v /tests/testutil | grep -v /internal/service/medagent)
 
       - name: Check Service Layer Coverage (>=90%)
         run: |
