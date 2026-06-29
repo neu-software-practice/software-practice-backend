@@ -8,6 +8,11 @@ import (
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 )
 
+// LLMClient defines the interface for LLM text completion used by title generation.
+type LLMClient interface {
+	ChatComplete(ctx context.Context, system, user string) (string, error)
+}
+
 // Service orchestrates all workbench operations (chat, lab, payment, etc.).
 type Service struct {
 	patientRepo    repository.PatientRepository
@@ -16,6 +21,7 @@ type Service struct {
 	flowCardRepo   repository.FlowCardRepository
 	medAgentClient *medagent.Client
 	medAgentMode   string
+	llmClient      LLMClient
 }
 
 // NewService creates a new WorkbenchService.
@@ -26,6 +32,7 @@ func NewService(
 	flowCardRepo repository.FlowCardRepository,
 	medAgentClient *medagent.Client,
 	medAgentMode string,
+	llmClient LLMClient,
 ) *Service {
 	return &Service{
 		patientRepo:    patientRepo,
@@ -34,6 +41,7 @@ func NewService(
 		flowCardRepo:   flowCardRepo,
 		medAgentClient: medAgentClient,
 		medAgentMode:   medAgentMode,
+		llmClient:      llmClient,
 	}
 }
 

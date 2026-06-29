@@ -475,3 +475,57 @@ func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 	}
 	writer.Close()
 }
+
+// GenerateTitle handles POST /visits/:sessionId/generate-title
+func (h *WorkbenchHandler) GenerateTitle(c *gin.Context) {
+	sessionID := ParseSessionID(c)
+
+	type generateTitleInput struct {
+		SessionID string `json:"sessionId"`
+	}
+	input, err := BindJSON[generateTitleInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
+
+	// Validate path param matches body
+	if input.SessionID != "" && input.SessionID != sessionID {
+		apperrors.WriteValidationError(c, "sessionId in body does not match path parameter")
+		return
+	}
+
+	// Verify session access
+	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
+	if err != nil {
+		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
+		return
+	}
+	if !RequirePatientID(c, session.PatientID) {
+		return
+	}
+
+	title, err := h.svc.GenerateTitle(c.Request.Context(), sessionID)
+	if err != nil {
+		switch {
+		case err.Error() == "session not found":
+			apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
+		case err.Error() == "title already exists":
+			// Idempotent: return existing title
+			c.JSON(http.StatusOK, api.SuccessResponse(gin.H{
+				"sessionId": sessionID,
+				"title":     *session.Summary.Title,
+			}))
+		case err.Error() == "llm unavailable":
+			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeLLMUnavailable, "LLM service unavailable", 503))
+		default:
+			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, api.SuccessResponse(gin.H{
+		"sessionId": sessionID,
+		"title":     title,
+	}))
+}

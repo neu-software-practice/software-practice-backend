@@ -19,4 +19,7 @@ const (
 	CodeAuthRefreshInvalid     = "AUTH_REFRESH_INVALID"
 	CodeAuthRefreshExpired     = "AUTH_REFRESH_EXPIRED"
 	CodeRateLimited            = "RATE_LIMITED"
+
+	CodeTitleAlreadyExists = "TITLE_ALREADY_EXISTS"
+	CodeLLMUnavailable     = "LLM_UNAVAILABLE"
 )
