@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/model"
-	"github.com/neuhis/software-practice-backend/pkg/api"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
+	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
 // WorkbenchHandler handles workbench-related HTTP endpoints.

@@ -85,7 +85,7 @@ func RunMigrations(t *testing.T, dsn, migrationsDir string) {
 	}
 
 	for _, f := range files {
-		content, err := os.ReadFile(f)
+		content, err := os.ReadFile(f) // #nosec G304
 		if err != nil {
 			t.Fatalf("failed to read migration %s: %v", f, err)
 		}
@@ -106,7 +106,7 @@ func RunMigrationsWithGolangMigrate(t *testing.T, dsn, migrationsDir string) {
 
 	// Try using golang-migrate CLI
 	migrateDSN := "mysql://" + dsn
-	cmd := exec.Command("migrate",
+	cmd := exec.Command("migrate", // #nosec G204
 		"-path", absPath,
 		"-database", migrateDSN,
 		"up",

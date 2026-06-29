@@ -77,6 +77,9 @@ func createVisit(ctx context.Context, t *testing.T, repo repository.VisitReposit
 // ---------------------------------------------------------------------------
 
 func TestPatientRepo_CRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	db, cleanup := setupDB(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -218,6 +221,9 @@ func TestPatientRepo_CRUD(t *testing.T) {
 }
 
 func TestPatientRepo_NotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	db, cleanup := setupDB(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -234,6 +240,9 @@ func TestPatientRepo_NotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestVisitRepo_CRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	db, cleanup := setupDB(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -396,6 +405,9 @@ func TestVisitRepo_CRUD(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTimelineRepo_CRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	db, cleanup := setupDB(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -442,7 +454,7 @@ func TestTimelineRepo_CRUD(t *testing.T) {
 			if err := tRepo.Append(ctx, &item); err != nil {
 				t.Fatalf("setup Append %d: %v", i, err)
 			}
-			time.Sleep(1100 * time.Millisecond)
+			time.Sleep(2100 * time.Millisecond)
 		}
 
 		// First page (pageSize=2)
@@ -507,6 +519,9 @@ func TestTimelineRepo_CRUD(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFlowCardRepo_CRUD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	db, cleanup := setupDB(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -542,15 +557,15 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 
 	t.Run("FindByID", func(t *testing.T) {
 		card := &model.FlowCard{
-			ID:        uuid.New().String(),
-			SessionID: visit.ID,
-			Kind:      string(model.FlowCardKindDiagnosis),
-			Status:    string(model.FlowCardStatusAccepted),
-			Blocking:  false,
-			Title:     "诊断结果",
-			Diagnosis: "上呼吸道感染",
+			ID:         uuid.New().String(),
+			SessionID:  visit.ID,
+			Kind:       string(model.FlowCardKindDiagnosis),
+			Status:     string(model.FlowCardStatusAccepted),
+			Blocking:   false,
+			Title:      "诊断结果",
+			Diagnosis:  "上呼吸道感染",
 			Confidence: string(model.DiagnosisConfidenceHigh),
-			Evidence:  []string{"发热", "咳嗽"},
+			Evidence:   []string{"发热", "咳嗽"},
 		}
 		if err := fRepo.Create(ctx, card); err != nil {
 			t.Fatalf("setup: Create: %v", err)
@@ -614,13 +629,13 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 	t.Run("ListBySession", func(t *testing.T) {
 		// Create two flow cards for the same session
 		card1 := &model.FlowCard{
-			ID:        uuid.New().String(),
-			SessionID: visit.ID,
-			Kind:      string(model.FlowCardKindTreatmentPlan),
-			Status:    string(model.FlowCardStatusPending),
-			Blocking:  false,
-			Title:     "治疗方案",
-			Plan:      "口服抗生素",
+			ID:         uuid.New().String(),
+			SessionID:  visit.ID,
+			Kind:       string(model.FlowCardKindTreatmentPlan),
+			Status:     string(model.FlowCardStatusPending),
+			Blocking:   false,
+			Title:      "治疗方案",
+			Plan:       "口服抗生素",
 			Capability: string(model.TreatmentCapabilityAvailable),
 		}
 		if err := fRepo.Create(ctx, card1); err != nil {

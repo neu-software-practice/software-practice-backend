@@ -51,7 +51,7 @@ type VisitSessionSummary struct {
 
 // VisitSnapshot is a read-only snapshot of a complete visit.
 type VisitSnapshot struct {
-	Session        VisitSession  `json:"session"`
+	Session        VisitSession   `json:"session"`
 	Timeline       []TimelineItem `json:"timeline"`
 	Readonly       bool           `json:"readonly"`
 	TerminalReason *string        `json:"terminalReason,omitempty"`

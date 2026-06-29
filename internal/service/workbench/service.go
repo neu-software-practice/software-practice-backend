@@ -10,10 +10,10 @@ import (
 
 // Service orchestrates all workbench operations (chat, lab, payment, etc.).
 type Service struct {
-	patientRepo   repository.PatientRepository
-	visitRepo     repository.VisitRepository
-	timelineRepo  repository.TimelineRepository
-	flowCardRepo  repository.FlowCardRepository
+	patientRepo    repository.PatientRepository
+	visitRepo      repository.VisitRepository
+	timelineRepo   repository.TimelineRepository
+	flowCardRepo   repository.FlowCardRepository
 	medAgentClient *medagent.Client
 	medAgentMode   string
 }
@@ -28,10 +28,10 @@ func NewService(
 	medAgentMode string,
 ) *Service {
 	return &Service{
-		patientRepo:   patientRepo,
-		visitRepo:     visitRepo,
-		timelineRepo:  timelineRepo,
-		flowCardRepo:  flowCardRepo,
+		patientRepo:    patientRepo,
+		visitRepo:      visitRepo,
+		timelineRepo:   timelineRepo,
+		flowCardRepo:   flowCardRepo,
 		medAgentClient: medAgentClient,
 		medAgentMode:   medAgentMode,
 	}

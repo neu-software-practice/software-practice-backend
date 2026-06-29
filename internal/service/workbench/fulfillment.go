@@ -62,14 +62,14 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 
 	// Create completed visit card
 	completedCard := &model.FlowCard{
-		ID:              "",
-		SessionID:       input.SessionID,
-		Kind:            string(model.FlowCardKindCompletedVisit),
-		Status:          string(model.FlowCardStatusCompleted),
-		Blocking:        false,
-		Title:           "就诊完成",
-		CreatedAt:       now,
-		CompletedAt:     now,
+		ID:               "",
+		SessionID:        input.SessionID,
+		Kind:             string(model.FlowCardKindCompletedVisit),
+		Status:           string(model.FlowCardStatusCompleted),
+		Blocking:         false,
+		Title:            "就诊完成",
+		CreatedAt:        now,
+		CompletedAt:      now,
 		TreatmentSummary: "药物治疗完成",
 	}
 	_ = s.flowCardRepo.Create(ctx, completedCard)

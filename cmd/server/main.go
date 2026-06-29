@@ -12,10 +12,10 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/handler"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
 	"github.com/neuhis/software-practice-backend/internal/repository"
+	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
-	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 )
 
 func main() {

@@ -111,7 +111,7 @@ func TestLoggingMiddleware(t *testing.T) {
 }
 
 func TestAuthMiddleware(t *testing.T) {
-	secret := "this-is-a-32-byte-secret-key-for-testing!!"
+	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
 
 	t.Run("missing auth header", func(t *testing.T) {
 		r := setupRouter()
@@ -209,7 +209,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 }
 
 func TestGenerateToken(t *testing.T) {
-	secret := "this-is-a-32-byte-secret-key-for-testing!!"
+	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
 	token, err := middleware.GenerateToken("p001", secret)
 	if err != nil {
 		t.Fatalf("generate: %v", err)

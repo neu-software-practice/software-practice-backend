@@ -120,14 +120,14 @@ func BuildMedicationFulfillmentCard(sessionID string, step *medagent.Step) *mode
 func BuildCompletedVisitCard(sessionID string, result *medagent.Result) *model.FlowCard {
 	now := time.Now()
 	card := &model.FlowCard{
-		ID:        uuid.New().String(),
-		SessionID: sessionID,
-		Kind:      string(model.FlowCardKindCompletedVisit),
-		Status:    string(model.FlowCardStatusCompleted),
-		Blocking:  false,
-		Title:     "就诊完成",
-		CreatedAt: now,
-		HandledAt: &now,
+		ID:          uuid.New().String(),
+		SessionID:   sessionID,
+		Kind:        string(model.FlowCardKindCompletedVisit),
+		Status:      string(model.FlowCardStatusCompleted),
+		Blocking:    false,
+		Title:       "就诊完成",
+		CreatedAt:   now,
+		HandledAt:   &now,
 		CompletedAt: now,
 	}
 
@@ -163,19 +163,19 @@ func BuildAdviceOnlyCard(sessionID string, result *medagent.Result) *model.FlowC
 func BuildPaymentCard(sessionID, purpose string, items []model.PaymentLineItem, totalAmount float64) *model.FlowCard {
 	now := time.Now()
 	card := &model.FlowCard{
-		ID:             uuid.New().String(),
-		SessionID:      sessionID,
-		Kind:           string(model.FlowCardKindPayment),
-		Status:         string(model.FlowCardStatusPending),
-		Blocking:       true,
-		Title:          "缴费",
-		CreatedAt:      now,
-		Purpose:        purpose,
-		Items:          items,
-		TotalAmount:    totalAmount,
+		ID:              uuid.New().String(),
+		SessionID:       sessionID,
+		Kind:            string(model.FlowCardKindPayment),
+		Status:          string(model.FlowCardStatusPending),
+		Blocking:        true,
+		Title:           "缴费",
+		CreatedAt:       now,
+		Purpose:         purpose,
+		Items:           items,
+		TotalAmount:     totalAmount,
 		InsuranceAmount: 0,
-		SelfPayAmount:  totalAmount,
-		PaymentStatus:  string(model.PaymentStatusUnpaid),
+		SelfPayAmount:   totalAmount,
+		PaymentStatus:   string(model.PaymentStatusUnpaid),
 	}
 
 	return card

@@ -100,8 +100,8 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 	}
 
 	profile := map[string]interface{}{
-		"age":    patient.Age,
-		"gender": patient.Gender,
+		"age":       patient.Age,
+		"gender":    patient.Gender,
 		"allergies": patient.Allergies,
 	}
 

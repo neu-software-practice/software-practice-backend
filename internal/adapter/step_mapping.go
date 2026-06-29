@@ -7,10 +7,10 @@ import (
 
 // StepMapping defines how a medAgent Step.kind maps to SSE events and FlowCard kinds.
 type StepMapping struct {
-	SSETypes      []string          // SSE event types to emit
-	CardKind      model.FlowCardKind // FlowCardKind if a card is produced
-	ProducesCard  bool
-	IsTerminal    bool
+	SSETypes     []string           // SSE event types to emit
+	CardKind     model.FlowCardKind // FlowCardKind if a card is produced
+	ProducesCard bool
+	IsTerminal   bool
 }
 
 // StepMappingTable maps medAgent StepKind to StepMapping.

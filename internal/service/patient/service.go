@@ -31,14 +31,14 @@ func (s *Service) VerifyIdentity(ctx context.Context, input model.VerifyIdentity
 	if err == model.ErrPatientNotFound {
 		// Create new patient
 		patient = &model.PatientProfile{
-			ID:                   uuid.New().String(),
-			Name:                 input.Name,
-			Gender:               string(model.GenderUnknown),
-			Age:                  0,
-			Allergies:            []string{},
-			ChronicDiseases:      []string{},
-			LongTermMedications:  []string{},
-			UpdatedAt:            time.Now(),
+			ID:                  uuid.New().String(),
+			Name:                input.Name,
+			Gender:              string(model.GenderUnknown),
+			Age:                 0,
+			Allergies:           []string{},
+			ChronicDiseases:     []string{},
+			LongTermMedications: []string{},
+			UpdatedAt:           time.Now(),
 		}
 		if input.CredentialType == "phone" {
 			patient.PhoneMasked = input.Credential
@@ -55,7 +55,7 @@ func (s *Service) VerifyIdentity(ctx context.Context, input model.VerifyIdentity
 	scopes := []string{"profile", "history", "allergies", "medications"}
 
 	return &model.VerifyIdentityResult{
-		Patient:       *patient,
+		Patient:        *patient,
 		ReadableScopes: scopes,
 		VerifiedAt:     time.Now(),
 	}, nil

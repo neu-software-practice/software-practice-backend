@@ -23,11 +23,11 @@ type PatientProfile struct {
 // It wraps the patient profile along with their chief complaint, medical history,
 // allergies, long-term medications, and optionally the prior visit summary.
 type PatientContext struct {
-	Patient             PatientProfile   `json:"patient"`
-	ChiefComplaint      string           `json:"chiefComplaint,omitempty"`
-	MedicalHistory      []string         `json:"medicalHistory"`
-	Allergies           []string         `json:"allergies"`
-	LongTermMedications []string         `json:"longTermMedications"`
+	Patient             PatientProfile     `json:"patient"`
+	ChiefComplaint      string             `json:"chiefComplaint,omitempty"`
+	MedicalHistory      []string           `json:"medicalHistory"`
+	Allergies           []string           `json:"allergies"`
+	LongTermMedications []string           `json:"longTermMedications"`
 	PriorVisit          *PatientPriorVisit `json:"priorVisit,omitempty"`
 }
 

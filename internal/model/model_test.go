@@ -269,11 +269,11 @@ func TestExitConsequence(t *testing.T) {
 
 func TestPaymentTypes(t *testing.T) {
 	input := model.SubmitPaymentInput{
-		SessionID:      "v001",
-		CardID:         "f001",
-		Purpose:        "lab",
+		SessionID:       "v001",
+		CardID:          "f001",
+		Purpose:         "lab",
 		PaymentMethodID: "pm001",
-		Defer:          false,
+		Defer:           false,
 	}
 	b, _ := json.Marshal(input)
 	var parsed map[string]interface{}

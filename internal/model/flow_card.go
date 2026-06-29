@@ -18,12 +18,12 @@ type PaymentLineItem struct {
 
 // MedicationItem represents a single medication prescribed in a medication_fulfillment card.
 type MedicationItem struct {
-	Name   string  `json:"name"`
-	Spec   string  `json:"spec"`
-	Quantity int   `json:"quantity"`
-	Dosage string  `json:"dosage"`
-	Days   int     `json:"days"`
-	Price  float64 `json:"price"`
+	Name     string  `json:"name"`
+	Spec     string  `json:"spec"`
+	Quantity int     `json:"quantity"`
+	Dosage   string  `json:"dosage"`
+	Days     int     `json:"days"`
+	Price    float64 `json:"price"`
 }
 
 // FlowCard is a discriminated union identified by the Kind field.
@@ -32,15 +32,15 @@ type MedicationItem struct {
 // current Kind are serialized.
 type FlowCard struct {
 	// --- common base fields ---
-	ID        string     `json:"id"`
-	SessionID string     `json:"sessionId"`
-	Kind      string     `json:"kind"`
-	Status    string     `json:"status"`
-	Blocking  bool       `json:"blocking"`
-	Title     string     `json:"title"`
-	CreatedAt time.Time  `json:"createdAt"`
-	HandledAt *time.Time `json:"handledAt,omitempty"`
-	LockReason *string   `json:"lockReason,omitempty"`
+	ID         string     `json:"id"`
+	SessionID  string     `json:"sessionId"`
+	Kind       string     `json:"kind"`
+	Status     string     `json:"status"`
+	Blocking   bool       `json:"blocking"`
+	Title      string     `json:"title"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	HandledAt  *time.Time `json:"handledAt,omitempty"`
+	LockReason *string    `json:"lockReason,omitempty"`
 
 	// --- lab_decision ---
 	TestItems           []TestItem `json:"testItems,omitempty"`
@@ -58,10 +58,10 @@ type FlowCard struct {
 	PaymentStatus   string            `json:"paymentStatus,omitempty"`
 
 	// --- lab_execution ---
-	LabOrderID        string     `json:"labOrderId,omitempty"`
-	ExecutionStatus   string     `json:"executionStatus,omitempty"`
-	ResultSummary     *string    `json:"resultSummary,omitempty"`
-	ResultReturnedAt  *time.Time `json:"resultReturnedAt,omitempty"`
+	LabOrderID       string     `json:"labOrderId,omitempty"`
+	ExecutionStatus  string     `json:"executionStatus,omitempty"`
+	ResultSummary    *string    `json:"resultSummary,omitempty"`
+	ResultReturnedAt *time.Time `json:"resultReturnedAt,omitempty"`
 
 	// --- diagnosis ---
 	Diagnosis       string   `json:"diagnosis,omitempty"`
@@ -77,10 +77,10 @@ type FlowCard struct {
 	Actions    []string `json:"actions,omitempty"`
 
 	// --- medication_fulfillment ---
-	Medications      []MedicationItem `json:"medications,omitempty"`
-	AvailableModes   []string         `json:"availableModes,omitempty"`
-	SelectedMode     *string          `json:"selectedMode,omitempty"`
-	FulfillmentStatus string          `json:"fulfillmentStatus,omitempty"`
+	Medications       []MedicationItem `json:"medications,omitempty"`
+	AvailableModes    []string         `json:"availableModes,omitempty"`
+	SelectedMode      *string          `json:"selectedMode,omitempty"`
+	FulfillmentStatus string           `json:"fulfillmentStatus,omitempty"`
 
 	// --- treatment_execution ---
 	TreatmentName    string     `json:"treatmentName,omitempty"`
@@ -90,12 +90,12 @@ type FlowCard struct {
 	AvailableActions []string   `json:"availableActions,omitempty"`
 
 	// --- advice_only ---
-	Advices                  []string `json:"advices,omitempty"`
-	WatchItems               []string `json:"watchItems,omitempty"`
-	FollowUpRecommendation   string   `json:"followUpRecommendation,omitempty"`
+	Advices                []string `json:"advices,omitempty"`
+	WatchItems             []string `json:"watchItems,omitempty"`
+	FollowUpRecommendation string   `json:"followUpRecommendation,omitempty"`
 
 	// --- completed_visit ---
-	TreatmentSummary  string    `json:"treatmentSummary,omitempty"`
-	FollowUpSuggestion string   `json:"followUpSuggestion,omitempty"`
-	CompletedAt       time.Time `json:"completedAt,omitempty"`
+	TreatmentSummary   string    `json:"treatmentSummary,omitempty"`
+	FollowUpSuggestion string    `json:"followUpSuggestion,omitempty"`
+	CompletedAt        time.Time `json:"completedAt,omitempty"`
 }

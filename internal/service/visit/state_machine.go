@@ -8,9 +8,9 @@ import (
 
 // TerminalStates are states from which no further transitions are allowed.
 var TerminalStates = map[string]bool{
-	string(model.VisitMachineStateCompleted):        true,
-	string(model.VisitMachineStateTerminated):        true,
-	string(model.VisitMachineStateExited):            true,
+	string(model.VisitMachineStateCompleted):  true,
+	string(model.VisitMachineStateTerminated): true,
+	string(model.VisitMachineStateExited):     true,
 }
 
 // IsTerminal checks if a machine state is terminal.
@@ -36,9 +36,9 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateEmergencyPending),
 	},
 	string(model.VisitMachineStateLabDecision): {
-		string(model.VisitMachineStateChatting),          // vetoed
-		string(model.VisitMachineStateDiagnosis),         // skipped
-		string(model.VisitMachineStateLabPayment),        // accepted
+		string(model.VisitMachineStateChatting),   // vetoed
+		string(model.VisitMachineStateDiagnosis),  // skipped
+		string(model.VisitMachineStateLabPayment), // accepted
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateLabPayment): {
@@ -46,7 +46,7 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateLabExecution): {
-		string(model.VisitMachineStateAnalyzing),  // result returned → continue
+		string(model.VisitMachineStateAnalyzing), // result returned → continue
 		string(model.VisitMachineStateDiagnosis),
 	},
 	string(model.VisitMachineStateDiagnosis): {
@@ -57,7 +57,7 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateMedicationFulfillment),
 		string(model.VisitMachineStateTreatmentExecution),
 		string(model.VisitMachineStateAdviceOnly),
-		string(model.VisitMachineStateCompleted),         // referral
+		string(model.VisitMachineStateCompleted), // referral
 	},
 	string(model.VisitMachineStateMedicationPayment): {
 		string(model.VisitMachineStateMedicationFulfillment),
@@ -110,23 +110,23 @@ func Transition(current, next string) (string, error) {
 
 // MachineStateToStatus maps internal machine states to external VisitStatus values.
 var MachineStateToStatus = map[string]string{
-	string(model.VisitMachineStateLoadingContext):      string(model.VisitStatusLoadingContext),
-	string(model.VisitMachineStateChatting):            string(model.VisitStatusChatting),
-	string(model.VisitMachineStateAnalyzing):           string(model.VisitStatusAnalyzing),
-	string(model.VisitMachineStateLabDecision):         string(model.VisitStatusBlocked),
-	string(model.VisitMachineStateLabPayment):          string(model.VisitStatusBlocked),
-	string(model.VisitMachineStateLabExecution):        string(model.VisitStatusDiagnosis),
-	string(model.VisitMachineStateDiagnosis):           string(model.VisitStatusDiagnosis),
-	string(model.VisitMachineStateTreatmentDecision):   string(model.VisitStatusTreatment),
-	string(model.VisitMachineStateMedicationPayment):   string(model.VisitStatusBlocked),
+	string(model.VisitMachineStateLoadingContext):        string(model.VisitStatusLoadingContext),
+	string(model.VisitMachineStateChatting):              string(model.VisitStatusChatting),
+	string(model.VisitMachineStateAnalyzing):             string(model.VisitStatusAnalyzing),
+	string(model.VisitMachineStateLabDecision):           string(model.VisitStatusBlocked),
+	string(model.VisitMachineStateLabPayment):            string(model.VisitStatusBlocked),
+	string(model.VisitMachineStateLabExecution):          string(model.VisitStatusDiagnosis),
+	string(model.VisitMachineStateDiagnosis):             string(model.VisitStatusDiagnosis),
+	string(model.VisitMachineStateTreatmentDecision):     string(model.VisitStatusTreatment),
+	string(model.VisitMachineStateMedicationPayment):     string(model.VisitStatusBlocked),
 	string(model.VisitMachineStateMedicationFulfillment): string(model.VisitStatusBlocked),
-	string(model.VisitMachineStateTreatmentExecution):  string(model.VisitStatusTreatment),
-	string(model.VisitMachineStateAdviceOnly):          string(model.VisitStatusBlocked),
-	string(model.VisitMachineStateCompleted):           string(model.VisitStatusCompleted),
-	string(model.VisitMachineStateEmergencyPending):    string(model.VisitStatusEmergencyTerminated),
-	string(model.VisitMachineStateTerminated):          string(model.VisitStatusEmergencyTerminated),
-	string(model.VisitMachineStateExitSettlement):      string(model.VisitStatusExited),
-	string(model.VisitMachineStateExited):              string(model.VisitStatusExited),
+	string(model.VisitMachineStateTreatmentExecution):    string(model.VisitStatusTreatment),
+	string(model.VisitMachineStateAdviceOnly):            string(model.VisitStatusBlocked),
+	string(model.VisitMachineStateCompleted):             string(model.VisitStatusCompleted),
+	string(model.VisitMachineStateEmergencyPending):      string(model.VisitStatusEmergencyTerminated),
+	string(model.VisitMachineStateTerminated):            string(model.VisitStatusEmergencyTerminated),
+	string(model.VisitMachineStateExitSettlement):        string(model.VisitStatusExited),
+	string(model.VisitMachineStateExited):                string(model.VisitStatusExited),
 }
 
 // GetStatusForState returns the external VisitStatus for a given machine state.

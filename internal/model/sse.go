@@ -15,17 +15,17 @@ type SSEEventError struct {
 // Only the fields relevant to the current Type are populated; all others are
 // left at their zero value.
 type AssistantStreamEvent struct {
-	Type          string            `json:"type"`
-	SessionID     string            `json:"sessionId,omitempty"`
-	RequestID     string            `json:"requestId,omitempty"`
-	Content       string            `json:"content,omitempty"`
-	Item          *TimelineItem     `json:"item,omitempty"`
-	Card          *FlowCard         `json:"card,omitempty"`
-	TimelineItem  *TimelineItem     `json:"timelineItem,omitempty"`
-	State         string            `json:"state,omitempty"`
-	Status        string            `json:"status,omitempty"`
-	ActiveCardID  *string           `json:"activeCardId,omitempty"`
-	Severity      string            `json:"severity,omitempty"`
-	Message       string            `json:"message,omitempty"`
-	Error         *SSEEventError    `json:"error,omitempty"`
+	Type         string         `json:"type"`
+	SessionID    string         `json:"sessionId,omitempty"`
+	RequestID    string         `json:"requestId,omitempty"`
+	Content      string         `json:"content,omitempty"`
+	Item         *TimelineItem  `json:"item,omitempty"`
+	Card         *FlowCard      `json:"card,omitempty"`
+	TimelineItem *TimelineItem  `json:"timelineItem,omitempty"`
+	State        string         `json:"state,omitempty"`
+	Status       string         `json:"status,omitempty"`
+	ActiveCardID *string        `json:"activeCardId,omitempty"`
+	Severity     string         `json:"severity,omitempty"`
+	Message      string         `json:"message,omitempty"`
+	Error        *SSEEventError `json:"error,omitempty"`
 }

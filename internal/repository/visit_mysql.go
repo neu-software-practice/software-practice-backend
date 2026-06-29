@@ -69,7 +69,8 @@ func (r *visitMySQLRepo) FindByID(ctx context.Context, id string) (*model.VisitS
 		return nil, fmt.Errorf("find visit by id: %w", err)
 	}
 
-	_ = machineState; _ = json.Unmarshal([]byte(summaryJSON), &v.Summary)
+	_ = machineState
+	_ = json.Unmarshal([]byte(summaryJSON), &v.Summary)
 	return &v, nil
 }
 
@@ -91,7 +92,8 @@ func scanVisitSummary(scanner interface {
 	if err != nil {
 		return nil, err
 	}
-	_ = machineState; _ = json.Unmarshal([]byte(summaryJSON), &s.Summary)
+	_ = machineState
+	_ = json.Unmarshal([]byte(summaryJSON), &s.Summary)
 	return &s, nil
 }
 

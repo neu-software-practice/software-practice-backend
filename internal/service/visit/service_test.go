@@ -10,11 +10,11 @@ import (
 )
 
 type mockVisitRepo struct {
-	createFunc         func(ctx context.Context, v *model.VisitSession) error
-	findByIDFunc       func(ctx context.Context, id string) (*model.VisitSession, error)
-	listByPatientFunc  func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
-	updateStatusFunc   func(ctx context.Context, id string, status string, machineState string) error
-	updateFunc         func(ctx context.Context, v *model.VisitSession) error
+	createFunc        func(ctx context.Context, v *model.VisitSession) error
+	findByIDFunc      func(ctx context.Context, id string) (*model.VisitSession, error)
+	listByPatientFunc func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	updateStatusFunc  func(ctx context.Context, id string, status string, machineState string) error
+	updateFunc        func(ctx context.Context, v *model.VisitSession) error
 }
 
 func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error {

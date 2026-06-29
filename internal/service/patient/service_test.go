@@ -86,10 +86,10 @@ func TestVerifyIdentity_ExistingPatient(t *testing.T) {
 	patientRepo := &mockPatientRepo{
 		findByCredFunc: func(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
 			return &model.PatientProfile{
-				ID:      "p001",
-				Name:    "张三",
-				Gender:  "male",
-				Age:     35,
+				ID:        "p001",
+				Name:      "张三",
+				Gender:    "male",
+				Age:       35,
 				UpdatedAt: time.Now(),
 			}, nil
 		},

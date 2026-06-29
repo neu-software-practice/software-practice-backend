@@ -25,7 +25,9 @@ func (m *mockPatientRepo) FindByCredential(ctx context.Context, ct, cred string)
 func (m *mockPatientRepo) FindByID(ctx context.Context, id string) (*model.PatientProfile, error) {
 	return m.findByIDFunc(ctx, id)
 }
-func (m *mockPatientRepo) Create(ctx context.Context, p *model.PatientProfile) error { return m.createFunc(ctx, p) }
+func (m *mockPatientRepo) Create(ctx context.Context, p *model.PatientProfile) error {
+	return m.createFunc(ctx, p)
+}
 func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
 	return m.updateFunc(ctx, id, input)
 }
@@ -38,7 +40,9 @@ type mockVisitRepo struct {
 	updateFunc        func(ctx context.Context, v *model.VisitSession) error
 }
 
-func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error { return m.createFunc(ctx, v) }
+func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error {
+	return m.createFunc(ctx, v)
+}
 func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
 	return m.findByIDFunc(ctx, id)
 }
@@ -48,7 +52,9 @@ func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, c *string
 func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id, status, ms string) error {
 	return m.updateStatusFunc(ctx, id, status, ms)
 }
-func (m *mockVisitRepo) Update(ctx context.Context, v *model.VisitSession) error { return m.updateFunc(ctx, v) }
+func (m *mockVisitRepo) Update(ctx context.Context, v *model.VisitSession) error {
+	return m.updateFunc(ctx, v)
+}
 
 type mockTimelineRepo struct {
 	appendFunc      func(ctx context.Context, item *model.TimelineItem) error
@@ -71,11 +77,11 @@ func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) 
 }
 
 type mockFlowCardRepo struct {
-	createFunc     func(ctx context.Context, card *model.FlowCard) error
-	findByIDFunc   func(ctx context.Context, id string) (*model.FlowCard, error)
-	listFunc       func(ctx context.Context, sid string) ([]model.FlowCard, error)
+	createFunc       func(ctx context.Context, card *model.FlowCard) error
+	findByIDFunc     func(ctx context.Context, id string) (*model.FlowCard, error)
+	listFunc         func(ctx context.Context, sid string) ([]model.FlowCard, error)
 	updateStatusFunc func(ctx context.Context, id, status string) error
-	updateFunc     func(ctx context.Context, card *model.FlowCard) error
+	updateFunc       func(ctx context.Context, card *model.FlowCard) error
 }
 
 func (m *mockFlowCardRepo) Create(ctx context.Context, card *model.FlowCard) error {
@@ -157,8 +163,8 @@ func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mo
 		findByIDFunc: func(ctx context.Context, id string) (*model.FlowCard, error) {
 			return makeCard(id, "s1", "lab_decision", true), nil
 		},
-		listFunc:     func(ctx context.Context, sid string) ([]model.FlowCard, error) { return nil, nil },
-		updateFunc:   func(ctx context.Context, card *model.FlowCard) error { return nil },
+		listFunc:         func(ctx context.Context, sid string) ([]model.FlowCard, error) { return nil, nil },
+		updateFunc:       func(ctx context.Context, card *model.FlowCard) error { return nil },
 		updateStatusFunc: func(ctx context.Context, id, status string) error { return nil },
 	}
 	return p, v, t, f
