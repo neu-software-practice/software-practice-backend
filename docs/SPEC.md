@@ -1,6 +1,6 @@
 ## 项目说明
 
-本项目是前端先行项目的golang微服务业务后端。基于./docs/front-api.md前端接口文档。承担东软云医院传统业务逻辑的gin后端实现。
+本项目是前端先行项目的golang gin单体业务后端。基于./docs/front-api.md前端接口文档。承担东软云医院传统业务逻辑的gin后端实现。
 
 ## 依赖
 
@@ -10,3 +10,14 @@
 ## 目的
 
 完整实现前端接口文档，尽量提高项目质量(包括但不限于可靠性，性能) 
+
+## 要求
+
+- 采用go test cover进行测试，测试覆盖率>=90%
+- 使用golangci-lint进行静态代码审查
+- 搭建github-precommit，配置go test cover >= 90%和golangci-lint 均通过门控
+
+## 参考文档
+
+- ./docs/STRUCTURE.md 项目总体架构设计文档
+- ./docs/PLAN.md 分阶段实现计划文档

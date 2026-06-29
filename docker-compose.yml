@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    container_name: neuhis-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      medagent:
+        condition: service_started
+    networks:
+      - neuhis-net
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: neuhis-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: neuhis
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - neuhis-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  medagent:
+    image: golang:1.22-alpine
+    container_name: neuhis-medagent
+    working_dir: /app
+    volumes:
+      - ./medAgent:/app
+    command: >
+      sh -c "CGO_ENABLED=0 go run ./cmd/server
+      -addr :8080
+      -provider $${MEDAGENT_PROVIDER:-deepseek}
+      -model $${MEDAGENT_MODEL:-deepseek-chat}
+      -log-dir /tmp/medagent-logs"
+    environment:
+      - DEEPSEEK_API_KEY=${MEDAGENT_API_KEY}
+      - DASHSCOPE_API_KEY=${MEDAGENT_API_KEY}
+      - OPENAI_API_KEY=${MEDAGENT_API_KEY}
+    ports:
+      - "8081:8080"
+    networks:
+      - neuhis-net
+    restart: unless-stopped
+
+networks:
+  neuhis-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
