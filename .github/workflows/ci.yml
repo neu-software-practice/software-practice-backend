@@ -132,11 +132,19 @@ jobs:
             sleep 2
           done
 
-      - name: Run Newman
-        uses: postmanlabs/newman-action@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          collection: tests/newman/neuhis-agent.postman_collection.json
-          environment: tests/newman/neuhis-agent.postman_environment.json
+          node-version: "20"
+
+      - name: Install Newman
+        run: npm install -g newman
+
+      - name: Run Newman
+        run: |
+          newman run tests/newman/neuhis-agent.postman_collection.json \
+            -e tests/newman/neuhis-agent.postman_environment.json \
+            --timeout-request 30000
 
       - name: Cleanup
         if: always()
