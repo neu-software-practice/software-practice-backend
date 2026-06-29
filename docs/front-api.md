@@ -14,8 +14,10 @@ NEUHIS Agent（产品名「东软云脑智能医疗」）是面向患者的「AI
 
 ### 1.1 鉴权与患者身份上下文
 
+- 系统采用 **JWT 双令牌认证**：**accessToken**（15 分钟有效期）携带于 `Authorization: Bearer <token>` header；**refreshToken**（7 天有效期）为不透明字符串，服务端存储，单次使用后轮换（rotation）。
+- 用户通过 `POST /auth/register` 或 `POST /auth/login` 获取令牌对；accessToken 过期后通过 `POST /auth/refresh` 静默换取新令牌对。
 - 患者身份通过 `POST /patients/verify` 核验后建立。核验返回患者摘要 `patient` 与可读范围 `readableScopes`（`profile` / `history` / `allergies` / `medications`）。
-- 后续请求以 `patientId` / `sessionId` 作为路径或入参标识资源。鉴权令牌的具体承载（Header/Cookie）由后端鉴权网关决定，不在本前端 contract 范围内；前端 transport 仅透传 `headers`。
+- 后续请求以 `patientId` / `sessionId` 作为路径或入参标识资源，并在 `Authorization` header 中携带有效 accessToken。
 - 患者只能访问归属于自身的会话；越权访问应返回 HTTP `403`（见 §2.2 错误码）。
 
 ### 1.2 环境与运行模式
@@ -73,6 +75,14 @@ NEUHIS Agent（产品名「东软云脑智能医疗」）是面向患者的「AI
 | `SESSION_NOT_FOUND` | 业务 | false | 找不到该就诊会话 |
 | `PATIENT_NOT_FOUND` | 业务 | false | 找不到患者信息 |
 | `CARD_NOT_FOUND` | 业务 | true | 流程卡已更新/失效，提示刷新 |
+| `AUTH_PHONE_EXISTS` | 业务 | false | 注册时手机号已存在 |
+| `AUTH_INVALID_CREDENTIALS` | 业务 | false | 登录时手机号或密码不匹配 |
+| `AUTH_TOKEN_EXPIRED` | 业务 | false | accessToken 过期（JWT exp 校验失败） |
+| `AUTH_REFRESH_INVALID` | 业务 | false | refreshToken 无效、已被使用或已被撤销 |
+| `AUTH_REFRESH_EXPIRED` | 业务 | false | refreshToken 超过 7 天有效期 |
+| `RATE_LIMITED` | 业务 | false | 超出速率限制 |
+| `TITLE_ALREADY_EXISTS` | 业务 | false | 会话已有标题（幂等保护） |
+| `LLM_UNAVAILABLE` | 业务 | true | 大模型服务不可用 |
 
 UI 文案命中的 HTTP 状态（`MESSAGE_BY_HTTP_STATUS`）：`401`（登录失效，不可重试）、`403`（无法访问该记录，不可重试）、`404`（找不到内容，不可重试）、`408`（请求超时，可重试）。其余 HTTP 错误按 `status >= 500` 可重试、`4xx` 不可重试兜底。
 
@@ -164,6 +174,10 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 
 | Method | Path | Facade 方法 | 用途 | 写入时间线? |
 | --- | --- | --- | --- | --- |
+| `POST` | `/auth/register` | `authApi.register` | 注册新用户，签发令牌对 | 否 |
+| `POST` | `/auth/login` | `authApi.login` | 手机号+密码登录，签发令牌对 | 否 |
+| `POST` | `/auth/refresh` | `authApi.refresh` | 使用 refreshToken 换取新令牌对 | 否 |
+| `POST` | `/auth/logout` | `authApi.logout` | 注销当前会话，使 refreshToken 失效 | 否 |
 | `POST` | `/patients/verify` | `patientApi.verifyIdentity` | 身份核验，返回患者摘要与可读范围 | 否 |
 | `GET` | `/patients/:patientId/context` | `patientApi.getPatientContext` | 读取问诊上下文（病史/过敏史/上次诊断） | 否 |
 | `PATCH` | `/patients/:patientId/profile` | `patientApi.updatePatientProfile` | 更新患者过敏史/慢病/长期用药 | 否 |
@@ -186,6 +200,7 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `POST` | `/visits/:sessionId/vitals` | `workbenchApi.reportVitals` | 上报体征触发急症复检 | 否（命中后经 emergency） |
 | `POST` | `/visits/:sessionId/exit` | `workbenchApi.exitVisit` | 主动退出并生成结算结果 | 是 |
 | `POST` | `/visits/:sessionId/timer` | `workbenchApi.pauseVisitTimer` / `resumeVisitTimer` | 暂停/恢复整次导诊总计时 | 否 |
+| `POST` | `/visits/:sessionId/generate-title` | `workbenchApi.generateTitle` | 调用 LLM 生成会话标题 | 否 |
 | `POST` | `/visits/:sessionId/dismiss-emergency` | `workbenchApi.dismissEmergency` | 误报申诉，解除急症态 | 是 |
 
 > 检验结果回填 `POST /visits/:sessionId/lab-results`（`special-designs/api.md` 列出）由 mock/后端内部驱动，前端 facade 不直接暴露方法，故不在本表 facade 列展开。
@@ -260,6 +275,7 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `allergies` | string[] | 否 | 过敏史（整体替换） |
 | `chronicDiseases` | string[] | 否 | 慢性病 |
 | `longTermMedications` | string[] | 否 | 长期用药 |
+| `medicalHistory` | string[] | 否 | 既往病史（整体替换）；不传则不修改，传 `[]` 则清空 |
 
 响应：更新后的 `PatientProfile`。注意错误：`PATIENT_NOT_FOUND`、`VALIDATION_ERROR`。
 
@@ -329,7 +345,9 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 
 校验约束（`superRefine`）：`entryType=new` 不得带 `parentSessionId`；`status=blocked` 必须带 `activeCardId`。
 
-`VisitSummary`（`visitSummarySchema`，全部可选）：`chiefComplaint?`、`diagnosis?`、`treatmentSummary?`、`lastMessage?`。
+`VisitSummary`（`visitSummarySchema`，全部可选）：`title?`、`chiefComplaint?`、`diagnosis?`、`treatmentSummary?`、`lastMessage?`。
+
+> `title`：AI 生成的问诊记录标题（由 `POST /visits/:sessionId/generate-title` 生成）。前端展示优先级：`title > chiefComplaint > "未命名问诊"`。
 
 #### `GET /visits/:sessionId/snapshot` — 只读快照
 
@@ -501,6 +519,145 @@ facade `pauseVisitTimer` / `resumeVisitTimer` 共用此 endpoint。请求体为 
 | `card` | `FlowCard` | 否 | 新增/更新的流程卡 |
 | `timelineItems` | `TimelineItem[]` | 是 | 本次追加的时间线项 |
 | `message` | string | 否 | 附加说明 |
+
+### 5.11 auth 域 — JWT 认证
+
+#### `POST /auth/register` — 注册
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `phone` | string | 是 | 手机号，11 位中国大陆号码 |
+| `password` | string | 是 | 密码，最少 8 字符 |
+| `realName` | string | 否 | 真实姓名；不传则留空 |
+
+响应（201 Created）：
+
+```jsonc
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2g...",
+  "expiresIn": 900,
+  "user": {
+    "userId": "u_abc123",
+    "patientId": "p_xyz789",
+    "phone": "13800138000",
+    "realName": "张三"
+  }
+}
+```
+
+注意错误：`AUTH_PHONE_EXISTS`（409）、`VALIDATION_ERROR`（422）。
+
+#### `POST /auth/login` — 登录
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `phone` | string | 是 | 手机号 |
+| `password` | string | 是 | 密码 |
+
+响应（200 OK）：同 register 响应结构。
+
+注意错误：`AUTH_INVALID_CREDENTIALS`（401）、`RATE_LIMITED`（429）。
+
+#### `POST /auth/refresh` — 刷新令牌
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `refreshToken` | string | 是 | 当前持有的 refreshToken |
+
+响应（200 OK）：
+
+```jsonc
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "bmV3IHJlZnJlc2ggdG9rZW4...",
+  "expiresIn": 900
+}
+```
+
+注意错误：`AUTH_REFRESH_INVALID`（401）、`AUTH_REFRESH_EXPIRED`（401）。
+
+#### `POST /auth/logout` — 注销
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `refreshToken` | string | 是 | 需要失效的 refreshToken |
+
+响应：204 No Content（无响应体）。幂等处理——即使 token 已失效也返回 204。
+
+#### Token 规格
+
+**accessToken**：
+- 格式：JWT（HS256）
+- 传输：`Authorization: Bearer <accessToken>`
+- 有效期：900 秒（15 分钟）
+- Payload：`{ "sub": "userId", "patientId": "...", "phone": "...", "iat": ..., "exp": ... }`
+
+**refreshToken**：
+- 格式：不透明字符串（≥ 32 字节 Base64 URL-safe）
+- 存储：服务端持久化，关联 userId
+- 有效期：604800 秒（7 天）
+- 单次使用后轮换（rotation）
+
+#### 安全要求
+
+| 要求 | 说明 |
+| --- | --- |
+| 密码存储 | bcrypt，cost factor ≥ 12 |
+| refreshToken 单次使用 | 每次 refresh 调用后旧 token 立即失效 |
+| Token theft 防护 | 已失效 refreshToken 被重用 → 撤销该用户全部 refreshToken |
+| Rate limiting | `/auth/login` 和 `/auth/register` 限制 5 req/min/IP |
+| JWT 签名密钥 | 至少 256-bit 随机密钥 |
+| 传输安全 | 所有 auth 端点必须 HTTPS |
+
+#### 数据库 schema
+
+- `users` 表：`userId`、`phone`（唯一）、`passwordHash`、`realName`、`createdAt`
+- `refresh_tokens` 表：`tokenHash`、`userId`、`expiresAt`、`usedAt`
+
+### 5.12 workbench 域 — 会话标题生成
+
+#### `POST /visits/:sessionId/generate-title` — 生成会话标题
+
+调用后端 LLM 基于对话上下文生成简短问诊标题。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sessionId` | SessionId | 是 | 问诊会话 ID（需与路径参数一致） |
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `sessionId` | SessionId | 回显的会话 ID |
+| `title` | string | 生成的标题，1-50 字符 |
+
+注意错误：`SESSION_NOT_FOUND`（404）、`VALIDATION_ERROR`（422）、`TITLE_ALREADY_EXISTS`（409，可选）、`LLM_UNAVAILABLE`（503）。
+
+#### 标题生成规范
+
+| 规则 | 说明 |
+| --- | --- |
+| 长度 | 1-50 字符 |
+| 格式 | 简短中文短语，无标点结尾 |
+| 内容 | 概括症状 + 时间线索，或诊断名称 |
+| 示例 | "发热伴咳嗽3天"、"反复腹痛一周"、"上呼吸道感染" |
+
+#### 后端实现要求
+
+输入上下文：患者消息（`role: "patient"`）+ 助手前 2 条消息 + 已有诊断（若有则优先）。
+
+LLM 降级策略：大模型不可用时返回 503 或降级使用 `chiefComplaint` 截断（≤50 字符）。
 
 ---
 
