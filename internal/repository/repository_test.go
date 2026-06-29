@@ -437,7 +437,8 @@ func TestTimelineRepo_CRUD(t *testing.T) {
 	})
 
 	t.Run("ListBySession with pagination", func(t *testing.T) {
-		// Ensure there are at least 3 timeline items
+		baseTime := time.Now().Add(-1 * time.Hour)
+		// Ensure there are at least 3 timeline items with distinct timestamps
 		existing, _, _, err := tRepo.ListBySession(ctx, visit.ID, nil, 10)
 		if err != nil {
 			t.Fatalf("ListBySession setup: %v", err)
@@ -450,11 +451,11 @@ func TestTimelineRepo_CRUD(t *testing.T) {
 				Status:    string(model.TimelineItemStatusDone),
 				Role:      string(model.MessageRolePatient),
 				Content:   "消息",
+				CreatedAt: baseTime.Add(time.Duration(i) * time.Minute),
 			}
 			if err := tRepo.Append(ctx, &item); err != nil {
 				t.Fatalf("setup Append %d: %v", i, err)
 			}
-			time.Sleep(2100 * time.Millisecond)
 		}
 
 		// First page (pageSize=2)
