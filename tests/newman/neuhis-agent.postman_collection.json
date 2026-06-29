@@ -46,7 +46,7 @@
               "pm.test('Has patient data', function() {",
               "  pm.expect(jsonData.data.patient).to.exist;",
               "});",
-              "pm.collectionVariables.set('patientId', jsonData.data.patient.id);"
+              "pm.environment.set('patientId', jsonData.data.patient.id);"
             ],
             "type": "text/javascript"
           }
@@ -78,7 +78,7 @@
               "pm.test('Has session', function() {",
               "  pm.expect(jsonData.data.session).to.exist;",
               "});",
-              "pm.collectionVariables.set('sessionId', jsonData.data.session.id);"
+              "pm.environment.set('sessionId', jsonData.data.session.id);"
             ],
             "type": "text/javascript"
           }
