@@ -10,6 +10,7 @@ import (
 
 	"github.com/neuhis/software-practice-backend/internal/config"
 	"github.com/neuhis/software-practice-backend/internal/handler"
+	"github.com/neuhis/software-practice-backend/internal/llm"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
 	"github.com/neuhis/software-practice-backend/internal/repository"
 	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
@@ -60,12 +61,16 @@ func main() {
 	medAgentClient := medagent.NewClient(cfg.MedAgentBaseURL)
 	log.Printf("MedAgent client initialized: %s", cfg.MedAgentBaseURL)
 
+	// Initialize LLM client for title generation (reuses medAgent provider config)
+	llmClient := llm.NewFromProvider(cfg.MedAgentProvider, cfg.MedAgentAPIKey, cfg.MedAgentModel, "")
+	log.Printf("LLM client initialized: provider=%s model=%s", cfg.MedAgentProvider, cfg.MedAgentModel)
+
 	// Initialize services
 	patientSvc := patientsvc.NewService(patientRepo, visitRepo)
 	visitSvc := visitsvc.NewService(visitRepo, timelineRepo)
 	workbenchSvc := wbsvc.NewService(
 		patientRepo, visitRepo, timelineRepo, flowCardRepo,
-		medAgentClient, cfg.MedAgentMode,
+		medAgentClient, cfg.MedAgentMode, llmClient,
 	)
 	authSvc := authsvc.NewService(userRepo, refreshTokenRepo, patientRepo, cfg.JWTSecret)
 

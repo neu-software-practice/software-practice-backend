@@ -87,6 +87,7 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 		auth.POST("/visits/:sessionId/exit", router.Workbench.ExitVisit)
 		auth.POST("/visits/:sessionId/timer", router.Workbench.ToggleTimer)
 		auth.POST("/visits/:sessionId/dismiss-emergency", router.Workbench.DismissEmergency)
+		auth.POST("/visits/:sessionId/generate-title", router.Workbench.GenerateTitle)
 	}
 
 	// Error handler for 404

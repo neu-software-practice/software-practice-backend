@@ -178,7 +178,7 @@ func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mo
 }
 
 func newSvc(p *mockPatientRepo, v *mockVisitRepo, t *mockTimelineRepo, f *mockFlowCardRepo) *wbsvc.Service {
-	return wbsvc.NewService(p, v, t, f, nil, "http")
+	return wbsvc.NewService(p, v, t, f, nil, "http", nil)
 }
 
 // eventCollector collects SSE events for callback-based tests.
@@ -1431,7 +1431,7 @@ func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path stri
 	mf := &mockFlowCardRepo{
 		createFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
 	}
-	return wbsvc.NewService(mp, mv, mt, mf, client, "http"), mp, mv, mt, mf
+	return wbsvc.NewService(mp, mv, mt, mf, client, "http", nil), mp, mv, mt, mf
 }
 
 func TestStreamAssistantMessage_Ask(t *testing.T) {

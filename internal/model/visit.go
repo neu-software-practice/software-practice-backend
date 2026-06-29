@@ -29,6 +29,7 @@ type VisitSession struct {
 
 // VisitSummary contains optional summary fields for a visit session.
 type VisitSummary struct {
+	Title            *string `json:"title,omitempty"`
 	ChiefComplaint   *string `json:"chiefComplaint,omitempty"`
 	Diagnosis        *string `json:"diagnosis,omitempty"`
 	TreatmentSummary *string `json:"treatmentSummary,omitempty"`

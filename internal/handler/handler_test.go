@@ -961,6 +961,7 @@ func newWorkbenchServiceForTest(
 		&mockFlowCardRepo{},
 		nil, // medAgentClient — not used by simple read methods
 		"test",
+		nil, // llmClient — not used by simple read methods
 	)
 }
 
