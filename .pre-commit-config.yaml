@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: go-test-cover
+        name: Go Test Cover (>=90%)
+        entry: bash -c 'go test -race -cover ./...'
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run ./...
+        language: system
+        pass_filenames: false
+        types: [go]

@@ -1,0 +1,158 @@
+{
+  "info": {
+    "name": "NEUHIS Agent Smoke Tests",
+    "description": "Core smoke test collection for NEUHIS Agent backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function() {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Body has status ok', function() {",
+              "  var jsonData = pm.response.json();",
+              "  pm.expect(jsonData.status).to.eql('ok');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health"
+      }
+    },
+    {
+      "name": "Verify Identity",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function() {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Has success=true', function() {",
+              "  pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "pm.test('Has patient data', function() {",
+              "  pm.expect(jsonData.data.patient).to.exist;",
+              "});",
+              "pm.collectionVariables.set('patientId', jsonData.data.patient.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/patients/verify",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"credentialType\":\"phone\",\"credential\":\"13900000001\",\"name\":\"测试患者\"}"
+        }
+      }
+    },
+    {
+      "name": "Create Session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function() {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Has session', function() {",
+              "  pm.expect(jsonData.data.session).to.exist;",
+              "});",
+              "pm.collectionVariables.set('sessionId', jsonData.data.session.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/visits",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"patientId\":\"{{patientId}}\",\"entryType\":\"new\",\"chiefComplaint\":\"头痛发热\"}"
+        }
+      }
+    },
+    {
+      "name": "Get Session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function() {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/visits/{{sessionId}}",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ]
+      }
+    },
+    {
+      "name": "Send Message",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function() {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/visits/{{sessionId}}/messages",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"我头痛三天了\",\"clientMessageId\":\"msg-001\"}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "test-token" },
+    { "key": "patientId", "value": "" },
+    { "key": "sessionId", "value": "" }
+  ]
+}
