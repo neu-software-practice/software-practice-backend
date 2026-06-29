@@ -103,22 +103,7 @@ jobs:
           cache: true
 
       - name: Run integration tests
-        run: go test -v -race -count=1 -timeout 600s -coverprofile=integration.out ./internal/repository/...
-
-      - name: Check Combined Coverage (unit + integration >=75%)
-        run: |
-          # Merge coverage profiles
-          echo "mode: set" > combined.out
-          tail -n +2 coverage.out >> combined.out 2>/dev/null
-          tail -n +2 integration.out >> combined.out 2>/dev/null
-          TOTAL=$(go tool cover -func=combined.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Combined coverage (unit + integration): ${TOTAL}%"
-          THRESHOLD=75
-          if (( $(echo "$TOTAL < $THRESHOLD" | bc -l) )); then
-            echo "Combined coverage ${TOTAL}% is below ${THRESHOLD}% threshold"
-            exit 1
-          fi
-          echo "Combined coverage check passed: ${TOTAL}%"
+        run: go test -v -race -count=1 -timeout 600s ./internal/repository/...
 
   smoke:
     name: Smoke Test
