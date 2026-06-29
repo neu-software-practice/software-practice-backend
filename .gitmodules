@@ -1,0 +1,4 @@
+[submodule "medAgent"]
+	path = medAgent
+	url = git@github.com:neu-software-practice/medAgent.git
+	branch = main
