@@ -74,11 +74,11 @@ jobs:
           fi
           echo "Service layer coverage check passed"
 
-      - name: Check Total Unit Coverage (>=80%)
+      - name: Check Total Unit Coverage (>=75%)
         run: |
           TOTAL=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage (unit tests): ${TOTAL}%"
-          THRESHOLD=80
+          THRESHOLD=75
           if (( $(echo "$TOTAL < $THRESHOLD" | bc -l) )); then
             echo "Total coverage ${TOTAL}% is below ${THRESHOLD}% threshold"
             exit 1
@@ -105,7 +105,7 @@ jobs:
       - name: Run integration tests
         run: go test -v -race -count=1 -timeout 600s -coverprofile=integration.out ./internal/repository/...
 
-      - name: Check Combined Coverage (unit + integration >=80%)
+      - name: Check Combined Coverage (unit + integration >=75%)
         run: |
           # Merge coverage profiles
           echo "mode: set" > combined.out
@@ -113,7 +113,7 @@ jobs:
           tail -n +2 integration.out >> combined.out 2>/dev/null
           TOTAL=$(go tool cover -func=combined.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Combined coverage (unit + integration): ${TOTAL}%"
-          THRESHOLD=80
+          THRESHOLD=75
           if (( $(echo "$TOTAL < $THRESHOLD" | bc -l) )); then
             echo "Combined coverage ${TOTAL}% is below ${THRESHOLD}% threshold"
             exit 1

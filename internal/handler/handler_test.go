@@ -1,14 +1,21 @@
 package handler_test
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/neuhis/software-practice-backend/internal/config"
 	"github.com/neuhis/software-practice-backend/internal/handler"
 	"github.com/neuhis/software-practice-backend/internal/model"
+	"github.com/neuhis/software-practice-backend/internal/repository"
+	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
+	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
+	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
 	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
@@ -426,6 +433,87 @@ func TestGetPatientIDFromContext_NonString(t *testing.T) {
 	}
 }
 
+func TestWriteSuccessWithMeta(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	handler.WriteSuccessWithMeta(c, http.StatusOK, map[string]string{"key": "value"}, map[string]int{"total": 42})
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if body == "" {
+		t.Error("body should not be empty")
+	}
+}
+
+func TestSSEWriter_WriteError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/stream", nil)
+
+	writer, err := handler.NewSSEWriter(c)
+	if err != nil {
+		t.Fatalf("NewSSEWriter: %v", err)
+	}
+
+	writer.WriteError("s001", "req-1", model.ErrSessionNotFound)
+
+	// Verify SSE format in response
+	body := w.Body.String()
+	if body == "" {
+		t.Error("body should not be empty for error event")
+	}
+	if !strings.Contains(body, "error") {
+		t.Errorf("body should contain 'error': %s", body)
+	}
+}
+
+func TestStreamEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("successful stream", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/stream", nil)
+
+		events := []model.AssistantStreamEvent{
+			{Type: "thinking", SessionID: "s1", RequestID: "r1", Message: "thinking..."},
+			{Type: "message", SessionID: "s1", RequestID: "r1", Message: "你好"},
+		}
+
+		// StreamEvents writes via SSE and returns without error
+		handler.StreamEvents(c, events)
+
+		body := w.Body.String()
+		if !strings.Contains(body, "thinking") {
+			t.Errorf("body should contain 'thinking': %s", body)
+		}
+		if !strings.Contains(body, "message") {
+			t.Errorf("body should contain 'message': %s", body)
+		}
+	})
+
+	t.Run("empty events", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/stream", nil)
+
+		handler.StreamEvents(c, nil)
+
+		// Should still set SSE headers
+		if c.Writer.Header().Get("Content-Type") != "text/event-stream" {
+			t.Errorf("Content-Type = %s, want text/event-stream",
+				c.Writer.Header().Get("Content-Type"))
+		}
+	})
+}
+
 func TestRouteRegistration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -452,6 +540,537 @@ func TestRouteRegistration(t *testing.T) {
 		r.ServeHTTP(w, req)
 		if w.Code != 200 {
 			t.Errorf("status = %d, want 200", w.Code)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Mock repositories (shared across handler tests)
+// ---------------------------------------------------------------------------
+
+type mockPatientRepo struct {
+	findByCredFunc func(ctx context.Context, credType, credential string) (*model.PatientProfile, error)
+	findByIDFunc   func(ctx context.Context, id string) (*model.PatientProfile, error)
+	createFunc     func(ctx context.Context, p *model.PatientProfile) error
+	updateFunc     func(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error)
+}
+
+func (m *mockPatientRepo) FindByCredential(ctx context.Context, ct, cred string) (*model.PatientProfile, error) {
+	return m.findByCredFunc(ctx, ct, cred)
+}
+func (m *mockPatientRepo) FindByID(ctx context.Context, id string) (*model.PatientProfile, error) {
+	return m.findByIDFunc(ctx, id)
+}
+func (m *mockPatientRepo) Create(ctx context.Context, p *model.PatientProfile) error {
+	return m.createFunc(ctx, p)
+}
+func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
+	return m.updateFunc(ctx, id, input)
+}
+
+type mockVisitRepo struct {
+	findByIDFunc      func(ctx context.Context, id string) (*model.VisitSession, error)
+	listByPatientFunc func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	createFunc        func(ctx context.Context, v *model.VisitSession) error
+}
+
+func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error {
+	if m.createFunc != nil {
+		return m.createFunc(ctx, v)
+	}
+	return nil
+}
+func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
+	if m.findByIDFunc != nil {
+		return m.findByIDFunc(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+	if m.listByPatientFunc != nil {
+		return m.listByPatientFunc(ctx, pid, cursor, ps)
+	}
+	return nil, nil, false, nil
+}
+func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id, status, machineState string) error {
+	return nil
+}
+func (m *mockVisitRepo) Update(ctx context.Context, v *model.VisitSession) error { return nil }
+
+type mockTimelineRepo struct {
+	appendFunc     func(ctx context.Context, item *model.TimelineItem) error
+	listBySessFunc func(ctx context.Context, sid string, cursor *string, ps int) ([]model.TimelineItem, *string, bool, error)
+}
+
+func (m *mockTimelineRepo) Append(ctx context.Context, item *model.TimelineItem) error {
+	if m.appendFunc != nil {
+		return m.appendFunc(ctx, item)
+	}
+	return nil
+}
+func (m *mockTimelineRepo) AppendBatch(ctx context.Context, items []model.TimelineItem) error {
+	return nil
+}
+func (m *mockTimelineRepo) ListBySession(ctx context.Context, sid string, cursor *string, ps int) ([]model.TimelineItem, *string, bool, error) {
+	if m.listBySessFunc != nil {
+		return m.listBySessFunc(ctx, sid, cursor, ps)
+	}
+	return nil, nil, false, nil
+}
+func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) error { return nil }
+
+type mockFlowCardRepo struct{}
+
+func (m *mockFlowCardRepo) Create(ctx context.Context, card *model.FlowCard) error { return nil }
+func (m *mockFlowCardRepo) FindByID(ctx context.Context, id string) (*model.FlowCard, error) {
+	return nil, nil
+}
+func (m *mockFlowCardRepo) ListBySession(ctx context.Context, sid string) ([]model.FlowCard, error) {
+	return nil, nil
+}
+func (m *mockFlowCardRepo) UpdateStatus(ctx context.Context, id, status string) error { return nil }
+func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) error    { return nil }
+
+// Verify repository interface compliance
+var _ repository.PatientRepository = (*mockPatientRepo)(nil)
+var _ repository.VisitRepository = (*mockVisitRepo)(nil)
+var _ repository.TimelineRepository = (*mockTimelineRepo)(nil)
+var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
+
+// ---------------------------------------------------------------------------
+// Patient Handler tests
+// ---------------------------------------------------------------------------
+
+func TestPatientHandler_VerifyIdentity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	patientRepo := &mockPatientRepo{
+		findByCredFunc: func(ctx context.Context, ct, cred string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+		createFunc: func(ctx context.Context, p *model.PatientProfile) error {
+			return nil
+		},
+	}
+	svc := patientsvc.NewService(patientRepo, &mockVisitRepo{})
+	h := handler.NewPatientHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/patients/verify",
+			strings.NewReader(`{"credential":"13800001111","credentialType":"phone","name":"测试"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.VerifyIdentity(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200", w.Code)
+		}
+	})
+
+	t.Run("invalid body", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/patients/verify",
+			strings.NewReader(`not-json`))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		h.VerifyIdentity(c)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want 400", w.Code)
+		}
+	})
+}
+
+func TestPatientHandler_GetContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	patientRepo := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return &model.PatientProfile{
+				ID: id, Name: "测试", PhoneMasked: "138****1111",
+			}, nil
+		},
+	}
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			return nil, nil, false, nil
+		},
+	}
+	svc := patientsvc.NewService(patientRepo, visitRepo)
+	h := handler.NewPatientHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+		c.Request = httptest.NewRequest("GET", "/patients/p001/context", nil)
+		c.Set("patientId", "p001")
+
+		h.GetContext(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200", w.Code)
+		}
+	})
+
+	t.Run("patient not found", func(t *testing.T) {
+		pRepo := &mockPatientRepo{
+			findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+				return nil, model.ErrPatientNotFound
+			},
+		}
+		svc2 := patientsvc.NewService(pRepo, &mockVisitRepo{})
+		h2 := handler.NewPatientHandler(svc2)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "patientId", Value: "p999"}}
+		c.Request = httptest.NewRequest("GET", "/patients/p999/context", nil)
+		c.Set("patientId", "p999")
+
+		h2.GetContext(c)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", w.Code)
+		}
+	})
+}
+
+func TestPatientHandler_UpdateProfile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	patientRepo := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return &model.PatientProfile{ID: id, Name: "旧名"}, nil
+		},
+		updateFunc: func(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
+			return &model.PatientProfile{
+				ID: id, Name: "旧名", PhoneMasked: "138****1111",
+			}, nil
+		},
+	}
+	svc := patientsvc.NewService(patientRepo, &mockVisitRepo{})
+	h := handler.NewPatientHandler(svc)
+
+	t.Run("valid update", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+		c.Request = httptest.NewRequest("PATCH", "/patients/p001/profile",
+			strings.NewReader(`{"name":"新名","allergies":["青霉素"]}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("patientId", "p001")
+
+		h.UpdateProfile(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200", w.Code)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Visit Handler tests
+// ---------------------------------------------------------------------------
+
+func TestVisitHandler_CreateSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		createFunc: func(ctx context.Context, v *model.VisitSession) error {
+			return nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/visits",
+			strings.NewReader(`{"patientId":"p001","chiefComplaint":"头疼","entryType":"new"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("patientId", "p001")
+
+		h.CreateSession(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestVisitHandler_ListSessions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			return []model.VisitSessionSummary{}, nil, false, nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/visits?patientId=p001", nil)
+		c.Set("patientId", "p001")
+
+		h.ListSessions(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200", w.Code)
+		}
+	})
+}
+
+func TestVisitHandler_GetSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "p001", Status: "active",
+			}, nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		c.Request = httptest.NewRequest("GET", "/visits/s001", nil)
+		c.Set("patientId", "p001")
+
+		h.GetSession(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestVisitHandler_GetSnapshot(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "p001", Status: "active",
+			}, nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		c.Request = httptest.NewRequest("GET", "/visits/s001/snapshot", nil)
+		c.Set("patientId", "p001")
+
+		h.GetSnapshot(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestVisitHandler_CreateFollowUp(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "p001", Status: "active",
+			}, nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		c.Request = httptest.NewRequest("POST", "/visits/s001/follow-up",
+			strings.NewReader(`{"patientId":"p001","chiefComplaint":"复诊"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("patientId", "p001")
+
+		h.CreateFollowUp(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Workbench Handler tests
+// ---------------------------------------------------------------------------
+
+func newWorkbenchServiceForTest(
+	visitRepo *mockVisitRepo,
+	timelineRepo *mockTimelineRepo,
+) *wbsvc.Service {
+	return wbsvc.NewService(
+		&mockPatientRepo{},
+		visitRepo,
+		timelineRepo,
+		&mockFlowCardRepo{},
+		nil, // medAgentClient — not used by simple read methods
+		"test",
+	)
+}
+
+func TestWorkbenchHandler_GetSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "p001", Status: "active",
+			}, nil
+		},
+	}
+	svc := newWorkbenchServiceForTest(visitRepo, &mockTimelineRepo{})
+	h := handler.NewWorkbenchHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		c.Request = httptest.NewRequest("GET", "/visits/s001", nil)
+		c.Set("patientId", "p001")
+
+		h.GetSession(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("session not found", func(t *testing.T) {
+		vRepo := &mockVisitRepo{
+			findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+				return nil, model.ErrSessionNotFound
+			},
+		}
+		svc2 := newWorkbenchServiceForTest(vRepo, &mockTimelineRepo{})
+		h2 := handler.NewWorkbenchHandler(svc2)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s999"}}
+		c.Request = httptest.NewRequest("GET", "/visits/s999", nil)
+		c.Set("patientId", "p001")
+
+		h2.GetSession(c)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", w.Code)
+		}
+	})
+}
+
+func TestNewRouter(t *testing.T) {
+	patientSvc := patientsvc.NewService(&mockPatientRepo{}, &mockVisitRepo{})
+	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{})
+
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc)
+	if router.Patient == nil {
+		t.Error("Patient handler should not be nil")
+	}
+	if router.Visit == nil {
+		t.Error("Visit handler should not be nil")
+	}
+	if router.Workbench == nil {
+		t.Error("Workbench handler should not be nil")
+	}
+}
+
+func TestSetupRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	patientSvc := patientsvc.NewService(&mockPatientRepo{}, &mockVisitRepo{})
+	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{})
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc)
+
+	cfg := &config.Config{
+		ServerMode:         "test",
+		JWTSecret:          "this-is-a-32-byte-secret-key-for-testing!!",
+		CORSAllowedOrigins: "http://localhost:5173",
+	}
+
+	engine := gin.New()
+	handler.SetupRoutes(engine, cfg, router)
+
+	// Verify key routes are registered
+	routes := engine.Routes()
+	routePaths := make(map[string]bool)
+	for _, r := range routes {
+		routePaths[r.Method+" "+r.Path] = true
+	}
+
+	expectedRoutes := []string{
+		"GET /api/health",
+		"POST /api/patients/verify",
+		"GET /api/patients/:patientId/context",
+		"PATCH /api/patients/:patientId/profile",
+		"POST /api/visits",
+		"GET /api/visits",
+		"GET /api/visits/:sessionId",
+		"GET /api/visits/:sessionId/snapshot",
+		"POST /api/visits/:sessionId/follow-up",
+	}
+
+	for _, expected := range expectedRoutes {
+		if !routePaths[expected] {
+			t.Errorf("route not registered: %s", expected)
+		}
+	}
+}
+
+func TestWorkbenchHandler_ListTimeline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "p001", Status: "active",
+			}, nil
+		},
+	}
+	timelineRepo := &mockTimelineRepo{
+		listBySessFunc: func(ctx context.Context, sid string, cursor *string, ps int) ([]model.TimelineItem, *string, bool, error) {
+			return []model.TimelineItem{}, nil, false, nil
+		},
+	}
+	svc := newWorkbenchServiceForTest(visitRepo, timelineRepo)
+	h := handler.NewWorkbenchHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		c.Request = httptest.NewRequest("GET", "/visits/s001/timeline", nil)
+		c.Set("patientId", "p001")
+
+		h.ListTimeline(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
 		}
 	})
 }
