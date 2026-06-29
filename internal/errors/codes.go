@@ -12,4 +12,11 @@ const (
 	CodeNotFound        = "HTTP_404"
 	CodeTimeout         = "HTTP_408"
 	CodeInternalError   = "HTTP_500"
+
+	CodeAuthPhoneExists        = "AUTH_PHONE_EXISTS"
+	CodeAuthInvalidCredentials = "AUTH_INVALID_CREDENTIALS" // #nosec G101
+	CodeAuthTokenExpired       = "AUTH_TOKEN_EXPIRED"       // #nosec G101
+	CodeAuthRefreshInvalid     = "AUTH_REFRESH_INVALID"
+	CodeAuthRefreshExpired     = "AUTH_REFRESH_EXPIRED"
+	CodeRateLimited            = "RATE_LIMITED"
 )

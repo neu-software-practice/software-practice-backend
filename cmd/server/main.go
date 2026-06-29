@@ -12,6 +12,7 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/handler"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
 	"github.com/neuhis/software-practice-backend/internal/repository"
+	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
@@ -52,6 +53,8 @@ func main() {
 	visitRepo := repository.NewVisitRepository(db)
 	timelineRepo := repository.NewTimelineRepository(db)
 	flowCardRepo := repository.NewFlowCardRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 
 	// Initialize medAgent client
 	medAgentClient := medagent.NewClient(cfg.MedAgentBaseURL)
@@ -64,9 +67,10 @@ func main() {
 		patientRepo, visitRepo, timelineRepo, flowCardRepo,
 		medAgentClient, cfg.MedAgentMode,
 	)
+	authSvc := authsvc.NewService(userRepo, refreshTokenRepo, patientRepo, cfg.JWTSecret)
 
 	// Initialize handlers
-	router := handler.NewRouter(patientSvc, visitSvc, workbenchSvc)
+	router := handler.NewRouter(patientSvc, visitSvc, workbenchSvc, authSvc)
 
 	// Create Gin engine
 	engine := gin.New()
