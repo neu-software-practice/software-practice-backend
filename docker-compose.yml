@@ -1,6 +1,9 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        - GOPROXY=${GOPROXY:-https://proxy.golang.org,direct}
     container_name: neuhis-backend
     ports:
       - "8080:8080"
