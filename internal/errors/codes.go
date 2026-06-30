@@ -28,7 +28,7 @@ const (
 	CodeAddressRequired      = "ADDRESS_REQUIRED"
 
 	// Admin error codes
-	CodeAdminInvalidCredentials  = "INVALID_CREDENTIALS"
-	CodeAdminInvalidRefreshToken = "INVALID_REFRESH_TOKEN"
+	CodeAdminInvalidCredentials  = "INVALID_CREDENTIALS"   // #nosec G101
+	CodeAdminInvalidRefreshToken = "INVALID_REFRESH_TOKEN" // #nosec G101
 	CodeAdminInvalidSettings     = "INVALID_SETTINGS"
 )
