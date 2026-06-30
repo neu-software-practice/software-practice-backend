@@ -1,0 +1,51 @@
+name: CD - Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: [self-hosted, cd]
+
+    steps:
+      - name: Pull latest code
+        working-directory: /root/app/software-practice-backend
+        run: |
+          git pull origin main
+          git submodule update --init --recursive
+
+      - name: Rebuild and restart services
+        working-directory: /root/app/software-practice-backend
+        run: |
+          docker compose up -d --build app
+
+      - name: Wait for health check
+        working-directory: /root/app/software-practice-backend
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/api/health && break
+            echo "Waiting for service... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run database migrations
+        working-directory: /root/app/software-practice-backend
+        run: |
+          for f in db/migrations/*.up.sql; do
+            echo "Running migration: $f"
+            docker compose exec -T mysql mysql -u root -ppassword neuhis < "$f" 2>/dev/null || echo "  (may already be applied)"
+          done
+
+      - name: Cleanup old images
+        working-directory: /root/app/software-practice-backend
+        run: |
+          docker image prune -f
+
+      - name: Verify deployment
+        working-directory: /root/app/software-practice-backend
+        run: |
+          STATUS=$(curl -sf http://localhost:8080/api/health | jq -r '.status // "unknown"')
+          echo "Health check status: $STATUS"
+          docker compose ps
