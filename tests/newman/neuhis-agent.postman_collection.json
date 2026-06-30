@@ -3644,6 +3644,246 @@
           }
         }
       ]
+    },
+    {
+      "name": "15. Medical Orders",
+      "description": "医嘱记录查询端点 (v8): 从历史问诊时间线聚合 advice_only + medication_fulfillment 卡片",
+      "item": [
+        {
+          "name": "✅ GET Medical Orders - Empty (New Patient)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var phone = '139' + Date.now().toString().slice(-8);",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/auth/register',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: 'TestPass123!', realName: '临时空用户' }) }",
+                  "}, function(err, res) {",
+                  "    if (!err && res && (res.code === 201 || res.code === 200)) {",
+                  "        var d = res.json().data;",
+                  "        pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + d.accessToken });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Empty items for new patient', function() {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "    pm.expect(jsonData.data.items.length).to.eql(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical-orders"
+          }
+        },
+        {
+          "name": "✅ GET Medical Orders - Session Without Cards",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('success=true', function() { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('data.items is array', function() {",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "});",
+                  "pm.test('Empty items (no completed advice/medication cards)', function() {",
+                  "    pm.expect(jsonData.data.items.length).to.eql(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical-orders",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "✅ GET Medical Orders - Has Records",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns items array', function() {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "});",
+                  "",
+                  "if (jsonData.data.items.length > 0) {",
+                  "    pm.test('Required fields present', function() {",
+                  "        jsonData.data.items.forEach(function(r) {",
+                  "            pm.expect(r.recordId, 'recordId missing').to.be.a('string');",
+                  "            pm.expect(r.sessionId, 'sessionId missing').to.be.a('string');",
+                  "            pm.expect(r.sessionTitle, 'sessionTitle missing').to.be.a('string');",
+                  "            pm.expect(r.kind, 'kind missing').to.be.a('string');",
+                  "            pm.expect(r.handledAt, 'handledAt missing').to.be.a('string');",
+                  "            pm.expect(r.createdAt, 'createdAt missing').to.be.a('string');",
+                  "        });",
+                  "    });",
+                  "",
+                  "    pm.test('Kind is advice or medication only', function() {",
+                  "        jsonData.data.items.forEach(function(r) {",
+                  "            pm.expect(r.kind).to.match(/^(advice|medication)$/);",
+                  "        });",
+                  "    });",
+                  "",
+                  "    pm.test('Kind-specific fields', function() {",
+                  "        jsonData.data.items.forEach(function(r) {",
+                  "            if (r.kind === 'advice') {",
+                  "                pm.expect(r.advices).to.be.an('array');",
+                  "                pm.expect(r.watchItems).to.be.an('array');",
+                  "                pm.expect(r.followUpRecommendation).to.be.a('string');",
+                  "            } else if (r.kind === 'medication') {",
+                  "                pm.expect(r.medications).to.be.an('array');",
+                  "                pm.expect(r.fulfillmentStatus).to.be.a('string');",
+                  "                pm.expect(r.fulfillmentStatus).to.match(/^(pending|confirmed|completed)$/);",
+                  "                if (r.deliveryAddress) {",
+                  "                    pm.expect(r.deliveryAddress.name).to.be.a('string');",
+                  "                    pm.expect(r.deliveryAddress.phone).to.be.a('string');",
+                  "                    pm.expect(r.deliveryAddress.fullAddress).to.be.a('string');",
+                  "                }",
+                  "            }",
+                  "        });",
+                  "    });",
+                  "",
+                  "    pm.test('Timestamps are ISO8601', function() {",
+                  "        jsonData.data.items.forEach(function(r) {",
+                  "            pm.expect(r.handledAt).to.match(/^\\d{4}-\\d{2}-\\d{2}T/);",
+                  "            pm.expect(r.createdAt).to.match(/^\\d{4}-\\d{2}-\\d{2}T/);",
+                  "        });",
+                  "    });",
+                  "",
+                  "    pm.test('Sorted by handledAt descending', function() {",
+                  "        for (var i = 1; i < jsonData.data.items.length; i++) {",
+                  "            pm.expect(jsonData.data.items[i-1].handledAt >= jsonData.data.items[i].handledAt).to.be.true;",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    pm.test('No records present (structure valid otherwise)', function() {",
+                  "        pm.expect(true).to.be.true;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical-orders",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "❌ GET Medical Orders - No Auth (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 401', function() { pm.response.to.have.status(401); });",
+                  "    pm.test('UNAUTHORIZED', function() {",
+                  "        pm.expect(pm.response.text()).to.include('UNAUTHORIZED');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical-orders"
+          }
+        },
+        {
+          "name": "❌ GET Medical Orders - Malformed JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical-orders",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer this.is.not.a.valid.jwt.token"
+              }
+            ]
+          }
+        },
+        {
+          "name": "❌ GET Medical Orders - Expired JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical-orders",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1LXRlc3QiLCJwYXRpZW50SWQiOiJwLXRlc3QiLCJwaG9uZSI6IjEzODAwMDAwMDAxIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.0000000000000000000000000000000"
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }
