@@ -399,6 +399,55 @@ func TestVisitRepo_CRUD(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("Update", func(t *testing.T) {
+		visit := &model.VisitSession{
+			ID:            uuid.New().String(),
+			PatientID:     patient.ID,
+			EntryType:     string(model.VisitEntryTypeNew),
+			Status:        string(model.VisitStatusChatting),
+			MachineState:  string(model.VisitMachineStateChatting),
+			AskRound:      1,
+			AskRoundLimit: 20,
+			LabRound:      0,
+			LabRoundLimit: 10,
+			TimerPaused:   false,
+			Summary: model.VisitSummary{
+				ChiefComplaint: strPtr("咳嗽"),
+			},
+		}
+		if err := vRepo.Create(ctx, visit); err != nil {
+			t.Fatalf("setup: Create: %v", err)
+		}
+
+		// Modify and update
+		visit.Status = string(model.VisitStatusDiagnosis)
+		visit.MachineState = string(model.VisitMachineStateDiagnosis)
+		visit.AskRound = 2
+		visit.Summary.ChiefComplaint = strPtr("咳嗽加重")
+		err := vRepo.Update(ctx, visit)
+		if err != nil {
+			t.Fatalf("Update failed: %v", err)
+		}
+
+		// Verify
+		updated, err := vRepo.FindByID(ctx, visit.ID)
+		if err != nil {
+			t.Fatalf("FindByID after update: %v", err)
+		}
+		if updated.Status != string(model.VisitStatusDiagnosis) {
+			t.Errorf("Status = %q, want %q", updated.Status, string(model.VisitStatusDiagnosis))
+		}
+		if updated.MachineState != string(model.VisitMachineStateDiagnosis) {
+			t.Errorf("MachineState = %q, want %q", updated.MachineState, string(model.VisitMachineStateDiagnosis))
+		}
+		if updated.AskRound != 2 {
+			t.Errorf("AskRound = %d, want 2", updated.AskRound)
+		}
+		if updated.Summary.ChiefComplaint == nil || *updated.Summary.ChiefComplaint != "咳嗽加重" {
+			t.Error("ChiefComplaint not updated")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -546,7 +595,7 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 			TestItems: []model.TestItem{
 				{Code: "WBC", Name: "白细胞计数", SampleType: "blood"},
 			},
-			EstimatedFee: 50.0,
+			EstimatedFee: model.Float64Ptr(50.0),
 		}
 		err := fRepo.Create(ctx, card)
 		if err != nil {
@@ -686,6 +735,47 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 		}
 		if !foundCard2 {
 			t.Error("card2 not found in ListBySession results")
+		}
+	})
+
+	t.Run("Update", func(t *testing.T) {
+		card := &model.FlowCard{
+			ID:        uuid.New().String(),
+			SessionID: visit.ID,
+			Kind:      string(model.FlowCardKindDiagnosis),
+			Status:    string(model.FlowCardStatusPending),
+			Blocking:  true,
+			Title:     "诊断初稿",
+			Diagnosis: "疑似感冒",
+		}
+		if err := fRepo.Create(ctx, card); err != nil {
+			t.Fatalf("setup: Create: %v", err)
+		}
+
+		// Modify and update
+		card.Status = string(model.FlowCardStatusAccepted)
+		card.Diagnosis = "上呼吸道感染"
+		card.Confidence = string(model.DiagnosisConfidenceHigh)
+		now := time.Now()
+		card.HandledAt = &now
+		err := fRepo.Update(ctx, card)
+		if err != nil {
+			t.Fatalf("Update failed: %v", err)
+		}
+
+		// Verify
+		updated, err := fRepo.FindByID(ctx, card.ID)
+		if err != nil {
+			t.Fatalf("FindByID after update: %v", err)
+		}
+		if updated.Status != string(model.FlowCardStatusAccepted) {
+			t.Errorf("Status = %q, want %q", updated.Status, string(model.FlowCardStatusAccepted))
+		}
+		if updated.Diagnosis != "上呼吸道感染" {
+			t.Errorf("Diagnosis = %q, want %q", updated.Diagnosis, "上呼吸道感染")
+		}
+		if updated.HandledAt == nil {
+			t.Error("expected HandledAt to be set after Update")
 		}
 	})
 }

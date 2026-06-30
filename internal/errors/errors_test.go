@@ -20,7 +20,7 @@ func TestNewApiError(t *testing.T) {
 		{"session not found", apperrors.CodeSessionNotFound, "session not found", 404, false},
 		{"patient not found", apperrors.CodePatientNotFound, "patient not found", 404, false},
 		{"validation error", apperrors.CodeValidationError, "invalid input", 400, false},
-		{"card not found", apperrors.CodeCardNotFound, "card not found", 404, false},
+		{"card not found", apperrors.CodeCardNotFound, "card not found", 404, true},
 		{"internal error 5xx", apperrors.CodeInternalError, "internal error", 500, true},
 		{"unknown error 5xx", apperrors.CodeUnknownError, "unknown", 502, true},
 	}
@@ -53,8 +53,8 @@ func TestHelperFunctions(t *testing.T) {
 		if err.Code != apperrors.CodeValidationError {
 			t.Errorf("code = %s", err.Code)
 		}
-		if err.Status != 400 {
-			t.Errorf("status = %d", err.Status)
+		if err.Status != 422 {
+			t.Errorf("status = %d, want 422", err.Status)
 		}
 	})
 
@@ -159,6 +159,18 @@ func TestWriteError(t *testing.T) {
 		c.Request = httptest.NewRequest("GET", "/test", nil)
 
 		apperrors.WriteError(c, apperrors.NewInternalError("boom"))
+
+		if w.Code != 500 {
+			t.Errorf("status = %d, want 500", w.Code)
+		}
+	})
+
+	t.Run("write internal error via helper", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/test", nil)
+
+		apperrors.WriteInternalError(c, "server error")
 
 		if w.Code != 500 {
 			t.Errorf("status = %d, want 500", w.Code)

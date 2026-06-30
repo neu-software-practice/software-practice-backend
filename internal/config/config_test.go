@@ -10,6 +10,7 @@ import (
 func TestLoadValidConfig(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
 	t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+	t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
 
 	cfg, err := config.Load()
 	if err != nil {

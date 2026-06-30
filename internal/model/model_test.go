@@ -143,7 +143,7 @@ func TestFlowCardJSON(t *testing.T) {
 			{Code: "blood_rt", Name: "血常规"},
 		},
 		Reason:       "需要进一步检查",
-		EstimatedFee: 50.0,
+		EstimatedFee: model.Float64Ptr(50.0),
 	}
 
 	b, _ := json.Marshal(card)
@@ -283,6 +283,38 @@ func TestPaymentTypes(t *testing.T) {
 	}
 	if parsed["cardId"] != "f001" {
 		t.Error("cardId mismatch")
+	}
+}
+
+func TestFloat64Ptr(t *testing.T) {
+	p := model.Float64Ptr(42.5)
+	if p == nil {
+		t.Fatal("Float64Ptr returned nil")
+	}
+	if *p != 42.5 {
+		t.Errorf("Float64Ptr: got %v, want 42.5", *p)
+	}
+}
+
+func TestDerefFloat64(t *testing.T) {
+	// Non-nil pointer
+	val := 99.9
+	if got := model.DerefFloat64(&val); got != 99.9 {
+		t.Errorf("DerefFloat64(non-nil): got %v, want 99.9", got)
+	}
+	// Nil pointer
+	if got := model.DerefFloat64(nil); got != 0 {
+		t.Errorf("DerefFloat64(nil): got %v, want 0", got)
+	}
+}
+
+func TestFloat64PtrZero(t *testing.T) {
+	p := model.Float64Ptr(0)
+	if p == nil {
+		t.Fatal("Float64Ptr(0) returned nil — must return a valid pointer to 0")
+	}
+	if *p != 0 {
+		t.Errorf("Float64Ptr(0): got %v, want 0", *p)
 	}
 }
 

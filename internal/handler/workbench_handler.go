@@ -21,10 +21,16 @@ func NewWorkbenchHandler(svc *wbsvc.Service) *WorkbenchHandler {
 }
 
 // getSessionAndVerify loads the session and verifies patient ownership.
+// It writes the appropriate HTTP error response on failure so callers can simply return.
 func (h *WorkbenchHandler) getSessionAndVerify(c *gin.Context) (*model.VisitSession, error) {
 	sessionID := ParseSessionID(c)
 	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
 	if err != nil {
+		if err == model.ErrSessionNotFound {
+			apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
+		} else {
+			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
+		}
 		return nil, err
 	}
 	if !RequirePatientID(c, session.PatientID) {
@@ -37,11 +43,6 @@ func (h *WorkbenchHandler) getSessionAndVerify(c *gin.Context) (*model.VisitSess
 func (h *WorkbenchHandler) GetSession(c *gin.Context) {
 	session, err := h.getSessionAndVerify(c)
 	if err != nil {
-		if err == model.ErrSessionNotFound {
-			apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
-			return
-		}
-		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
 		return
 	}
 	WriteSuccess(c, http.StatusOK, session)
@@ -164,7 +165,11 @@ func (h *WorkbenchHandler) SubmitLabDecision(c *gin.Context) {
 		CardID    string `json:"cardId"`
 		Decision  string `json:"decision"`
 	}
-	input, _ := BindJSON[labDecisionInput](c)
+	input, err := BindJSON[labDecisionInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
@@ -273,7 +278,11 @@ func (h *WorkbenchHandler) AckAdvice(c *gin.Context) {
 		SessionID string `json:"sessionId"`
 		CardID    string `json:"cardId"`
 	}
-	input, _ := BindJSON[ackInput](c)
+	input, err := BindJSON[ackInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
@@ -300,7 +309,11 @@ func (h *WorkbenchHandler) ClassifyIntent(c *gin.Context) {
 		SessionID string `json:"sessionId"`
 		Content   string `json:"content"`
 	}
-	input, _ := BindJSON[classifyInput](c)
+	input, err := BindJSON[classifyInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
@@ -327,9 +340,19 @@ func (h *WorkbenchHandler) ReportVitals(c *gin.Context) {
 		SessionID string                 `json:"sessionId"`
 		Source    string                 `json:"source"`
 		Vitals    map[string]interface{} `json:"vitals,omitempty"`
+		Symptoms  []string               `json:"symptoms"`
 	}
-	input, _ := BindJSON[vitalsInput](c)
+	input, err := BindJSON[vitalsInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
+
+	if len(input.Symptoms) == 0 {
+		apperrors.WriteValidationError(c, "symptoms is required")
+		return
+	}
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
 		return
@@ -339,6 +362,7 @@ func (h *WorkbenchHandler) ReportVitals(c *gin.Context) {
 		SessionID: input.SessionID,
 		Source:    input.Source,
 		Vitals:    input.Vitals,
+		Symptoms:  input.Symptoms,
 	})
 	if err != nil {
 		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
@@ -380,7 +404,11 @@ func (h *WorkbenchHandler) ToggleTimer(c *gin.Context) {
 		SessionID string `json:"sessionId"`
 		Action    string `json:"action"` // pause, resume
 	}
-	input, _ := BindJSON[timerInput](c)
+	input, err := BindJSON[timerInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
@@ -388,7 +416,6 @@ func (h *WorkbenchHandler) ToggleTimer(c *gin.Context) {
 	}
 
 	var result *model.VisitSession
-	var err error
 
 	switch input.Action {
 	case "pause":
@@ -440,7 +467,11 @@ func (h *WorkbenchHandler) AskLockedQuestion(c *gin.Context) {
 		Content   string `json:"content"`
 		RequestID string `json:"requestId"`
 	}
-	input, _ := BindJSON[lockQuestionInput](c)
+	input, err := BindJSON[lockQuestionInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
@@ -448,7 +479,7 @@ func (h *WorkbenchHandler) AskLockedQuestion(c *gin.Context) {
 	}
 
 	writer, _ := NewSSEWriter(c)
-	err := h.svc.AskLockedQuestion(c.Request.Context(), input.SessionID, input.CardID, input.Content, input.RequestID,
+	err = h.svc.AskLockedQuestion(c.Request.Context(), input.SessionID, input.CardID, input.Content, input.RequestID,
 		func(event model.AssistantStreamEvent) error {
 			return writer.WriteEvent(event)
 		})
@@ -467,7 +498,11 @@ func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 		Content   string `json:"content"`
 		RequestID string `json:"requestId"`
 	}
-	input, _ := BindJSON[consultInput](c)
+	input, err := BindJSON[consultInput](c)
+	if err != nil {
+		apperrors.WriteValidationError(c, "invalid request body")
+		return
+	}
 	input.SessionID = sessionID
 
 	if _, err := h.getSessionAndVerify(c); err != nil {
@@ -475,7 +510,7 @@ func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 	}
 
 	writer, _ := NewSSEWriter(c)
-	err := h.svc.StreamConsultationReply(c.Request.Context(), input.SessionID, input.Content, input.RequestID,
+	err = h.svc.StreamConsultationReply(c.Request.Context(), input.SessionID, input.Content, input.RequestID,
 		func(event model.AssistantStreamEvent) error {
 			return writer.WriteEvent(event)
 		})

@@ -7,24 +7,26 @@ import (
 
 // VisitSession represents a complete visit session entity.
 type VisitSession struct {
-	ID              string       `json:"id"`
-	PatientID       string       `json:"patientId"`
-	EntryType       string       `json:"entryType"`
-	Status          string       `json:"status"`
-	StartedAt       time.Time    `json:"startedAt"`
-	UpdatedAt       time.Time    `json:"updatedAt"`
-	EndedAt         *time.Time   `json:"endedAt,omitempty"`
-	TimeoutAt       *time.Time   `json:"timeoutAt,omitempty"`
-	PausedAt        *time.Time   `json:"pausedAt,omitempty"`
-	AskRound        int          `json:"askRound"`
-	AskRoundLimit   int          `json:"askRoundLimit"`
-	LabRound        int          `json:"labRound"`
-	LabRoundLimit   int          `json:"labRoundLimit"`
-	ParentSessionID *string      `json:"parentSessionId,omitempty"`
-	TerminalReason  *string      `json:"terminalReason,omitempty"`
-	ActiveCardID    *string      `json:"activeCardId,omitempty"`
-	TimerPaused     bool         `json:"timerPaused"`
-	Summary         VisitSummary `json:"summary"`
+	ID                string       `json:"id"`
+	PatientID         string       `json:"patientId"`
+	EntryType         string       `json:"entryType"`
+	Status            string       `json:"status"`
+	MachineState      string       `json:"machineState"`
+	StartedAt         time.Time    `json:"startedAt"`
+	UpdatedAt         time.Time    `json:"updatedAt"`
+	EndedAt           *time.Time   `json:"endedAt,omitempty"`
+	TimeoutAt         *time.Time   `json:"timeoutAt,omitempty"`
+	PausedAt          *time.Time   `json:"pausedAt,omitempty"`
+	AskRound          int          `json:"askRound"`
+	AskRoundLimit     int          `json:"askRoundLimit"`
+	LabRound          int          `json:"labRound"`
+	LabRoundLimit     int          `json:"labRoundLimit"`
+	ParentSessionID   *string      `json:"parentSessionId,omitempty"`
+	TerminalReason    *string      `json:"terminalReason,omitempty"`
+	ActiveCardID      *string      `json:"activeCardId,omitempty"`
+	MedAgentSessionID *string      `json:"medagentSessionId,omitempty"`
+	TimerPaused       bool         `json:"timerPaused"`
+	Summary           VisitSummary `json:"summary"`
 }
 
 // VisitSummary contains optional summary fields for a visit session.
