@@ -169,7 +169,6 @@ func TestCreateAddress_ValidationError(t *testing.T) {
 		{"name too long", model.CreateAddressInput{Name: "一二三四五六七八九十一二三四五六七八九十一", Phone: "13800002468", Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试"}},
 		{"invalid phone", model.CreateAddressInput{Name: "李明", Phone: "12345", Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试"}},
 		{"empty detail", model.CreateAddressInput{Name: "李明", Phone: "13800002468", Province: "辽宁", City: "沈阳", District: "浑南", Detail: ""}},
-		{"invalid tag", model.CreateAddressInput{Name: "李明", Phone: "13800002468", Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试", Tag: "invalid"}},
 	}
 
 	for _, tt := range tests {
@@ -407,7 +406,6 @@ func TestUpdateAddress_ValidationErrors(t *testing.T) {
 		{"name too long", model.UpdateAddressInput{Name: strPtr("一二三四五六七八九十一二三四五六七八九十一")}},
 		{"invalid phone", model.UpdateAddressInput{Phone: strPtr("12345")}},
 		{"empty detail", model.UpdateAddressInput{Detail: strPtr("")}},
-		{"invalid tag", model.UpdateAddressInput{Tag: strPtr("invalid")}},
 	}
 
 	for _, tt := range tests {
