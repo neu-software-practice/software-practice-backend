@@ -319,7 +319,7 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `district` | string | 是 | 区 |
 | `detail` | string(1–200) | 是 | 详细地址 |
 | `isDefault` | boolean | 是 | 是否默认地址 |
-| `tag` | string | 是 | 标签：`家` \| `公司` \| `医院` \| `其他` \| `""` |
+| `tag` | string | 是 | 标签（自由字符串，默认 `""`） |
 | `createdAt` | ISO8601 | 是 | 创建时间 |
 | `updatedAt` | ISO8601 | 是 | 更新时间 |
 

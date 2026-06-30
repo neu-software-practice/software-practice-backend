@@ -320,16 +320,6 @@ const (
 	LabExecutionStatusCompleted      LabExecutionStatus = "completed"
 )
 
-// AddressTag represents a category label for a delivery address.
-type AddressTag string
-
-const (
-	AddressTagHome     AddressTag = "家"
-	AddressTagCompany  AddressTag = "公司"
-	AddressTagHospital AddressTag = "医院"
-	AddressTagOther    AddressTag = "其他"
-)
-
 // FinalOutcome represents the terminal outcome of a visit from the agent's perspective.
 type FinalOutcome string
 

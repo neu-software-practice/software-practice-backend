@@ -22,8 +22,7 @@ func NewService(addressRepo repository.AddressRepository) *Service {
 }
 
 var (
-	phoneRegex       = regexp.MustCompile(`^1[3-9]\d{9}$`)
-	validAddressTags = map[string]bool{"": true, "家": true, "公司": true, "医院": true, "其他": true}
+	phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 )
 
 // ListAddresses returns all addresses for a patient.
@@ -210,9 +209,6 @@ func validateCreateAddressInput(input model.CreateAddressInput) error {
 	if input.Province == "" || input.City == "" || input.District == "" {
 		return fmt.Errorf("%w: province, city, and district are required", model.ErrValidation)
 	}
-	if !validAddressTags[input.Tag] {
-		return fmt.Errorf("%w: tag must be one of: 家, 公司, 医院, 其他, or empty", model.ErrValidation)
-	}
 	return nil
 }
 
@@ -225,9 +221,6 @@ func validateUpdateAddressInput(input model.UpdateAddressInput) error {
 	}
 	if input.Detail != nil && (len(*input.Detail) < 1 || len(*input.Detail) > 200) {
 		return fmt.Errorf("%w: detail must be 1-200 characters", model.ErrValidation)
-	}
-	if input.Tag != nil && !validAddressTags[*input.Tag] {
-		return fmt.Errorf("%w: tag must be one of: 家, 公司, 医院, 其他, or empty", model.ErrValidation)
 	}
 	return nil
 }
