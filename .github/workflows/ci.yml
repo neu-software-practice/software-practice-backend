@@ -140,18 +140,31 @@ jobs:
       - name: Install Newman
         run: npm install -g newman
 
-      - name: Run Smoke Tests
-        id: smoke
+      - name: Run Patient Smoke Tests
+        id: smoke-patient
         run: make smoke-test-docker
         timeout-minutes: 20
 
-      - name: Collect logs on failure
-        if: failure() && steps.smoke.outcome == 'failure'
+      - name: Collect patient test logs on failure
+        if: failure() && steps.smoke-patient.outcome == 'failure'
         run: |
           echo "=== App logs ==="
           docker compose logs app || true
-          echo "=== Newman report ==="
+          echo "=== Patient Newman report ==="
           cat tests/newman/reports/summary_*.txt 2>/dev/null || echo "No report found"
+
+      - name: Run Admin Smoke Tests
+        id: smoke-admin
+        run: make smoke-test-admin-docker
+        timeout-minutes: 10
+
+      - name: Collect admin test logs on failure
+        if: failure() && steps.smoke-admin.outcome == 'failure'
+        run: |
+          echo "=== App logs ==="
+          docker compose logs app || true
+          echo "=== Admin Newman report ==="
+          cat tests/newman/reports/admin-summary_*.txt 2>/dev/null || echo "No report found"
 
       - name: Cleanup
         if: always()

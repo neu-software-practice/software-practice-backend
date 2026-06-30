@@ -85,6 +85,51 @@ smoke-test-quick: ## 快速冒烟测试 (仅运行基础端点)
 		-d '{"phone":"13800000001","password":"TestPass123!","realName":"测试"}' > /dev/null && echo "✅ Auth OK" || echo "⚠️ Auth (may already exist)"
 
 # ==========================
+# Admin Smoke Test (Newman Black-Box)
+# ==========================
+
+smoke-test-admin: ## 运行 Admin 黑盒测试 (默认 localhost:8080)
+	@bash tests/newman/run-admin-smoke.sh http://localhost:8080
+
+smoke-test-admin-remote: ## 运行 Admin 黑盒测试 (指定地址: make smoke-test-admin-remote BASE_URL=http://host:8080)
+	@bash tests/newman/run-admin-smoke.sh $(BASE_URL)
+
+smoke-test-admin-docker: ## 启动 Docker 服务 → 运行 Admin 黑盒测试 → 清理
+	@docker compose up -d --build
+	@sleep 8
+	@bash tests/newman/run-admin-smoke.sh http://localhost:8080; EXIT_CODE=$$?; \
+	docker compose down; \
+	exit $$EXIT_CODE
+
+# ==========================
+# Combined Smoke Tests
+# ==========================
+
+smoke-test-all: ## 运行所有黑盒测试（患者端 + Admin）
+	@echo "=== Patient API Tests ==="
+	@bash tests/newman/run-smoke.sh http://localhost:8080; PATIENT_EXIT=$$?; \
+	echo "=== Admin API Tests ==="; \
+	bash tests/newman/run-admin-smoke.sh http://localhost:8080; ADMIN_EXIT=$$?; \
+	if [ $$PATIENT_EXIT -ne 0 ] || [ $$ADMIN_EXIT -ne 0 ]; then \
+		echo "❌ Some test suites failed (patient=$$PATIENT_EXIT, admin=$$ADMIN_EXIT)"; \
+		exit 1; \
+	fi; \
+	echo "✅ All test suites passed"
+
+smoke-test-all-docker: ## 启动 Docker 服务 → 运行所有黑盒测试 → 清理
+	@docker compose up -d --build
+	@sleep 8
+	@bash tests/newman/run-smoke.sh http://localhost:8080; PATIENT_EXIT=$$?; \
+	echo ""; \
+	bash tests/newman/run-admin-smoke.sh http://localhost:8080; ADMIN_EXIT=$$?; \
+	docker compose down; \
+	if [ $$PATIENT_EXIT -ne 0 ] || [ $$ADMIN_EXIT -ne 0 ]; then \
+		echo "❌ Some test suites failed (patient=$$PATIENT_EXIT, admin=$$ADMIN_EXIT)"; \
+		exit 1; \
+	fi; \
+	echo "✅ All test suites passed"
+
+# ==========================
 # Clean
 # ==========================
 
