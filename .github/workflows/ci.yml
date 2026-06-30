@@ -140,16 +140,55 @@ jobs:
       - name: Install Newman
         run: npm install -g newman
 
-      - name: Run All Smoke Tests
-        id: smoke-all
-        run: make smoke-test-all-docker
-        timeout-minutes: 30
+      - name: Start Docker Compose
+        id: docker-up
+        run: |
+          docker compose up -d --build
+          echo "Waiting for services to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/api/health > /dev/null 2>&1; then
+              echo "✅ Server is ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          curl -s http://localhost:8080/api/health | python3 -m json.tool || true
+        timeout-minutes: 5
 
-      - name: Collect test logs on failure
-        if: failure() && steps.smoke-all.outcome == 'failure'
+      - name: Run Database Migrations
+        run: |
+          echo "Running database migrations..."
+          for f in db/migrations/*.up.sql; do
+            echo "  Running: $f"
+            docker compose exec -T mysql mysql -u root -ppassword neuhis < "$f" || echo "  (may already be applied)"
+          done
+          echo "✅ Migrations complete"
+
+      - name: Run Patient Smoke Tests
+        id: smoke-patient
+        run: bash tests/newman/run-smoke.sh http://localhost:8080
+        timeout-minutes: 20
+
+      - name: Restart server to clear rate limits
+        run: |
+          echo "Restarting app to clear rate limits before admin tests..."
+          docker compose restart app
+          sleep 5
+          curl -sf http://localhost:8080/api/health > /dev/null && echo "✅ Server ready"
+
+      - name: Run Admin Smoke Tests
+        id: smoke-admin
+        run: bash tests/newman/run-admin-smoke.sh http://localhost:8080
+        timeout-minutes: 10
+
+      - name: Collect Docker logs on failure
+        if: failure() && steps.docker-up.outcome == 'success'
         run: |
           echo "=== App logs ==="
           docker compose logs app || true
+          echo "=== MySQL logs ==="
+          docker compose logs mysql || true
           echo "=== Patient Newman report ==="
           cat tests/newman/reports/summary_*.txt 2>/dev/null || echo "No report found"
           echo "=== Admin Newman report ==="
