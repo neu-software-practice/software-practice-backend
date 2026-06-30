@@ -83,6 +83,9 @@ func (m *mockTimelineRepo) ListBySession(ctx context.Context, sid string, c *str
 func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) error {
 	return m.updateFunc(ctx, id, status)
 }
+func (m *mockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID string) (string, error) {
+	return "", nil
+}
 
 type mockFlowCardRepo struct {
 	createFunc       func(ctx context.Context, card *model.FlowCard) error
@@ -1268,7 +1271,7 @@ func TestClassifyIntent_Uncertain(t *testing.T) {
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
-	// Content with no matching keywords should default to consultation with low confidence.
+	// Content with no matching keywords should return uncertain per spec.
 	result, err := svc.ClassifyIntent(ctx, wbsvc.ClassifyIntentInput{
 		SessionID: "s1",
 		Content:   "我没什么特别想说的",
@@ -1276,11 +1279,11 @@ func TestClassifyIntent_Uncertain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ClassifyIntent: %v", err)
 	}
-	if result.Intent != "consultation" {
-		t.Errorf("intent = %s, want consultation (default)", result.Intent)
+	if result.Intent != "uncertain" {
+		t.Errorf("intent = %s, want uncertain", result.Intent)
 	}
-	if result.Confidence != 0.5 {
-		t.Errorf("confidence = %f, want 0.5", result.Confidence)
+	if result.Confidence > 0.5 {
+		t.Errorf("confidence = %f, want <= 0.5", result.Confidence)
 	}
 }
 
@@ -1724,4 +1727,61 @@ func containsStr(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestStreamAssistantMessage_CreateSessionFailure tests the error path when
+// medAgent session creation fails.
+func TestStreamAssistantMessage_CreateSessionFailure(t *testing.T) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		if path == "/sessions" {
+			return 500, `{"error":"internal server error"}`
+		}
+		return 404, `{"error":"not found"}`
+	})
+
+	ec := &eventCollector{}
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: "s1", RequestID: "r1",
+	}, ec.callback)
+	if err == nil {
+		t.Fatal("expected error when medAgent session creation fails")
+	}
+	if !containsStr(err.Error(), "medagent session") && !containsStr(err.Error(), "create") {
+		t.Logf("error message (informational): %v", err)
+	}
+}
+
+// TestStreamAssistantMessage_OK tests the StepOK handling.
+func TestStreamAssistantMessage_OK(t *testing.T) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		switch {
+		case path == "/sessions":
+			return 200, `{"session_id":"ma-001"}`
+		case containsStr(path, "/patient-say"):
+			return 200, `{"kind":"OK"}`
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+
+	ec := &eventCollector{}
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: "s1", RequestID: "r1",
+	}, ec.callback)
+	if err != nil {
+		t.Fatalf("StreamAssistantMessage OK: %v", err)
+	}
+	// OK step should only emit done (no state per A15 fix)
+	foundDone := false
+	for _, e := range ec.events {
+		if e.Type == "state" {
+			t.Error("OK step should not emit state event")
+		}
+		if e.Type == "done" {
+			foundDone = true
+		}
+	}
+	if !foundDone {
+		t.Error("OK step should emit done event")
+	}
 }

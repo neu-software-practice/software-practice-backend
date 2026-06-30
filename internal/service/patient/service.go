@@ -80,9 +80,13 @@ func (s *Service) GetContext(ctx context.Context, patientID string) (*model.Pati
 	summaries, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, nil, 1)
 	if err == nil && len(summaries) > 0 {
 		last := summaries[0]
+		completedAt := last.UpdatedAt
+		if last.EndedAt != nil {
+			completedAt = *last.EndedAt
+		}
 		ctx2.PriorVisit = &model.PatientPriorVisit{
 			SessionID:        last.ID,
-			CompletedAt:      time.Now(),
+			CompletedAt:      completedAt,
 			Diagnosis:        stringDeref(last.Summary.Diagnosis),
 			TreatmentSummary: stringDeref(last.Summary.TreatmentSummary),
 		}

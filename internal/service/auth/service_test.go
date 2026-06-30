@@ -8,6 +8,7 @@ import (
 
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/service/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const testSecret = "this-is-a-test-secret-that-is-at-least-32-bytes-long!!"
@@ -244,12 +245,19 @@ func TestRegister_PasswordTooShort(t *testing.T) {
 func TestLogin_Success(t *testing.T) {
 	ctx := context.Background()
 
+	// Pre-compute bcrypt hash directly — avoids coupling to Register implementation (C14)
+	const testPassword = "mypassword"
+	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), auth.BcryptCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword: %v", err)
+	}
+
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
 			return &model.User{
 				ID:           "u1",
 				Phone:        "13800001111",
-				PasswordHash: "$2a$12$LJ3m4ys/Y4BnEm4y6GXbku8lSxGPYhDqNfOJpGqse5MYFnTnNADXe",
+				PasswordHash: string(hash),
 				PatientID:    "p1",
 			}, nil
 		},
@@ -264,45 +272,9 @@ func TestLogin_Success(t *testing.T) {
 
 	svc := newTestService(userRepo, tokenRepo, patientRepo)
 
-	// Use Register to create a properly hashed user first
-	userRepo.findByPhoneFunc = func(ctx context.Context, phone string) (*model.User, error) {
-		return nil, model.ErrUserNotFound
-	}
-	userRepo.createFunc = func(ctx context.Context, user *model.User) error { return nil }
-	patientRepo.findByCredFunc = func(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
-		return &model.PatientProfile{ID: "p1"}, nil
-	}
-
-	regResp, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "mypassword",
-	})
-	if err != nil {
-		t.Fatalf("Register: %v", err)
-	}
-
-	// Now set up for login - capture the hash from Register
-	var capturedUser *model.User
-	userRepo.createFunc = func(ctx context.Context, user *model.User) error {
-		capturedUser = user
-		return nil
-	}
-	_, _ = svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800003333",
-		Password: "mypassword",
-	})
-
-	if capturedUser == nil {
-		t.Fatal("failed to capture user")
-	}
-
-	userRepo.findByPhoneFunc = func(ctx context.Context, phone string) (*model.User, error) {
-		return capturedUser, nil
-	}
-
 	resp, err := svc.Login(ctx, model.LoginInput{
-		Phone:    "13800003333",
-		Password: "mypassword",
+		Phone:    "13800001111",
+		Password: testPassword,
 	})
 	if err != nil {
 		t.Fatalf("Login: %v", err)
@@ -313,7 +285,6 @@ func TestLogin_Success(t *testing.T) {
 	if resp.User == nil {
 		t.Fatal("User should not be nil")
 	}
-	_ = regResp
 }
 
 func TestLogin_UserNotFound(t *testing.T) {

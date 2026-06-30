@@ -11,6 +11,7 @@ func TestLoadValidConfig(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
 	t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
 	t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -53,10 +54,37 @@ func TestLoadErrors(t *testing.T) {
 			wantErr: "JWT_SECRET must be at least 32 bytes, got 5 bytes",
 		},
 		{
+			name: "JWTBoundary31Bytes",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				// 31 bytes — one short of the 32-byte minimum
+				t.Setenv("JWT_SECRET", "abcdefghijklmnopqrstuvwxyz12345")
+				t.Setenv("MEDAGENT_API_KEY", "sk-test-key-for-validation")
+			},
+			wantErr: "JWT_SECRET must be at least 32 bytes, got 31 bytes",
+		},
+		{
 			name: "JWTWeakPassword",
 			setup: func(t *testing.T) {
 				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
 				t.Setenv("JWT_SECRET", "12345678901234567890123456789012")
+			},
+			wantErr: "JWT_SECRET is too weak (matches blacklisted pattern)",
+		},
+		{
+			name: "JWTWeakPasswordPattern2",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "changeme-changeme-changeme-change")
+			},
+			wantErr: "JWT_SECRET is too weak (matches blacklisted pattern)",
+		},
+		{
+			name: "JWTWeakPasswordPattern3",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				// Pad the blacklisted pattern to exceed 32-byte minimum
+				t.Setenv("JWT_SECRET", "extra-secret-secret-secret-secret-sec")
 			},
 			wantErr: "JWT_SECRET is too weak (matches blacklisted pattern)",
 		},

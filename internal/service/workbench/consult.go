@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
 	"github.com/neuhis/software-practice-backend/internal/model"
@@ -40,10 +41,10 @@ func (s *Service) ClassifyIntent(ctx context.Context, input ClassifyIntentInput)
 		confidence = 0.8
 		reason = "检测到咨询意向"
 	} else {
-		// Default to consultation for completed visits
-		intent = "consultation"
-		confidence = 0.5
-		reason = "默认分类为咨询"
+		// Confidence below threshold — return uncertain per spec
+		intent = "uncertain"
+		confidence = 0.3
+		reason = "无法确定意图"
 	}
 
 	return &ClassifyIntentResult{
@@ -82,10 +83,10 @@ func (s *Service) StreamConsultationReply(ctx context.Context, sessionID, conten
 
 	// Message final
 	_ = callback(model.AssistantStreamEvent{
-		Type:      "message_final",
-		SessionID: sessionID,
-		RequestID: requestID,
-		Item:      &msgItem,
+		Type:             "message_final",
+		SessionID:        sessionID,
+		RequestID:        requestID,
+		MessageFinalItem: &msgItem,
 	})
 
 	// Done
@@ -120,10 +121,10 @@ func (s *Service) AskLockedQuestion(ctx context.Context, sessionID, cardID, cont
 	_ = s.timelineRepo.Append(ctx, &msgItem)
 
 	_ = callback(model.AssistantStreamEvent{
-		Type:      "message_final",
-		SessionID: sessionID,
-		RequestID: requestID,
-		Item:      &msgItem,
+		Type:             "message_final",
+		SessionID:        sessionID,
+		RequestID:        requestID,
+		MessageFinalItem: &msgItem,
 	})
 
 	_ = callback(model.AssistantStreamEvent{
@@ -137,21 +138,8 @@ func (s *Service) AskLockedQuestion(ctx context.Context, sessionID, cardID, cont
 
 func containsAny(s string, keywords []string) bool {
 	for _, k := range keywords {
-		for i := 0; i <= len(s)-len(k); i++ {
-			// Using rune-based comparison for CJK support
-			if len([]rune(s[i:i+len(k)])) == len([]rune(k)) {
-				if s[i:i+len(k)] == k {
-					return true
-				}
-			}
-		}
-		// Simple substring check fallback
-		if len(s) >= len(k) {
-			for j := 0; j <= len(s)-len(k); j++ {
-				if s[j:j+len(k)] == k {
-					return true
-				}
-			}
+		if strings.Contains(s, k) {
+			return true
 		}
 	}
 	return false

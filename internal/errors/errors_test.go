@@ -112,8 +112,16 @@ func TestWriteError(t *testing.T) {
 
 		apperrors.WriteValidationError(c, "invalid")
 
-		if w.Code != 400 {
-			t.Errorf("status = %d, want 400", w.Code)
+		if w.Code != 422 {
+			t.Errorf("status = %d, want 422", w.Code)
+		}
+		// Verify body contains the error code and message
+		var body map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &body)
+		if errMap, ok := body["error"].(map[string]interface{}); ok {
+			if errMap["code"] != "VALIDATION_ERROR" {
+				t.Errorf("error code = %v, want VALIDATION_ERROR", errMap["code"])
+			}
 		}
 	})
 
@@ -126,6 +134,14 @@ func TestWriteError(t *testing.T) {
 
 		if w.Code != 404 {
 			t.Errorf("status = %d, want 404", w.Code)
+		}
+		// Verify body contains the error code
+		var body map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &body)
+		if errMap, ok := body["error"].(map[string]interface{}); ok {
+			if errMap["code"] != "SESSION_NOT_FOUND" {
+				t.Errorf("error code = %v, want SESSION_NOT_FOUND", errMap["code"])
+			}
 		}
 	})
 

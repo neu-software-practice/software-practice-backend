@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
@@ -30,28 +31,52 @@ func (r *timelineMySQLRepo) Append(ctx context.Context, item *model.TimelineItem
 }
 
 func (r *timelineMySQLRepo) AppendBatch(ctx context.Context, items []model.TimelineItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	valueStrings := make([]string, 0, len(items))
+	valueArgs := make([]interface{}, 0, len(items)*6)
+
 	for i := range items {
 		if items[i].CreatedAt.IsZero() {
-			items[i].CreatedAt = time.Now()
+			items[i].CreatedAt = now
 		}
 		if items[i].Status == "" {
 			items[i].Status = "done"
 		}
 
-		contentJSON, err := json.Marshal(items[i])
+		// Marshal only non-column fields to avoid dual storage (B6)
+		contentJSON, err := json.Marshal(model.TimelineContent{
+			Role:                items[i].Role,
+			Content:             items[i].Content,
+			LocalKey:            items[i].LocalKey,
+			InterruptedBy:       items[i].InterruptedBy,
+			Card:                items[i].Card,
+			EventType:           items[i].EventType,
+			Title:               items[i].Title,
+			Description:         items[i].Description,
+			Reason:              items[i].Reason,
+			SuggestedDepartment: items[i].SuggestedDepartment,
+		})
 		if err != nil {
 			return fmt.Errorf("marshal timeline item: %w", err)
 		}
 
-		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO timeline_items (id, session_id, kind, status, content, created_at)
-			VALUES (?, ?, ?, ?, ?, ?)`,
-			items[i].ID, items[i].SessionID, items[i].Kind, items[i].Status,
-			string(contentJSON), items[i].CreatedAt,
-		)
-		if err != nil {
-			return fmt.Errorf("append timeline item: %w", err)
-		}
+		// Build multi-row INSERT: (?, ?, ?, ?, ?, ?)
+		valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?)")
+		valueArgs = append(valueArgs, items[i].ID, items[i].SessionID, items[i].Kind,
+			items[i].Status, string(contentJSON), items[i].CreatedAt)
+	}
+
+	// #nosec G202 — multi-row INSERT with parameterized placeholders; values are not user-controlled
+	query := `INSERT INTO timeline_items (id, session_id, kind, status, content, created_at) VALUES ` +
+		strings.Join(valueStrings, ", ")
+
+	_, err := r.db.ExecContext(ctx, query, valueArgs...)
+	if err != nil {
+		return fmt.Errorf("batch append timeline items: %w", err)
 	}
 	return nil
 }
@@ -66,13 +91,13 @@ func (r *timelineMySQLRepo) ListBySession(ctx context.Context, sessionID string,
 
 	if cursor != nil && *cursor != "" {
 		rows, err = r.db.QueryContext(ctx,
-			`SELECT content FROM timeline_items
+			`SELECT id, session_id, kind, status, content, created_at FROM timeline_items
 			WHERE session_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?`,
 			sessionID, *cursor, pageSize+1,
 		)
 	} else {
 		rows, err = r.db.QueryContext(ctx,
-			`SELECT content FROM timeline_items
+			`SELECT id, session_id, kind, status, content, created_at FROM timeline_items
 			WHERE session_id = ? ORDER BY created_at DESC LIMIT ?`,
 			sessionID, pageSize+1,
 		)
@@ -85,13 +110,15 @@ func (r *timelineMySQLRepo) ListBySession(ctx context.Context, sessionID string,
 	var items []model.TimelineItem
 	for rows.Next() {
 		var contentJSON string
-		if err := rows.Scan(&contentJSON); err != nil {
+		var item model.TimelineItem
+		if err := rows.Scan(&item.ID, &item.SessionID, &item.Kind, &item.Status, &contentJSON, &item.CreatedAt); err != nil {
 			return nil, nil, false, fmt.Errorf("scan timeline item: %w", err)
 		}
-		var item model.TimelineItem
+		// Unmarshal non-column fields from content JSON; column values take precedence
 		if err := json.Unmarshal([]byte(contentJSON), &item); err != nil {
 			return nil, nil, false, fmt.Errorf("unmarshal timeline item: %w", err)
 		}
+		// Restore column values from SQL (content JSON may carry stale/extra values in old format)
 		items = append(items, item)
 	}
 
@@ -116,4 +143,34 @@ func (r *timelineMySQLRepo) UpdateStatus(ctx context.Context, id string, status 
 		status, id,
 	)
 	return err
+}
+
+// FindLastPatientMessage finds the most recent patient message in a session.
+// It scans recent message-type items and returns the content of the last patient message.
+func (r *timelineMySQLRepo) FindLastPatientMessage(ctx context.Context, sessionID string) (string, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT content FROM timeline_items
+		WHERE session_id = ? AND kind = 'message'
+		ORDER BY created_at DESC LIMIT 5`,
+		sessionID,
+	)
+	if err != nil {
+		return "", fmt.Errorf("find last patient message: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var contentJSON string
+		if err := rows.Scan(&contentJSON); err != nil {
+			return "", fmt.Errorf("scan last patient message: %w", err)
+		}
+		var item model.TimelineItem
+		if err := json.Unmarshal([]byte(contentJSON), &item); err != nil {
+			return "", fmt.Errorf("unmarshal last patient message: %w", err)
+		}
+		if item.Role == "patient" {
+			return item.Content, nil
+		}
+	}
+	return "", nil
 }

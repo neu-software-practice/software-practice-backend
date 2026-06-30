@@ -14,7 +14,6 @@ import (
 type SSEWriter struct {
 	c       *gin.Context
 	flusher http.Flusher
-	done    chan struct{}
 }
 
 // NewSSEWriter creates a new SSE writer for the given context.
@@ -32,7 +31,6 @@ func NewSSEWriter(c *gin.Context) (*SSEWriter, error) {
 	return &SSEWriter{
 		c:       c,
 		flusher: flusher,
-		done:    make(chan struct{}),
 	}, nil
 }
 
@@ -44,7 +42,7 @@ func (w *SSEWriter) WriteEvent(event model.AssistantStreamEvent) error {
 	}
 
 	// SSE format: "data: <JSON>\n\n"
-	_, err = fmt.Fprintf(w.c.Writer, "data: %s\n\n", string(data))
+	_, err = fmt.Fprintf(w.c.Writer, "data: %s\n\n", data)
 	if err != nil {
 		return err
 	}
@@ -81,12 +79,11 @@ func (w *SSEWriter) Heartbeat(interval time.Duration, stop <-chan struct{}) {
 	}
 }
 
-// Close signals the SSE writer is done.
+// Close is a no-op kept for compatibility with callers that defer its execution.
 func (w *SSEWriter) Close() {
-	close(w.done)
 }
 
-// StreamEvents writes a sequence of SSE events.
+// StreamEvents streams a batch of assistant events via SSE, then closes.
 func StreamEvents(c *gin.Context, events []model.AssistantStreamEvent) {
 	writer, err := NewSSEWriter(c)
 	if err != nil {

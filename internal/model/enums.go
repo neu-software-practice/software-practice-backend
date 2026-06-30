@@ -337,3 +337,12 @@ const (
 	FinalOutcomeAdvice   FinalOutcome = "ADVICE"
 	FinalOutcomeReferral FinalOutcome = "REFERRAL"
 )
+
+// EvidenceSource identifies the origin of a diagnostic evidence item.
+type EvidenceSource string
+
+const (
+	EvidenceSourceHistory   EvidenceSource = "history"
+	EvidenceSourceAnswer    EvidenceSource = "answer"
+	EvidenceSourceLabResult EvidenceSource = "lab_result"
+)

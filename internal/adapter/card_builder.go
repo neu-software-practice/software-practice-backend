@@ -9,18 +9,23 @@ import (
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 )
 
-// BuildLabDecisionCard creates a lab_decision FlowCard from a NEED_TESTS step.
-func BuildLabDecisionCard(sessionID string, step *medagent.Step) *model.FlowCard {
+// newBaseCard creates a FlowCard with the common shared fields populated.
+func newBaseCard(sessionID string, kind model.FlowCardKind, status model.FlowCardStatus, title string) *model.FlowCard {
 	now := time.Now()
-	card := &model.FlowCard{
+	return &model.FlowCard{
 		ID:        uuid.New().String(),
 		SessionID: sessionID,
-		Kind:      string(model.FlowCardKindLabDecision),
-		Status:    string(model.FlowCardStatusPending),
-		Blocking:  true,
-		Title:     "是否需要进行检验？",
+		Kind:      string(kind),
+		Status:    string(status),
+		Title:     title,
 		CreatedAt: now,
 	}
+}
+
+// BuildLabDecisionCard creates a lab_decision FlowCard from a NEED_TESTS step.
+func BuildLabDecisionCard(sessionID string, step *medagent.Step) *model.FlowCard {
+	card := newBaseCard(sessionID, model.FlowCardKindLabDecision, model.FlowCardStatusPending, "是否需要进行检验？")
+	card.Blocking = true
 
 	for _, item := range step.TestItems {
 		card.TestItems = append(card.TestItems, model.TestItem{
@@ -37,17 +42,9 @@ func BuildLabDecisionCard(sessionID string, step *medagent.Step) *model.FlowCard
 
 // BuildDiagnosisCard creates a diagnosis FlowCard from a DONE step result.
 func BuildDiagnosisCard(sessionID string, result *medagent.Result) *model.FlowCard {
+	card := newBaseCard(sessionID, model.FlowCardKindDiagnosis, model.FlowCardStatusCompleted, "诊断结果")
 	now := time.Now()
-	card := &model.FlowCard{
-		ID:        uuid.New().String(),
-		SessionID: sessionID,
-		Kind:      string(model.FlowCardKindDiagnosis),
-		Status:    string(model.FlowCardStatusCompleted),
-		Blocking:  false,
-		Title:     "诊断结果",
-		CreatedAt: now,
-		HandledAt: &now,
-	}
+	card.HandledAt = &now
 
 	if result.Diagnosis != nil {
 		card.Diagnosis = result.Diagnosis.Name
@@ -66,16 +63,7 @@ func BuildDiagnosisCard(sessionID string, result *medagent.Result) *model.FlowCa
 
 // BuildTreatmentPlanCard creates a treatment_plan FlowCard.
 func BuildTreatmentPlanCard(sessionID string, result *medagent.Result) *model.FlowCard {
-	now := time.Now()
-	card := &model.FlowCard{
-		ID:        uuid.New().String(),
-		SessionID: sessionID,
-		Kind:      string(model.FlowCardKindTreatmentPlan),
-		Status:    string(model.FlowCardStatusCompleted),
-		Blocking:  false,
-		Title:     "处置方案",
-		CreatedAt: now,
-	}
+	card := newBaseCard(sessionID, model.FlowCardKindTreatmentPlan, model.FlowCardStatusCompleted, "处置方案")
 
 	card.Plan = result.Plan
 	card.Summary = result.Advice
@@ -91,16 +79,8 @@ func BuildTreatmentPlanCard(sessionID string, result *medagent.Result) *model.Fl
 
 // BuildMedicationFulfillmentCard creates a medication_fulfillment FlowCard from a PURCHASE step.
 func BuildMedicationFulfillmentCard(sessionID string, step *medagent.Step) *model.FlowCard {
-	now := time.Now()
-	card := &model.FlowCard{
-		ID:        uuid.New().String(),
-		SessionID: sessionID,
-		Kind:      string(model.FlowCardKindMedicationFulfillment),
-		Status:    string(model.FlowCardStatusPending),
-		Blocking:  true,
-		Title:     "购药确认",
-		CreatedAt: now,
-	}
+	card := newBaseCard(sessionID, model.FlowCardKindMedicationFulfillment, model.FlowCardStatusPending, "购药确认")
+	card.Blocking = true
 
 	for _, order := range step.Orders {
 		card.Medications = append(card.Medications, model.MedicationItem{
@@ -118,18 +98,10 @@ func BuildMedicationFulfillmentCard(sessionID string, step *medagent.Step) *mode
 
 // BuildCompletedVisitCard creates a completed_visit FlowCard.
 func BuildCompletedVisitCard(sessionID string, result *medagent.Result) *model.FlowCard {
+	card := newBaseCard(sessionID, model.FlowCardKindCompletedVisit, model.FlowCardStatusCompleted, "就诊完成")
 	now := time.Now()
-	card := &model.FlowCard{
-		ID:          uuid.New().String(),
-		SessionID:   sessionID,
-		Kind:        string(model.FlowCardKindCompletedVisit),
-		Status:      string(model.FlowCardStatusCompleted),
-		Blocking:    false,
-		Title:       "就诊完成",
-		CreatedAt:   now,
-		HandledAt:   &now,
-		CompletedAt: now,
-	}
+	card.HandledAt = &now
+	card.CompletedAt = now
 
 	if result.Diagnosis != nil {
 		card.Diagnosis = result.Diagnosis.Name
@@ -142,16 +114,8 @@ func BuildCompletedVisitCard(sessionID string, result *medagent.Result) *model.F
 
 // BuildAdviceOnlyCard creates an advice_only FlowCard.
 func BuildAdviceOnlyCard(sessionID string, result *medagent.Result) *model.FlowCard {
-	now := time.Now()
-	card := &model.FlowCard{
-		ID:        uuid.New().String(),
-		SessionID: sessionID,
-		Kind:      string(model.FlowCardKindAdviceOnly),
-		Status:    string(model.FlowCardStatusPending),
-		Blocking:  true,
-		Title:     "医嘱确认",
-		CreatedAt: now,
-	}
+	card := newBaseCard(sessionID, model.FlowCardKindAdviceOnly, model.FlowCardStatusPending, "医嘱确认")
+	card.Blocking = true
 
 	card.Advices = append(card.Advices, result.Advice)
 	card.FollowUpRecommendation = "请遵医嘱，如有不适及时复诊"
@@ -161,22 +125,14 @@ func BuildAdviceOnlyCard(sessionID string, result *medagent.Result) *model.FlowC
 
 // BuildPaymentCard creates a payment FlowCard.
 func BuildPaymentCard(sessionID, purpose string, items []model.PaymentLineItem, totalAmount float64) *model.FlowCard {
-	now := time.Now()
-	card := &model.FlowCard{
-		ID:              uuid.New().String(),
-		SessionID:       sessionID,
-		Kind:            string(model.FlowCardKindPayment),
-		Status:          string(model.FlowCardStatusPending),
-		Blocking:        true,
-		Title:           "缴费",
-		CreatedAt:       now,
-		Purpose:         purpose,
-		Items:           items,
-		TotalAmount:     model.Float64Ptr(totalAmount),
-		InsuranceAmount: model.Float64Ptr(0),
-		SelfPayAmount:   model.Float64Ptr(totalAmount),
-		PaymentStatus:   string(model.PaymentStatusUnpaid),
-	}
+	card := newBaseCard(sessionID, model.FlowCardKindPayment, model.FlowCardStatusPending, "缴费")
+	card.Blocking = true
+	card.Purpose = purpose
+	card.Items = items
+	card.TotalAmount = model.Float64Ptr(totalAmount)
+	card.InsuranceAmount = model.Float64Ptr(0)
+	card.SelfPayAmount = model.Float64Ptr(totalAmount)
+	card.PaymentStatus = string(model.PaymentStatusUnpaid)
 
 	return card
 }

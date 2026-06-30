@@ -23,6 +23,8 @@ import (
 	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
+func pf(v float64) *float64 { return &v }
+
 func init() {
 	gin.SetMode(gin.TestMode)
 }
@@ -622,6 +624,9 @@ func (m *mockTimelineRepo) ListBySession(ctx context.Context, sid string, cursor
 	return nil, nil, false, nil
 }
 func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) error { return nil }
+func (m *mockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID string) (string, error) {
+	return "", nil
+}
 
 type mockFlowCardRepo struct {
 	listBySessionFunc func(ctx context.Context, sid string) ([]model.FlowCard, error)
@@ -1222,6 +1227,59 @@ func TestWorkbenchHandler_ListTimeline(t *testing.T) {
 	})
 }
 
+
+	// TestWorkbenchHandler_SendMessage tests the write endpoint for sending a patient message.
+	func TestWorkbenchHandler_SendMessage(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+
+		visitRepo := &mockVisitRepo{
+			findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+				return &model.VisitSession{
+					ID: id, PatientID: "p001", Status: "chatting",
+					MachineState: string(model.VisitMachineStateChatting),
+				}, nil
+			},
+		}
+		timelineRepo := &mockTimelineRepo{
+			appendFunc: func(ctx context.Context, item *model.TimelineItem) error {
+				return nil
+			},
+		}
+		svc := newWorkbenchServiceForTest(visitRepo, timelineRepo)
+		h := handler.NewWorkbenchHandler(svc)
+
+		t.Run("valid request", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+			body := `{"content":"hello"}`
+			c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("patientId", "p001")
+
+			h.SendMessage(c)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("auth denied - missing patientId", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+			body := `{"content":"hello"}`
+			c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			// Intentionally not setting patientId
+
+			h.SendMessage(c)
+
+			if w.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want 403", w.Code)
+			}
+		})
+	}
 // ---------------------------------------------------------------------------
 // Address Handler tests
 // ---------------------------------------------------------------------------
@@ -1544,8 +1602,8 @@ func TestBillingHandler_ListBillingRecords_WithData(t *testing.T) {
 		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
 			return []model.FlowCard{{
 				ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "paid",
-				PaymentID: "pay-1", Purpose: "lab", TotalAmount: 150.0,
-				InsuranceAmount: 100.0, SelfPayAmount: 50.0,
+				PaymentID: "pay-1", Purpose: "lab", TotalAmount: pf(150.0),
+				InsuranceAmount: pf(100.0), SelfPayAmount: pf(50.0),
 				HandledAt: &handledAt,
 			}}, nil
 		},

@@ -71,7 +71,11 @@ NEUHIS Agent（产品名「东软云脑智能医疗」）是面向患者的「AI
 | `VALIDATION_ERROR` | Zod 响应解析失败 (`createValidationApiError`) | false | 返回数据不符合前端契约，`details` 为 Zod issues |
 | `UNKNOWN_ERROR` | 未知异常兜底 (`toApiError`) | true | 未识别异常，默认可重试 |
 | `NETWORK_ERROR` | 网络层 | true | 网络连接不稳定 |
-| `HTTP_<status>` | HTTP 非 2xx（如 `HTTP_404`） | 4xx 不可重试 / 5xx 可重试 | 由 `parseHttpStatus` 从 `HTTP_404` 解析状态码 |
+| `UNAUTHORIZED` | 认证失败 | false | 未提供有效认证凭据 |
+| `FORBIDDEN` | 权限不足 | false | 无权访问指定资源 |
+| `NOT_FOUND` | 资源未找到 | false | 端点或资源不存在 |
+| `TIMEOUT` | 请求超时 | false | 请求处理超时 |
+| `INTERNAL_ERROR` | 服务器内部错误 | true | 服务器异常 |
 | `SESSION_NOT_FOUND` | 业务 | false | 找不到该就诊会话 |
 | `PATIENT_NOT_FOUND` | 业务 | false | 找不到患者信息 |
 | `CARD_NOT_FOUND` | 业务 | true | 流程卡已更新/失效，提示刷新 |
@@ -244,7 +248,7 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `longTermMedications` | string[] | 是 | 长期用药 |
 | `updatedAt` | ISO8601 | 是 | 更新时间 |
 
-注意错误：`PATIENT_NOT_FOUND`、`VALIDATION_ERROR`、`HTTP_401`。
+注意错误：`PATIENT_NOT_FOUND`、`VALIDATION_ERROR`、`UNAUTHORIZED`。
 
 #### `GET /patients/:patientId/context` — 问诊上下文
 
@@ -263,7 +267,7 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 
 `PatientPriorVisit`（`patientPriorVisitSchema`）：`sessionId`(必)、`completedAt`(ISO8601, 必)、`diagnosis`(必)、`labResultSummary`(可选)、`treatmentSummary`(必)。
 
-注意错误：`PATIENT_NOT_FOUND`、`HTTP_403`、`HTTP_404`。
+注意错误：`PATIENT_NOT_FOUND`、`FORBIDDEN`、`NOT_FOUND`。
 
 #### `PATCH /patients/:patientId/profile` — 更新患者资料
 

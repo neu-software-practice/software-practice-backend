@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -49,7 +50,7 @@ func (h *PatientHandler) GetContext(c *gin.Context) {
 	}
 
 	ctx2, err := h.svc.GetContext(c.Request.Context(), patientID)
-	if err == model.ErrPatientNotFound {
+	if errors.Is(err, model.ErrPatientNotFound) {
 		apperrors.WriteNotFound(c, apperrors.CodePatientNotFound, "patient not found")
 		return
 	}
@@ -77,7 +78,7 @@ func (h *PatientHandler) UpdateProfile(c *gin.Context) {
 	input.PatientID = patientID
 
 	updated, err := h.svc.UpdateProfile(c.Request.Context(), patientID, input)
-	if err == model.ErrPatientNotFound {
+	if errors.Is(err, model.ErrPatientNotFound) {
 		apperrors.WriteNotFound(c, apperrors.CodePatientNotFound, "patient not found")
 		return
 	}

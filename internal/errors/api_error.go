@@ -1,7 +1,5 @@
 package errors
 
-// fmt is used for error formatting
-
 // ApiError is a structured error for API responses.
 type ApiError struct {
 	Code      string      `json:"code"`

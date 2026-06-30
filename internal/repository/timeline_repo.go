@@ -11,5 +11,6 @@ type TimelineRepository interface {
 	Append(ctx context.Context, item *model.TimelineItem) error
 	AppendBatch(ctx context.Context, items []model.TimelineItem) error
 	ListBySession(ctx context.Context, sessionID string, cursor *string, pageSize int) ([]model.TimelineItem, *string, bool, error)
+	FindLastPatientMessage(ctx context.Context, sessionID string) (string, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 }

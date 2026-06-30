@@ -19,10 +19,35 @@ func NewPatientRepository(db *sql.DB) PatientRepository {
 	return &patientMySQLRepo{db: db}
 }
 
-func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
+type patientScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// scanPatient scans a patient row from the given scanner and parses JSON array columns.
+func scanPatient(scanner patientScanner) (*model.PatientProfile, error) {
 	var p model.PatientProfile
 	var allergiesJSON, chronicJSON, medsJSON, medHistJSON string
 
+	err := scanner.Scan(
+		&p.ID, &p.Name, &p.Gender, &p.Age, &p.PhoneMasked, &p.IDCardMasked,
+		&allergiesJSON, &chronicJSON, &medsJSON, &medHistJSON, &p.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, model.ErrPatientNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	p.Allergies = parseJSONStringArray(allergiesJSON)
+	p.ChronicDiseases = parseJSONStringArray(chronicJSON)
+	p.LongTermMedications = parseJSONStringArray(medsJSON)
+	p.MedicalHistory = parseJSONStringArray(medHistJSON)
+
+	return &p, nil
+}
+
+func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
 	query := `SELECT id, name, gender, age, phone_masked, id_card_masked,
 		allergies, chronic_diseases, long_term_medications, medical_history, updated_at
 		FROM patients WHERE `
@@ -36,48 +61,23 @@ func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, crede
 		return nil, fmt.Errorf("unknown credential type: %s", credType)
 	}
 
-	err := r.db.QueryRowContext(ctx, query, credential).Scan(
-		&p.ID, &p.Name, &p.Gender, &p.Age, &p.PhoneMasked, &p.IDCardMasked,
-		&allergiesJSON, &chronicJSON, &medsJSON, &medHistJSON, &p.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, model.ErrPatientNotFound
-	}
+	p, err := scanPatient(r.db.QueryRowContext(ctx, query, credential))
 	if err != nil {
 		return nil, fmt.Errorf("find patient by credential: %w", err)
 	}
-
-	p.Allergies = parseJSONStringArray(allergiesJSON)
-	p.ChronicDiseases = parseJSONStringArray(chronicJSON)
-	p.LongTermMedications = parseJSONStringArray(medsJSON)
-	p.MedicalHistory = parseJSONStringArray(medHistJSON)
-
-	return &p, nil
+	return p, nil
 }
 
 func (r *patientMySQLRepo) FindByID(ctx context.Context, id string) (*model.PatientProfile, error) {
-	var p model.PatientProfile
-	var allergiesJSON, chronicJSON, medsJSON, medHistJSON string
-
-	err := r.db.QueryRowContext(ctx,
+	p, err := scanPatient(r.db.QueryRowContext(ctx,
 		`SELECT id, name, gender, age, phone_masked, id_card_masked,
 		allergies, chronic_diseases, long_term_medications, medical_history, updated_at
 		FROM patients WHERE id = ?`, id,
-	).Scan(&p.ID, &p.Name, &p.Gender, &p.Age, &p.PhoneMasked, &p.IDCardMasked,
-		&allergiesJSON, &chronicJSON, &medsJSON, &medHistJSON, &p.UpdatedAt)
-	if err == sql.ErrNoRows {
-		return nil, model.ErrPatientNotFound
-	}
+	))
 	if err != nil {
 		return nil, fmt.Errorf("find patient by id: %w", err)
 	}
-
-	p.Allergies = parseJSONStringArray(allergiesJSON)
-	p.ChronicDiseases = parseJSONStringArray(chronicJSON)
-	p.LongTermMedications = parseJSONStringArray(medsJSON)
-	p.MedicalHistory = parseJSONStringArray(medHistJSON)
-
-	return &p, nil
+	return p, nil
 }
 
 func (r *patientMySQLRepo) Create(ctx context.Context, patient *model.PatientProfile) error {
@@ -106,10 +106,32 @@ func (r *patientMySQLRepo) Create(ctx context.Context, patient *model.PatientPro
 }
 
 func (r *patientMySQLRepo) UpdateProfile(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
-	p, err := r.FindByID(ctx, id)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }()
+
+	var p model.PatientProfile
+	var allergiesJSON, chronicJSON, medsJSON, medHistJSON string
+
+	err = tx.QueryRowContext(ctx,
+		`SELECT id, name, gender, age, phone_masked, id_card_masked,
+		allergies, chronic_diseases, long_term_medications, medical_history, updated_at
+		FROM patients WHERE id = ? FOR UPDATE`, id,
+	).Scan(&p.ID, &p.Name, &p.Gender, &p.Age, &p.PhoneMasked, &p.IDCardMasked,
+		&allergiesJSON, &chronicJSON, &medsJSON, &medHistJSON, &p.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, model.ErrPatientNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find patient for update: %w", err)
+	}
+
+	p.Allergies = parseJSONStringArray(allergiesJSON)
+	p.ChronicDiseases = parseJSONStringArray(chronicJSON)
+	p.LongTermMedications = parseJSONStringArray(medsJSON)
+	p.MedicalHistory = parseJSONStringArray(medHistJSON)
 
 	if input.Allergies != nil {
 		p.Allergies = input.Allergies
@@ -124,21 +146,27 @@ func (r *patientMySQLRepo) UpdateProfile(ctx context.Context, id string, input m
 		p.MedicalHistory = input.MedicalHistory
 	}
 
-	allergiesJSON, _ := json.Marshal(p.Allergies)
-	chronicJSON, _ := json.Marshal(p.ChronicDiseases)
-	medsJSON, _ := json.Marshal(p.LongTermMedications)
-	medHistJSON, _ := json.Marshal(p.MedicalHistory)
+	now := time.Now()
 
-	_, err = r.db.ExecContext(ctx,
+	allergiesJSONB, _ := json.Marshal(p.Allergies)
+	chronicJSONB, _ := json.Marshal(p.ChronicDiseases)
+	medsJSONB, _ := json.Marshal(p.LongTermMedications)
+	medHistJSONB, _ := json.Marshal(p.MedicalHistory)
+
+	_, err = tx.ExecContext(ctx,
 		`UPDATE patients SET allergies=?, chronic_diseases=?, long_term_medications=?, medical_history=?, updated_at=? WHERE id=?`,
-		string(allergiesJSON), string(chronicJSON), string(medsJSON), string(medHistJSON), time.Now(), id,
+		string(allergiesJSONB), string(chronicJSONB), string(medsJSONB), string(medHistJSONB), now, id,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("update patient profile: %w", err)
 	}
 
-	p.UpdatedAt = time.Now()
-	return p, nil
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	p.UpdatedAt = now
+	return &p, nil
 }
 
 func parseJSONStringArray(raw string) []string {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,7 +27,7 @@ func (h *WorkbenchHandler) getSessionAndVerify(c *gin.Context) (*model.VisitSess
 	sessionID := ParseSessionID(c)
 	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
 	if err != nil {
-		if err == model.ErrSessionNotFound {
+		if errors.Is(err, model.ErrSessionNotFound) {
 			apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
 		} else {
 			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
@@ -55,12 +56,7 @@ func (h *WorkbenchHandler) ListTimeline(c *gin.Context) {
 	pageSize := ParseQueryInt(c, "pageSize", 50)
 
 	// Verify session access
-	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
-	if err != nil {
-		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
-		return
-	}
-	if !RequirePatientID(c, session.PatientID) {
+	if _, err := h.getSessionAndVerify(c); err != nil {
 		return
 	}
 
@@ -89,12 +85,7 @@ func (h *WorkbenchHandler) SendMessage(c *gin.Context) {
 	}
 	input.SessionID = sessionID
 
-	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
-	if err != nil {
-		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
-		return
-	}
-	if !RequirePatientID(c, session.PatientID) {
+	if _, err := h.getSessionAndVerify(c); err != nil {
 		return
 	}
 
@@ -127,12 +118,7 @@ func (h *WorkbenchHandler) StreamAssistantMessage(c *gin.Context) {
 	}
 	input.SessionID = sessionID
 
-	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
-	if err != nil {
-		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
-		return
-	}
-	if !RequirePatientID(c, session.PatientID) {
+	if _, err := h.getSessionAndVerify(c); err != nil {
 		return
 	}
 
@@ -540,29 +526,21 @@ func (h *WorkbenchHandler) GenerateTitle(c *gin.Context) {
 	}
 
 	// Verify session access
-	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
-	if err != nil {
-		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
-		return
-	}
-	if !RequirePatientID(c, session.PatientID) {
+	if _, err := h.getSessionAndVerify(c); err != nil {
 		return
 	}
 
 	title, err := h.svc.GenerateTitle(c.Request.Context(), sessionID)
 	if err != nil {
-		switch {
-		case err.Error() == "session not found":
-			apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
-		case err.Error() == "title already exists":
-			// Idempotent: return existing title
-			c.JSON(http.StatusOK, api.SuccessResponse(gin.H{
-				"sessionId": sessionID,
-				"title":     *session.Summary.Title,
-			}))
-		case err.Error() == "llm unavailable":
-			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeLLMUnavailable, "LLM service unavailable", 503))
-		default:
+		var apiErr *apperrors.ApiError
+		if errors.As(err, &apiErr) {
+			switch apiErr.Code {
+			case apperrors.CodeSessionNotFound:
+				apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, apiErr.Message)
+			default:
+				apperrors.WriteError(c, apiErr)
+			}
+		} else {
 			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
 		}
 		return

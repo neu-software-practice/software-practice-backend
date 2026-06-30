@@ -185,7 +185,7 @@ func TestCreateSessionInputValidate(t *testing.T) {
 		wantErr bool
 	}{
 		{"valid new", model.CreateSessionInput{PatientID: "p1", EntryType: "new"}, false},
-		{"invalid entry type", model.CreateSessionInput{PatientID: "p1", EntryType: "follow_up"}, true},
+		{"follow_up entry type rejected for new session", model.CreateSessionInput{PatientID: "p1", EntryType: "follow_up"}, true},
 		{"empty entry type", model.CreateSessionInput{PatientID: "p1", EntryType: ""}, true},
 	}
 
@@ -200,41 +200,162 @@ func TestCreateSessionInputValidate(t *testing.T) {
 }
 
 func TestEnumConstants(t *testing.T) {
-	// Verify key enum values match front-api.md specs
-	if model.VisitStatusChatting != "chatting" {
-		t.Error("VisitStatusChatting mismatch")
-	}
-	if model.VisitStatusBlocked != "blocked" {
-		t.Error("VisitStatusBlocked mismatch")
-	}
-	if model.VisitStatusCompleted != "completed" {
-		t.Error("VisitStatusCompleted mismatch")
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		// VisitStatus — 10 values
+		{name: "VisitStatusLoadingContext", value: string(model.VisitStatusLoadingContext), expected: "loading_context"},
+		{name: "VisitStatusChatting", value: string(model.VisitStatusChatting), expected: "chatting"},
+		{name: "VisitStatusAnalyzing", value: string(model.VisitStatusAnalyzing), expected: "analyzing"},
+		{name: "VisitStatusBlocked", value: string(model.VisitStatusBlocked), expected: "blocked"},
+		{name: "VisitStatusDiagnosis", value: string(model.VisitStatusDiagnosis), expected: "diagnosis"},
+		{name: "VisitStatusTreatment", value: string(model.VisitStatusTreatment), expected: "treatment"},
+		{name: "VisitStatusCompleted", value: string(model.VisitStatusCompleted), expected: "completed"},
+		{name: "VisitStatusTransferred", value: string(model.VisitStatusTransferred), expected: "transferred"},
+		{name: "VisitStatusEmergencyTerminated", value: string(model.VisitStatusEmergencyTerminated), expected: "emergency_terminated"},
+		{name: "VisitStatusExited", value: string(model.VisitStatusExited), expected: "exited"},
+
+		// VisitMachineState — 17 values
+		{name: "VisitMachineStateLoadingContext", value: string(model.VisitMachineStateLoadingContext), expected: "loadingContext"},
+		{name: "VisitMachineStateChatting", value: string(model.VisitMachineStateChatting), expected: "chatting"},
+		{name: "VisitMachineStateAnalyzing", value: string(model.VisitMachineStateAnalyzing), expected: "analyzing"},
+		{name: "VisitMachineStateLabDecision", value: string(model.VisitMachineStateLabDecision), expected: "labDecision"},
+		{name: "VisitMachineStateLabPayment", value: string(model.VisitMachineStateLabPayment), expected: "labPayment"},
+		{name: "VisitMachineStateLabExecution", value: string(model.VisitMachineStateLabExecution), expected: "labExecution"},
+		{name: "VisitMachineStateDiagnosis", value: string(model.VisitMachineStateDiagnosis), expected: "diagnosis"},
+		{name: "VisitMachineStateTreatmentDecision", value: string(model.VisitMachineStateTreatmentDecision), expected: "treatmentDecision"},
+		{name: "VisitMachineStateMedicationPayment", value: string(model.VisitMachineStateMedicationPayment), expected: "medicationPayment"},
+		{name: "VisitMachineStateMedicationFulfillment", value: string(model.VisitMachineStateMedicationFulfillment), expected: "medicationFulfillment"},
+		{name: "VisitMachineStateTreatmentExecution", value: string(model.VisitMachineStateTreatmentExecution), expected: "treatmentExecution"},
+		{name: "VisitMachineStateAdviceOnly", value: string(model.VisitMachineStateAdviceOnly), expected: "adviceOnly"},
+		{name: "VisitMachineStateCompleted", value: string(model.VisitMachineStateCompleted), expected: "completed"},
+		{name: "VisitMachineStateEmergencyPending", value: string(model.VisitMachineStateEmergencyPending), expected: "emergencyPending"},
+		{name: "VisitMachineStateTerminated", value: string(model.VisitMachineStateTerminated), expected: "terminated"},
+		{name: "VisitMachineStateExitSettlement", value: string(model.VisitMachineStateExitSettlement), expected: "exitSettlement"},
+		{name: "VisitMachineStateExited", value: string(model.VisitMachineStateExited), expected: "exited"},
+
+		// TerminalReason — 7 values
+		{name: "TerminalReasonEmergency", value: string(model.TerminalReasonEmergency), expected: "emergency"},
+		{name: "TerminalReasonTimeout", value: string(model.TerminalReasonTimeout), expected: "timeout"},
+		{name: "TerminalReasonAskLimitReached", value: string(model.TerminalReasonAskLimitReached), expected: "ask_limit_reached"},
+		{name: "TerminalReasonLabLimitReached", value: string(model.TerminalReasonLabLimitReached), expected: "lab_limit_reached"},
+		{name: "TerminalReasonReferral", value: string(model.TerminalReasonReferral), expected: "referral"},
+		{name: "TerminalReasonCapabilityInsufficient", value: string(model.TerminalReasonCapabilityInsufficient), expected: "capability_insufficient"},
+		{name: "TerminalReasonExited", value: string(model.TerminalReasonExited), expected: "exited"},
+
+		// PaymentStatus — 5 values
+		{name: "PaymentStatusUnpaid", value: string(model.PaymentStatusUnpaid), expected: "unpaid"},
+		{name: "PaymentStatusPending", value: string(model.PaymentStatusPending), expected: "pending"},
+		{name: "PaymentStatusPaid", value: string(model.PaymentStatusPaid), expected: "paid"},
+		{name: "PaymentStatusFailed", value: string(model.PaymentStatusFailed), expected: "failed"},
+		{name: "PaymentStatusRefunded", value: string(model.PaymentStatusRefunded), expected: "refunded"},
+
+		// FlowCardKind — 9 values
+		{name: "FlowCardKindLabDecision", value: string(model.FlowCardKindLabDecision), expected: "lab_decision"},
+		{name: "FlowCardKindPayment", value: string(model.FlowCardKindPayment), expected: "payment"},
+		{name: "FlowCardKindLabExecution", value: string(model.FlowCardKindLabExecution), expected: "lab_execution"},
+		{name: "FlowCardKindDiagnosis", value: string(model.FlowCardKindDiagnosis), expected: "diagnosis"},
+		{name: "FlowCardKindTreatmentPlan", value: string(model.FlowCardKindTreatmentPlan), expected: "treatment_plan"},
+		{name: "FlowCardKindMedicationFulfillment", value: string(model.FlowCardKindMedicationFulfillment), expected: "medication_fulfillment"},
+		{name: "FlowCardKindTreatmentExecution", value: string(model.FlowCardKindTreatmentExecution), expected: "treatment_execution"},
+		{name: "FlowCardKindAdviceOnly", value: string(model.FlowCardKindAdviceOnly), expected: "advice_only"},
+		{name: "FlowCardKindCompletedVisit", value: string(model.FlowCardKindCompletedVisit), expected: "completed_visit"},
+
+		// FlowCardStatus — 9 values
+		{name: "FlowCardStatusPending", value: string(model.FlowCardStatusPending), expected: "pending"},
+		{name: "FlowCardStatusAccepted", value: string(model.FlowCardStatusAccepted), expected: "accepted"},
+		{name: "FlowCardStatusSkipped", value: string(model.FlowCardStatusSkipped), expected: "skipped"},
+		{name: "FlowCardStatusVetoed", value: string(model.FlowCardStatusVetoed), expected: "vetoed"},
+		{name: "FlowCardStatusPaid", value: string(model.FlowCardStatusPaid), expected: "paid"},
+		{name: "FlowCardStatusProcessing", value: string(model.FlowCardStatusProcessing), expected: "processing"},
+		{name: "FlowCardStatusCompleted", value: string(model.FlowCardStatusCompleted), expected: "completed"},
+		{name: "FlowCardStatusFailed", value: string(model.FlowCardStatusFailed), expected: "failed"},
+		{name: "FlowCardStatusInvalidated", value: string(model.FlowCardStatusInvalidated), expected: "invalidated"},
+
+		// TimelineItemKind — 4 values
+		{name: "TimelineItemKindMessage", value: string(model.TimelineItemKindMessage), expected: "message"},
+		{name: "TimelineItemKindFlowCard", value: string(model.TimelineItemKindFlowCard), expected: "flow_card"},
+		{name: "TimelineItemKindSystemEvent", value: string(model.TimelineItemKindSystemEvent), expected: "system_event"},
+		{name: "TimelineItemKindTerminal", value: string(model.TimelineItemKindTerminal), expected: "terminal"},
+
+		// TimelineItemStatus — 5 values
+		{name: "TimelineItemStatusPending", value: string(model.TimelineItemStatusPending), expected: "pending"},
+		{name: "TimelineItemStatusStreaming", value: string(model.TimelineItemStatusStreaming), expected: "streaming"},
+		{name: "TimelineItemStatusDone", value: string(model.TimelineItemStatusDone), expected: "done"},
+		{name: "TimelineItemStatusFailed", value: string(model.TimelineItemStatusFailed), expected: "failed"},
+		{name: "TimelineItemStatusInvalidated", value: string(model.TimelineItemStatusInvalidated), expected: "invalidated"},
+
+		// SystemEventType — 8 values
+		{name: "SystemEventTypeContextLoaded", value: string(model.SystemEventTypeContextLoaded), expected: "context_loaded"},
+		{name: "SystemEventTypeAgentThinking", value: string(model.SystemEventTypeAgentThinking), expected: "agent_thinking"},
+		{name: "SystemEventTypeLabResultReceived", value: string(model.SystemEventTypeLabResultReceived), expected: "lab_result_received"},
+		{name: "SystemEventTypePaymentSucceeded", value: string(model.SystemEventTypePaymentSucceeded), expected: "payment_succeeded"},
+		{name: "SystemEventTypeDrugPurchased", value: string(model.SystemEventTypeDrugPurchased), expected: "drug_purchased"},
+		{name: "SystemEventTypeFollowUpStarted", value: string(model.SystemEventTypeFollowUpStarted), expected: "follow_up_started"},
+		{name: "SystemEventTypeEmergencyDismissed", value: string(model.SystemEventTypeEmergencyDismissed), expected: "emergency_dismissed"},
+		{name: "SystemEventTypeExitSettled", value: string(model.SystemEventTypeExitSettled), expected: "exit_settled"},
+
+		// SSEEventType — 7 values
+		{name: "SSEEventTypeDelta", value: string(model.SSEEventTypeDelta), expected: "delta"},
+		{name: "SSEEventTypeMessageFinal", value: string(model.SSEEventTypeMessageFinal), expected: "message_final"},
+		{name: "SSEEventTypeCard", value: string(model.SSEEventTypeCard), expected: "card"},
+		{name: "SSEEventTypeState", value: string(model.SSEEventTypeState), expected: "state"},
+		{name: "SSEEventTypeEmergency", value: string(model.SSEEventTypeEmergency), expected: "emergency"},
+		{name: "SSEEventTypeDone", value: string(model.SSEEventTypeDone), expected: "done"},
+		{name: "SSEEventTypeError", value: string(model.SSEEventTypeError), expected: "error"},
+
+		// Minor enums
+		{name: "VisitEntryTypeNew", value: string(model.VisitEntryTypeNew), expected: "new"},
+		{name: "VisitEntryTypeFollowUp", value: string(model.VisitEntryTypeFollowUp), expected: "follow_up"},
+		{name: "GenderMale", value: string(model.GenderMale), expected: "male"},
+		{name: "GenderFemale", value: string(model.GenderFemale), expected: "female"},
+		{name: "GenderOther", value: string(model.GenderOther), expected: "other"},
+		{name: "GenderUnknown", value: string(model.GenderUnknown), expected: "unknown"},
+		{name: "ExitConsequenceNoFee", value: string(model.ExitConsequenceNoFee), expected: "no_fee"},
+		{name: "ExitConsequenceRefundable", value: string(model.ExitConsequenceRefundable), expected: "refundable"},
+		{name: "ExitConsequenceExecutedNoRefund", value: string(model.ExitConsequenceExecutedNoRefund), expected: "executed_no_refund"},
+		{name: "ExitConsequenceMedicationDispensed", value: string(model.ExitConsequenceMedicationDispensed), expected: "medication_dispensed"},
+		{name: "ConsultationIntentConsultation", value: string(model.ConsultationIntentConsultation), expected: "consultation"},
+		{name: "ConsultationIntentFollowUp", value: string(model.ConsultationIntentFollowUp), expected: "follow_up"},
+		{name: "ConsultationIntentUncertain", value: string(model.ConsultationIntentUncertain), expected: "uncertain"},
+		{name: "TreatmentPlanMedication", value: string(model.TreatmentPlanMedication), expected: "medication"},
+		{name: "TreatmentPlanTreatment", value: string(model.TreatmentPlanTreatment), expected: "treatment"},
+		{name: "TreatmentPlanAdviceOnly", value: string(model.TreatmentPlanAdviceOnly), expected: "advice_only"},
+		{name: "TreatmentPlanReferral", value: string(model.TreatmentPlanReferral), expected: "referral"},
 	}
 
-	if model.TerminalReasonEmergency != "emergency" {
-		t.Error("TerminalReasonEmergency mismatch")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.value != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.value, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTerminalReasons(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{name: "TerminalReasonEmergency", value: string(model.TerminalReasonEmergency), expected: "emergency"},
+		{name: "TerminalReasonTimeout", value: string(model.TerminalReasonTimeout), expected: "timeout"},
+		{name: "TerminalReasonAskLimitReached", value: string(model.TerminalReasonAskLimitReached), expected: "ask_limit_reached"},
+		{name: "TerminalReasonLabLimitReached", value: string(model.TerminalReasonLabLimitReached), expected: "lab_limit_reached"},
+		{name: "TerminalReasonReferral", value: string(model.TerminalReasonReferral), expected: "referral"},
+		{name: "TerminalReasonCapabilityInsufficient", value: string(model.TerminalReasonCapabilityInsufficient), expected: "capability_insufficient"},
+		{name: "TerminalReasonExited", value: string(model.TerminalReasonExited), expected: "exited"},
 	}
 
-	if model.FlowCardKindLabDecision != "lab_decision" {
-		t.Error("FlowCardKindLabDecision mismatch")
-	}
-	if model.FlowCardKindDiagnosis != "diagnosis" {
-		t.Error("FlowCardKindDiagnosis mismatch")
-	}
-
-	if model.PaymentStatusUnpaid != "unpaid" {
-		t.Error("PaymentStatusUnpaid mismatch")
-	}
-	if model.PaymentStatusPaid != "paid" {
-		t.Error("PaymentStatusPaid mismatch")
-	}
-
-	if string(model.GenderMale) != "male" {
-		t.Error("GenderMale mismatch")
-	}
-
-	if string(model.ExitConsequenceNoFee) != "no_fee" {
-		t.Error("ExitConsequenceNoFee mismatch")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.value != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.value, tt.expected)
+			}
+		})
 	}
 }
 
