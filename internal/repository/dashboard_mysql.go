@@ -62,7 +62,7 @@ func (r *dashboardMySQLRepo) CountActiveSessions(ctx context.Context) (int, erro
 func (r *dashboardMySQLRepo) CountSessionsSince(ctx context.Context, since string) (int, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM visits WHERE created_at >= ?`, since,
+		`SELECT COUNT(*) FROM visits WHERE started_at >= ?`, since,
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count sessions since: %w", err)
@@ -93,7 +93,7 @@ func (r *dashboardMySQLRepo) ListPatients(ctx context.Context, query model.Admin
 	//nolint:gosec // whereClause built from controlled conditions, user inputs use parameterized args
 	listQuery := fmt.Sprintf(
 		`SELECT p.id, p.name, p.phone_masked, p.gender,
-			COALESCE(p.birth_date, '') as birth_date,
+			'' as birth_date,
 			p.created_at,
 			(SELECT COUNT(*) FROM visits v WHERE v.patient_id = p.id) as session_count
 		FROM patients p %s
@@ -168,12 +168,12 @@ func (r *dashboardMySQLRepo) ListSessions(ctx context.Context, query model.Admin
 	listQuery := fmt.Sprintf(
 		`SELECT v.id, v.patient_id,
 			COALESCE(p.name, '') as patient_name,
-			COALESCE(v.title, '') as title,
-			v.status, v.created_at, v.updated_at
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v.summary, '$.title')), '') as title,
+			v.status, v.started_at, v.updated_at
 		FROM visits v
 		LEFT JOIN patients p ON p.id = v.patient_id
 		%s
-		ORDER BY v.created_at DESC
+		ORDER BY v.started_at DESC
 		LIMIT ? OFFSET ?`, whereClause,
 	)
 	listArgs := append(args, query.PageSize, offset)
