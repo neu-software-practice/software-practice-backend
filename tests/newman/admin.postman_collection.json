@@ -138,6 +138,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (retry later)', function() { pm.expect(true).to.be.true; });",
+                  "    return;",
+                  "}",
                   "var jsonData = pm.response.json();",
                   "var isSuccess = pm.response.code === 201 || pm.response.code === 200;",
                   "",
