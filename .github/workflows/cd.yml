@@ -13,39 +13,58 @@ jobs:
       - name: Pull latest code
         working-directory: /root/app/software-practice-backend
         run: |
+          set -euo pipefail
           git pull origin main
           git submodule update --init --recursive
 
-      - name: Rebuild and restart services
+      - name: Rebuild and restart app
+        id: docker-up
         working-directory: /root/app/software-practice-backend
         run: |
+          set -euo pipefail
           docker compose up -d --build app
-
-      - name: Wait for health check
-        working-directory: /root/app/software-practice-backend
-        run: |
+          echo "Waiting for service health..."
           for i in $(seq 1 30); do
-            curl -sf http://localhost:8080/api/health && break
-            echo "Waiting for service... ($i/30)"
+            if curl -sf http://localhost:8080/api/health > /dev/null 2>&1; then
+              echo "✅ Service is ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
             sleep 2
           done
+          echo "📋 Health check response:"
+          curl -s http://localhost:8080/api/health | python3 -m json.tool || true
 
       - name: Run database migrations
         working-directory: /root/app/software-practice-backend
         run: |
+          set -euo pipefail
+          echo "Running database migrations..."
           for f in db/migrations/*.up.sql; do
-            echo "Running migration: $f"
+            echo "  Running: $f"
             docker compose exec -T mysql mysql -u root -ppassword neuhis < "$f" 2>/dev/null || echo "  (may already be applied)"
           done
+          echo "✅ Migrations complete"
+
+      - name: Verify deployment
+        id: verify
+        working-directory: /root/app/software-practice-backend
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sf http://localhost:8080/api/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+          echo "Health check status: $STATUS"
+          docker compose ps
+
+      - name: Collect logs on failure
+        if: failure() && steps.docker-up.outcome == 'success'
+        working-directory: /root/app/software-practice-backend
+        run: |
+          echo "=== App logs (last 50 lines) ==="
+          docker compose logs --tail=50 app || true
+          echo "=== MySQL logs (last 20 lines) ==="
+          docker compose logs --tail=20 mysql || true
 
       - name: Cleanup old images
         working-directory: /root/app/software-practice-backend
         run: |
           docker image prune -f
-
-      - name: Verify deployment
-        working-directory: /root/app/software-practice-backend
-        run: |
-          STATUS=$(curl -sf http://localhost:8080/api/health | jq -r '.status // "unknown"')
-          echo "Health check status: $STATUS"
-          docker compose ps
