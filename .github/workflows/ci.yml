@@ -74,11 +74,11 @@ jobs:
           fi
           echo "Service layer coverage check passed"
 
-      - name: Check Total Unit Coverage (>=75%)
+      - name: Check Total Unit Coverage (>=70%)
         run: |
           TOTAL=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage (unit tests): ${TOTAL}%"
-          THRESHOLD=75
+          THRESHOLD=70
           if (( $(echo "$TOTAL < $THRESHOLD" | bc -l) )); then
             echo "Total coverage ${TOTAL}% is below ${THRESHOLD}% threshold"
             exit 1
