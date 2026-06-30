@@ -11,6 +11,8 @@ import (
 )
 
 var _ repository.VisitRepository = (*mockVisitRepo)(nil)
+
+func pf(v float64) *float64 { return &v }
 var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
 
 type mockVisitRepo struct {
@@ -111,9 +113,9 @@ func TestListBillingRecords_WithPaymentCards(t *testing.T) {
 					PaymentStatus:   "paid",
 					PaymentID:       "pay-1",
 					Purpose:         "lab",
-					TotalAmount:     150.0,
-					InsuranceAmount: 100.0,
-					SelfPayAmount:   50.0,
+					TotalAmount:     pf(150.0),
+					InsuranceAmount: pf(100.0),
+					SelfPayAmount:   pf(50.0),
 					Items:           []model.PaymentLineItem{{Name: "血常规", Amount: 150.0}},
 					HandledAt:       &handledAt,
 				},
@@ -174,7 +176,7 @@ func TestListBillingRecords_SessionTitleFallback(t *testing.T) {
 					Kind:          "payment",
 					PaymentStatus: "paid",
 					Purpose:       "medication",
-					TotalAmount:   200.0,
+					TotalAmount:   pf(200.0),
 					HandledAt:     &handledAt,
 				},
 			}, nil
@@ -209,7 +211,7 @@ func TestListBillingRecords_UnknownTitle(t *testing.T) {
 			return []model.FlowCard{
 				{
 					ID: "c1", SessionID: "s1", Kind: "payment",
-					PaymentStatus: "paid", Purpose: "lab", TotalAmount: 100.0,
+					PaymentStatus: "paid", Purpose: "lab", TotalAmount: pf(100.0),
 					HandledAt: &handledAt,
 				},
 			}, nil
@@ -245,12 +247,12 @@ func TestListBillingRecords_MultipleSessions(t *testing.T) {
 			case "s1":
 				return []model.FlowCard{{
 					ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "paid",
-					Purpose: "lab", TotalAmount: 100.0, HandledAt: &handledAt1,
+					Purpose: "lab", TotalAmount: pf(100.0), HandledAt: &handledAt1,
 				}}, nil
 			case "s2":
 				return []model.FlowCard{{
 					ID: "c2", SessionID: "s2", Kind: "payment", PaymentStatus: "paid",
-					Purpose: "medication", TotalAmount: 200.0, HandledAt: &handledAt2,
+					Purpose: "medication", TotalAmount: pf(200.0), HandledAt: &handledAt2,
 				}}, nil
 			}
 			return nil, nil
@@ -283,8 +285,8 @@ func TestListBillingRecords_SkipsUnpaid(t *testing.T) {
 	flowCardRepo := &mockFlowCardRepo{
 		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
 			return []model.FlowCard{
-				{ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "unpaid", TotalAmount: 100.0},
-				{ID: "c2", SessionID: "s1", Kind: "payment", PaymentStatus: "paid", Purpose: "lab", TotalAmount: 150.0, HandledAt: &handledAt},
+				{ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "unpaid", TotalAmount: pf(100.0)},
+				{ID: "c2", SessionID: "s1", Kind: "payment", PaymentStatus: "paid", Purpose: "lab", TotalAmount: pf(150.0), HandledAt: &handledAt},
 			}, nil
 		},
 	}
@@ -313,7 +315,7 @@ func TestListBillingRecords_TitleFromTitleField(t *testing.T) {
 		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
 			return []model.FlowCard{{
 				ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "paid",
-				Purpose: "lab", TotalAmount: 100.0, HandledAt: &handledAt,
+				Purpose: "lab", TotalAmount: pf(100.0), HandledAt: &handledAt,
 			}}, nil
 		},
 	}
@@ -343,7 +345,7 @@ func TestListBillingRecords_WithQuantity(t *testing.T) {
 		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
 			return []model.FlowCard{{
 				ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "paid",
-				Purpose: "medication", TotalAmount: 300.0,
+				Purpose: "medication", TotalAmount: pf(300.0),
 				Items:     []model.PaymentLineItem{{Name: "阿莫西林", Amount: 100.0, Quantity: qty}},
 				HandledAt: &handledAt,
 			}}, nil

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -98,7 +99,7 @@ func (h *VisitHandler) GetSession(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
 	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
-	if err == model.ErrSessionNotFound {
+	if errors.Is(err, model.ErrSessionNotFound) {
 		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
 		return
 	}
@@ -119,7 +120,7 @@ func (h *VisitHandler) GetSnapshot(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
 	snapshot, err := h.svc.GetSnapshot(c.Request.Context(), sessionID)
-	if err == model.ErrSessionNotFound {
+	if errors.Is(err, model.ErrSessionNotFound) {
 		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
 		return
 	}

@@ -1,10 +1,14 @@
 package middleware_test
 
 import (
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
 )
 
@@ -33,6 +37,31 @@ func TestCORSMiddleware(t *testing.T) {
 
 		if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:5173" {
 			t.Errorf("origin header = %s", w.Header().Get("Access-Control-Allow-Origin"))
+		}
+		if w.Header().Get("Access-Control-Allow-Methods") == "" {
+			t.Error("Allow-Methods header should be set")
+		}
+		if w.Header().Get("Access-Control-Allow-Headers") == "" {
+			t.Error("Allow-Headers header should be set")
+		}
+	})
+
+	t.Run("rejects mismatched origin", func(t *testing.T) {
+		r := setupRouter()
+		r.Use(middleware.CORSMiddleware(middleware.CORSConfig{
+			AllowedOrigins: "http://localhost:5173",
+		}))
+		r.GET("/test", func(c *gin.Context) {
+			c.String(200, "ok")
+		})
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Origin", "http://evil.com")
+		r.ServeHTTP(w, req)
+
+		if w.Header().Get("Access-Control-Allow-Origin") != "" {
+			t.Error("should not set Allow-Origin for mismatched origin")
 		}
 	})
 
@@ -188,6 +217,35 @@ func TestAuthMiddleware(t *testing.T) {
 			t.Errorf("status = %d, want 401", w.Code)
 		}
 	})
+
+	t.Run("expired token", func(t *testing.T) {
+		// Create an expired JWT token
+		now := time.Now()
+		expiredClaims := jwt.RegisteredClaims{
+			Subject:   "p001",
+			ExpiresAt: jwt.NewNumericDate(now.Add(-1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now.Add(-2 * time.Hour)),
+		}
+		expiredToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, expiredClaims).SignedString([]byte(secret))
+		if err != nil {
+			t.Fatalf("create expired token: %v", err)
+		}
+
+		r := setupRouter()
+		r.Use(middleware.AuthMiddleware(secret))
+		r.GET("/test", func(c *gin.Context) {
+			c.String(200, "ok")
+		})
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Authorization", "Bearer "+expiredToken)
+		r.ServeHTTP(w, req)
+
+		if w.Code != 401 {
+			t.Errorf("status = %d, want 401 for expired token, body=%s", w.Code, w.Body.String())
+		}
+	})
 }
 
 func TestRateLimitMiddleware(t *testing.T) {
@@ -204,6 +262,48 @@ func TestRateLimitMiddleware(t *testing.T) {
 		r.ServeHTTP(w, req)
 		if w.Code != 200 {
 			t.Errorf("request %d: status = %d, want 200", i, w.Code)
+		}
+	}
+}
+
+func TestRateLimitMiddleware_RejectsWhenExhausted(t *testing.T) {
+	r := setupRouter()
+	r.Use(middleware.RateLimitMiddleware(0.01, 1))
+	r.GET("/test", func(c *gin.Context) {
+		c.String(200, "ok")
+	})
+
+	// The first request creates the bucket and is free.
+	// The second request consumes the initial capacity-1 token.
+	// The third request should be rate-limited.
+	acceptCount := 0
+	rejectCount := 0
+	for i := 0; i < 10; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/test", nil)
+		r.ServeHTTP(w, req)
+		switch w.Code {
+		case 200:
+			acceptCount++
+		case http.StatusTooManyRequests:
+			rejectCount++
+		}
+	}
+
+	if acceptCount == 0 {
+		t.Error("expected at least one accepted request")
+	}
+	if rejectCount == 0 {
+		t.Error("expected at least one rejected request when bucket exhausted")
+	}
+
+	// Verify rejection body contains RATE_LIMITED
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/test", nil)
+	r.ServeHTTP(w, req)
+	if w.Code == http.StatusTooManyRequests {
+		if !strings.Contains(w.Body.String(), "RATE_LIMITED") {
+			t.Errorf("rejection body does not contain RATE_LIMITED: %s", w.Body.String())
 		}
 	}
 }

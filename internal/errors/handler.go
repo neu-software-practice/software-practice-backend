@@ -10,9 +10,9 @@ func WriteError(c *gin.Context, err *ApiError) {
 	c.JSON(err.Status, api.ErrorResponse(err))
 }
 
-// WriteValidationError sends a 400 VALIDATION_ERROR response.
+// WriteValidationError sends a 422 VALIDATION_ERROR response.
 func WriteValidationError(c *gin.Context, message string) {
-	WriteError(c, NewApiError(CodeValidationError, message, 400))
+	WriteError(c, NewApiError(CodeValidationError, message, 422))
 }
 
 // WriteNotFound sends a 404 not found response with the given code and message.

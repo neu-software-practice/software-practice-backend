@@ -81,8 +81,8 @@ func (c *Config) validate() error {
 	}
 
 	// JWT_SECRET must be at least 32 bytes
-	if len([]byte(c.JWTSecret)) < JWTSecretMinLen {
-		return fmt.Errorf("JWT_SECRET must be at least %d bytes, got %d bytes", JWTSecretMinLen, len([]byte(c.JWTSecret)))
+	if len(c.JWTSecret) < JWTSecretMinLen {
+		return fmt.Errorf("JWT_SECRET must be at least %d bytes, got %d bytes", JWTSecretMinLen, len(c.JWTSecret))
 	}
 
 	// JWT_SECRET weak password blacklist check
@@ -95,6 +95,11 @@ func (c *Config) validate() error {
 	// Production mode cannot use wildcard CORS
 	if c.ServerMode == "release" && c.CORSAllowedOrigins == "*" {
 		return fmt.Errorf("CORS_ALLOWED_ORIGINS cannot be '*' in release mode")
+	}
+
+	// Production mode requires explicit CORS configuration (no dev default)
+	if c.ServerMode == "release" && c.CORSAllowedOrigins == "http://localhost:5173" {
+		return fmt.Errorf("CORS_ALLOWED_ORIGINS must be explicitly set in release mode (default localhost not allowed)")
 	}
 
 	// MEDAGENT_API_KEY is required

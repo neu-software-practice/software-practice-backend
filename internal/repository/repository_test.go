@@ -3,6 +3,7 @@ package repository_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -231,7 +232,7 @@ func TestPatientRepo_NotFound(t *testing.T) {
 	repo := repository.NewPatientRepository(db)
 
 	_, err := repo.FindByID(ctx, "non-existent-id")
-	if err != model.ErrPatientNotFound {
+	if !errors.Is(err, model.ErrPatientNotFound) {
 		t.Fatalf("expected ErrPatientNotFound, got %v", err)
 	}
 }

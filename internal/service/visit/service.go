@@ -25,28 +25,41 @@ func NewService(visitRepo repository.VisitRepository, timelineRepo repository.Ti
 	}
 }
 
-// CreateSession creates a new visit session.
-func (s *Service) CreateSession(ctx context.Context, input model.CreateSessionInput) (*model.CreateSessionResult, error) {
-	if err := input.Validate(); err != nil {
-		return nil, err
-	}
+// createSessionParams holds the parameters for creating a new or follow-up session.
+type createSessionParams struct {
+	PatientID       string
+	ChiefComplaint  string
+	EntryType       string
+	ParentSessionID *string
+	ParentSummary   *model.VisitSummary
+}
 
+// createSession is the shared session-creation helper used by CreateSession and CreateFollowUp.
+// It creates the session in DB, appends the initial timeline, and transitions to chatting.
+func (s *Service) createSession(ctx context.Context, params createSessionParams) (*model.CreateSessionResult, error) {
 	sessionID := uuid.New().String()
 	now := time.Now()
 
 	session := &model.VisitSession{
-		ID:            sessionID,
-		PatientID:     input.PatientID,
-		EntryType:     string(model.VisitEntryTypeNew),
-		Status:        string(model.VisitStatusLoadingContext),
-		MachineState:  string(model.VisitMachineStateLoadingContext),
-		AskRoundLimit: 20,
-		LabRoundLimit: 10,
-		Summary:       model.VisitSummary{},
+		ID:              sessionID,
+		PatientID:       params.PatientID,
+		EntryType:       params.EntryType,
+		Status:          string(model.VisitStatusLoadingContext),
+		MachineState:    string(model.VisitMachineStateLoadingContext),
+		ParentSessionID: params.ParentSessionID,
+		AskRoundLimit:   20,
+		LabRoundLimit:   10,
+		Summary:         model.VisitSummary{},
 	}
 
-	if input.ChiefComplaint != "" {
-		cc := input.ChiefComplaint
+	if params.ParentSummary != nil {
+		session.Summary.ChiefComplaint = params.ParentSummary.ChiefComplaint
+		session.Summary.Diagnosis = params.ParentSummary.Diagnosis
+		session.Summary.TreatmentSummary = params.ParentSummary.TreatmentSummary
+	}
+
+	if params.ChiefComplaint != "" {
+		cc := params.ChiefComplaint
 		session.Summary.ChiefComplaint = &cc
 	}
 
@@ -54,11 +67,9 @@ func (s *Service) CreateSession(ctx context.Context, input model.CreateSessionIn
 		return nil, fmt.Errorf("create visit session: %w", err)
 	}
 
-	initialTimeline := adapter.BuildInitialTimeline(sessionID, input.ChiefComplaint)
-	if len(initialTimeline) > 0 {
-		if err := s.timelineRepo.AppendBatch(ctx, initialTimeline); err != nil {
-			return nil, fmt.Errorf("append initial timeline: %w", err)
-		}
+	initialTimeline := adapter.BuildInitialTimeline(sessionID, params.ChiefComplaint)
+	if err := s.timelineRepo.AppendBatch(ctx, initialTimeline); err != nil {
+		return nil, fmt.Errorf("append initial timeline: %w", err)
 	}
 
 	// After context loaded, transition to chatting
@@ -76,68 +87,50 @@ func (s *Service) CreateSession(ctx context.Context, input model.CreateSessionIn
 	}, nil
 }
 
+// CreateSession creates a new visit session.
+func (s *Service) CreateSession(ctx context.Context, input model.CreateSessionInput) (*model.CreateSessionResult, error) {
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	return s.createSession(ctx, createSessionParams{
+		PatientID:      input.PatientID,
+		ChiefComplaint: input.ChiefComplaint,
+		EntryType:      string(model.VisitEntryTypeNew),
+	})
+}
+
 // CreateFollowUp creates a follow-up visit session from a parent session.
 func (s *Service) CreateFollowUp(ctx context.Context, input model.CreateFollowUpInput) (*model.CreateSessionResult, error) {
-	// Validate parent session exists
 	parent, err := s.visitRepo.FindByID(ctx, input.ParentSessionID)
 	if err != nil {
 		return nil, fmt.Errorf("parent session: %w", err)
 	}
 
-	sessionID := uuid.New().String()
-	now := time.Now()
-
-	session := &model.VisitSession{
-		ID:              sessionID,
+	result, err := s.createSession(ctx, createSessionParams{
 		PatientID:       input.PatientID,
+		ChiefComplaint:  input.ChiefComplaint,
 		EntryType:       string(model.VisitEntryTypeFollowUp),
-		Status:          string(model.VisitStatusLoadingContext),
-		MachineState:    string(model.VisitMachineStateLoadingContext),
 		ParentSessionID: &input.ParentSessionID,
-		AskRoundLimit:   20,
-		LabRoundLimit:   10,
-		Summary: model.VisitSummary{
-			ChiefComplaint:   parent.Summary.ChiefComplaint,
-			Diagnosis:        parent.Summary.Diagnosis,
-			TreatmentSummary: parent.Summary.TreatmentSummary,
-		},
+		ParentSummary:   &parent.Summary,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if input.ChiefComplaint != "" {
-		cc := input.ChiefComplaint
-		session.Summary.ChiefComplaint = &cc
-	}
-
-	if err := s.visitRepo.Create(ctx, session); err != nil {
-		return nil, fmt.Errorf("create follow-up session: %w", err)
-	}
-
-	initialTimeline := adapter.BuildInitialTimeline(sessionID, input.ChiefComplaint)
-	// Add follow-up started event
+	// Append follow-up started event to the new session's timeline
 	followUpEvent := adapter.BuildSystemEventTimelineItem(
-		sessionID,
+		result.Session.ID,
 		string(model.SystemEventTypeFollowUpStarted),
 		"复诊开始",
 		fmt.Sprintf("基于上次就诊 %s 创建复诊", input.ParentSessionID),
 	)
-	initialTimeline = append(initialTimeline, followUpEvent)
-
-	if err := s.timelineRepo.AppendBatch(ctx, initialTimeline); err != nil {
-		return nil, fmt.Errorf("append initial timeline: %w", err)
+	if err := s.timelineRepo.Append(ctx, &followUpEvent); err != nil {
+		return nil, fmt.Errorf("append follow-up event: %w", err)
 	}
+	result.InitialTimeline = append(result.InitialTimeline, followUpEvent)
 
-	session.Status = string(model.VisitStatusChatting)
-	session.MachineState = string(model.VisitMachineStateChatting)
-	session.UpdatedAt = now
-
-	if err := s.visitRepo.UpdateStatus(ctx, sessionID, session.Status, session.MachineState); err != nil {
-		return nil, fmt.Errorf("update follow-up session status to chatting: %w", err)
-	}
-
-	return &model.CreateSessionResult{
-		Session:         *session,
-		InitialTimeline: initialTimeline,
-	}, nil
+	return result, nil
 }
 
 // GetSession retrieves a visit session by ID.

@@ -71,11 +71,11 @@ type FlowCard struct {
 	ResultReturnedAt *time.Time `json:"resultReturnedAt,omitempty"`
 
 	// --- diagnosis ---
-	Diagnosis       string   `json:"diagnosis,omitempty"`
-	Confidence      string   `json:"confidence,omitempty"`
-	Evidence        []string `json:"evidence,omitempty"`
-	EvidenceSources []string `json:"evidenceSources,omitempty"`
-	RiskSignals     []string `json:"riskSignals,omitempty"`
+	Diagnosis       string           `json:"diagnosis,omitempty"`
+	Confidence      string           `json:"confidence,omitempty"`
+	Evidence        []string         `json:"evidence,omitempty"`
+	EvidenceSources []EvidenceSource `json:"evidenceSources,omitempty"`
+	RiskSignals     []string         `json:"riskSignals,omitempty"`
 
 	// --- treatment_plan ---
 	Plan       string   `json:"plan,omitempty"`

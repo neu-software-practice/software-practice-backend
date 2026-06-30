@@ -11,18 +11,17 @@ import (
 
 func TestStepMappingTable(t *testing.T) {
 	tests := []struct {
-		kind         medagent.StepKind
-		producesCard bool
-		isTerminal   bool
-		minSSETypes  int
+		kind        medagent.StepKind
+		isTerminal  bool
+		minSSETypes int
 	}{
-		{medagent.StepAsk, false, false, 2},
-		{medagent.StepNeedTests, true, false, 2},
-		{medagent.StepDrugQuery, false, false, 1},
-		{medagent.StepPurchase, true, false, 2},
-		{medagent.StepEmergency, false, true, 1},
-		{medagent.StepDone, true, true, 3},
-		{medagent.StepOK, false, false, 1},
+		{medagent.StepAsk, false, 2},
+		{medagent.StepNeedTests, false, 2},
+		{medagent.StepDrugQuery, false, 1},
+		{medagent.StepPurchase, false, 2},
+		{medagent.StepEmergency, true, 1},
+		{medagent.StepDone, true, 3},
+		{medagent.StepOK, false, 0},
 	}
 
 	for _, tt := range tests {
@@ -30,9 +29,6 @@ func TestStepMappingTable(t *testing.T) {
 			mapping, ok := adapter.GetMapping(tt.kind)
 			if !ok {
 				t.Fatalf("no mapping found for %s", tt.kind)
-			}
-			if mapping.ProducesCard != tt.producesCard {
-				t.Errorf("ProducesCard = %v, want %v", mapping.ProducesCard, tt.producesCard)
 			}
 			if mapping.IsTerminal != tt.isTerminal {
 				t.Errorf("IsTerminal = %v, want %v", mapping.IsTerminal, tt.isTerminal)

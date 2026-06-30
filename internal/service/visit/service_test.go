@@ -41,16 +41,25 @@ type mockTimelineRepo struct {
 }
 
 func (m *mockTimelineRepo) Append(ctx context.Context, item *model.TimelineItem) error {
-	return m.appendFunc(ctx, item)
+	if m.appendFunc != nil {
+		return m.appendFunc(ctx, item)
+	}
+	return nil
 }
 func (m *mockTimelineRepo) AppendBatch(ctx context.Context, items []model.TimelineItem) error {
-	return m.appendBatchFunc(ctx, items)
+	if m.appendBatchFunc != nil {
+		return m.appendBatchFunc(ctx, items)
+	}
+	return nil
 }
 func (m *mockTimelineRepo) ListBySession(ctx context.Context, sessionID string, cursor *string, pageSize int) ([]model.TimelineItem, *string, bool, error) {
 	return m.listFunc(ctx, sessionID, cursor, pageSize)
 }
 func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id string, status string) error {
 	return nil
+}
+func (m *mockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID string) (string, error) {
+	return "", nil
 }
 
 var allMachineStates = []string{
@@ -707,6 +716,83 @@ func TestUpdateStatus_InvalidTransition(t *testing.T) {
 	}
 }
 
+// TestUpdateStatus_MultipleTransitions verifies service-level UpdateStatus for multiple
+// representative machine-state transitions, confirming correct repo interaction.
+func TestUpdateStatus_MultipleTransitions(t *testing.T) {
+	tests := []struct {
+		name       string
+		fromState  string
+		toState    string
+		wantStatus string
+		wantErr    bool
+	}{
+		{name: "loadingContext→chatting", fromState: string(model.VisitMachineStateLoadingContext), toState: string(model.VisitMachineStateChatting), wantStatus: "chatting"},
+		{name: "chatting→analyzing", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateAnalyzing), wantStatus: "analyzing"},
+		{name: "chatting→labDecision", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateLabDecision), wantStatus: "blocked"},
+		{name: "analyzing→labDecision", fromState: string(model.VisitMachineStateAnalyzing), toState: string(model.VisitMachineStateLabDecision), wantStatus: "blocked"},
+		{name: "labDecision→labPayment", fromState: string(model.VisitMachineStateLabDecision), toState: string(model.VisitMachineStateLabPayment), wantStatus: "blocked"},
+		{name: "labPayment→labExecution", fromState: string(model.VisitMachineStateLabPayment), toState: string(model.VisitMachineStateLabExecution), wantStatus: "diagnosis"},
+		{name: "labExecution→analyzing", fromState: string(model.VisitMachineStateLabExecution), toState: string(model.VisitMachineStateAnalyzing), wantStatus: "analyzing"},
+		{name: "analyzing→diagnosis", fromState: string(model.VisitMachineStateAnalyzing), toState: string(model.VisitMachineStateDiagnosis), wantStatus: "diagnosis"},
+		{name: "diagnosis→treatmentDecision", fromState: string(model.VisitMachineStateDiagnosis), toState: string(model.VisitMachineStateTreatmentDecision), wantStatus: "treatment"},
+		{name: "treatmentDecision→completed", fromState: string(model.VisitMachineStateTreatmentDecision), toState: string(model.VisitMachineStateCompleted), wantStatus: "completed"},
+		{name: "chatting→emergencyPending", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateEmergencyPending), wantStatus: "emergency_terminated"},
+		{name: "analyzing→emergencyPending", fromState: string(model.VisitMachineStateAnalyzing), toState: string(model.VisitMachineStateEmergencyPending), wantStatus: "emergency_terminated"},
+		{name: "chatting→exitSettlement", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateExitSettlement), wantStatus: "exited"},
+		{name: "treatmentDecision→adviceOnly", fromState: string(model.VisitMachineStateTreatmentDecision), toState: string(model.VisitMachineStateAdviceOnly), wantStatus: "blocked"},
+		// Invalid transitions
+		{name: "chatting→completed (invalid)", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateCompleted), wantErr: true},
+		{name: "completed→chatting (invalid)", fromState: string(model.VisitMachineStateCompleted), toState: string(model.VisitMachineStateChatting), wantErr: true},
+		{name: "exited→chatting (invalid)", fromState: string(model.VisitMachineStateExited), toState: string(model.VisitMachineStateChatting), wantErr: true},
+		{name: "analyzing→adviceOnly (invalid)", fromState: string(model.VisitMachineStateAnalyzing), toState: string(model.VisitMachineStateAdviceOnly), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			var updatedStatus, updatedMachineState string
+			visitRepo := &mockVisitRepo{
+				findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+					return &model.VisitSession{
+						ID:           id,
+						PatientID:    "p001",
+						Status:       "chatting",
+						MachineState: tt.fromState,
+						StartedAt:    time.Now(),
+						UpdatedAt:    time.Now(),
+					}, nil
+				},
+				updateStatusFunc: func(ctx context.Context, id, status, machineState string) error {
+					updatedStatus = status
+					updatedMachineState = machineState
+					return nil
+				},
+			}
+			timelineRepo := &mockTimelineRepo{}
+
+			svc := visit.NewService(visitRepo, timelineRepo)
+
+			err := svc.UpdateStatus(ctx, "v001", tt.toState)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error for invalid transition")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UpdateStatus: %v", err)
+			}
+			if updatedStatus != tt.wantStatus {
+				t.Errorf("updated status = %q, want %q", updatedStatus, tt.wantStatus)
+			}
+			if updatedMachineState != tt.toState {
+				t.Errorf("updated machineState = %q, want %q", updatedMachineState, tt.toState)
+			}
+		})
+	}
+}
+
 // --- Existing State Machine Tests ---
 
 func TestAllTransitions(t *testing.T) {
@@ -830,26 +916,6 @@ func TestGetStatusForState(t *testing.T) {
 			got := visit.GetStatusForState(tt.state)
 			if got != tt.expected {
 				t.Errorf("GetStatusForState(%q) = %q, want %q", tt.state, got, tt.expected)
-			}
-		})
-	}
-}
-
-// TestGetStatusForState_All preserves the existing table-driven test for common mappings.
-func TestGetStatusForState_All(t *testing.T) {
-	cases := []struct {
-		state    string
-		expected string
-	}{
-		{"chatting", "chatting"},
-		{"labDecision", "blocked"},
-		{"completed", "completed"},
-	}
-	for _, c := range cases {
-		t.Run(c.state, func(t *testing.T) {
-			got := visit.GetStatusForState(c.state)
-			if got != c.expected {
-				t.Errorf("GetStatusForState(%q) = %q, want %q", c.state, got, c.expected)
 			}
 		})
 	}

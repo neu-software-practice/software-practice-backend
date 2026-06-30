@@ -5,7 +5,7 @@ type ApiResponse[T any] struct {
 	Success bool        `json:"success"`
 	Data    *T          `json:"data"`
 	Error   interface{} `json:"error"`
-	Meta    interface{} `json:"meta,omitempty"`
+	Meta    interface{} `json:"meta"`
 }
 
 // SuccessResponse creates a success response with the provided data.

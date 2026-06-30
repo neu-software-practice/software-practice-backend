@@ -32,3 +32,19 @@ type TimelineItem struct {
 	Reason              *string `json:"reason,omitempty"`
 	SuggestedDepartment *string `json:"suggestedDepartment,omitempty"`
 }
+
+// TimelineContent is the JSON subset stored in the content column.
+// It excludes fields already stored as dedicated SQL columns (ID, SessionID, Kind, Status, CreatedAt)
+// to avoid redundant storage.
+type TimelineContent struct {
+	Role                string    `json:"role,omitempty"`
+	Content             string    `json:"content,omitempty"`
+	LocalKey            *string   `json:"localKey,omitempty"`
+	InterruptedBy       *string   `json:"interruptedBy,omitempty"`
+	Card                *FlowCard `json:"card,omitempty"`
+	EventType           string    `json:"eventType,omitempty"`
+	Title               string    `json:"title,omitempty"`
+	Description         string    `json:"description,omitempty"`
+	Reason              *string   `json:"reason,omitempty"`
+	SuggestedDepartment *string   `json:"suggestedDepartment,omitempty"`
+}

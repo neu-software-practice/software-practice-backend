@@ -86,13 +86,9 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 	}
 
 	// Determine the last patient message
-	var lastMessage string
-	timeline, _, _, _ := s.timelineRepo.ListBySession(ctx, input.SessionID, nil, 50)
-	for i := len(timeline) - 1; i >= 0; i-- {
-		if timeline[i].Kind == "message" && timeline[i].Role == "patient" {
-			lastMessage = timeline[i].Content
-			break
-		}
+	lastMessage, err := s.timelineRepo.FindLastPatientMessage(ctx, input.SessionID)
+	if err != nil {
+		return fmt.Errorf("find last patient message: %w", err)
 	}
 	if lastMessage == "" {
 		lastMessage = "你好"
@@ -209,10 +205,10 @@ func (s *Service) handleAsk(ctx context.Context, sessionID, requestID string, se
 
 	// Send message_final
 	_ = callback(model.AssistantStreamEvent{
-		Type:      "message_final",
-		SessionID: sessionID,
-		RequestID: requestID,
-		Item:      &msgItem,
+		Type:             "message_final",
+		SessionID:        sessionID,
+		RequestID:        requestID,
+		MessageFinalItem: &msgItem,
 	})
 
 	// Send state update
@@ -261,11 +257,11 @@ func (s *Service) handleNeedTests(ctx context.Context, sessionID, requestID stri
 	}
 
 	_ = callback(model.AssistantStreamEvent{
-		Type:         "card",
-		SessionID:    sessionID,
-		RequestID:    requestID,
-		Card:         card,
-		TimelineItem: &tlItem,
+		Type:             "card",
+		SessionID:        sessionID,
+		RequestID:        requestID,
+		Card:             card,
+		CardTimelineItem: &tlItem,
 	})
 
 	// Update state to labDecision (blocked)
@@ -515,13 +511,7 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 }
 
 func (s *Service) handleOK(ctx context.Context, sessionID, requestID string, session *model.VisitSession, callback StreamAssistantEventCallback) error {
-	_ = callback(model.AssistantStreamEvent{
-		Type:      "state",
-		SessionID: sessionID,
-		State:     string(model.VisitMachineStateChatting),
-		Status:    string(model.VisitStatusChatting),
-	})
-
+	// OK is a confirmation step — per spec, no SSE state events are emitted.
 	_ = callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,

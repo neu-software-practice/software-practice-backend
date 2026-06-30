@@ -45,14 +45,23 @@ func (r *flowCardMySQLRepo) Create(ctx context.Context, card *model.FlowCard) er
 
 func (r *flowCardMySQLRepo) FindByID(ctx context.Context, id string) (*model.FlowCard, error) {
 	var contentJSON, lockReason string
+	// Unmarshal into a separate variable first to avoid polluting column-scanned values
 	card := &model.FlowCard{}
+
+	// Save all column values before unmarshaling the JSON blob
+	var (
+		dbID, dbSessionID, dbKind, dbStatus, dbTitle string
+		dbBlocking                                   bool
+		dbCreatedAt                                  time.Time
+		dbHandledAt                                  sql.NullTime
+	)
 
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, session_id, kind, status, blocking, title, content, lock_reason, created_at, handled_at
 		FROM flow_cards WHERE id = ?`, id,
-	).Scan(&card.ID, &card.SessionID, &card.Kind, &card.Status,
-		&card.Blocking, &card.Title, &contentJSON, &lockReason,
-		&card.CreatedAt, &card.HandledAt,
+	).Scan(&dbID, &dbSessionID, &dbKind, &dbStatus,
+		&dbBlocking, &dbTitle, &contentJSON, &lockReason,
+		&dbCreatedAt, &dbHandledAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, model.ErrCardNotFound
@@ -61,15 +70,23 @@ func (r *flowCardMySQLRepo) FindByID(ctx context.Context, id string) (*model.Flo
 		return nil, fmt.Errorf("find flow card by id: %w", err)
 	}
 
-	// Save DB column values that may be overwritten by the JSON content.
-	dbStatus := card.Status
-
+	// Unmarshal non-column fields from JSON
 	if err := json.Unmarshal([]byte(contentJSON), card); err != nil {
 		return nil, fmt.Errorf("unmarshal flow card: %w", err)
 	}
-	card.LockReason = &lockReason
-	// Restore the DB column status (the content JSON may carry a stale value).
+
+	// Restore all column values — the content JSON may carry stale values
+	card.ID = dbID
+	card.SessionID = dbSessionID
+	card.Kind = dbKind
 	card.Status = dbStatus
+	card.Blocking = dbBlocking
+	card.Title = dbTitle
+	card.CreatedAt = dbCreatedAt
+	if dbHandledAt.Valid {
+		card.HandledAt = &dbHandledAt.Time
+	}
+	card.LockReason = &lockReason
 
 	return card, nil
 }

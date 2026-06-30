@@ -17,7 +17,7 @@ type PatientProfile struct {
 	LongTermMedications []string  `json:"longTermMedications"`
 	MedicalHistory      []string  `json:"medicalHistory"`
 	CreatedAt           time.Time `json:"createdAt,omitempty"`
-	UpdatedAt           time.Time `json:"updatedAt"`
+	UpdatedAt           time.Time `json:"updatedAt,omitempty"`
 }
 
 // PatientContext represents the full consultation context for a patient.

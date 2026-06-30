@@ -7,11 +7,11 @@ const (
 	CodeValidationError = "VALIDATION_ERROR"
 	CodeUnknownError    = "UNKNOWN_ERROR"
 	CodeNetworkError    = "NETWORK_ERROR"
-	CodeUnauthorized    = "HTTP_401"
-	CodeForbidden       = "HTTP_403"
-	CodeNotFound        = "HTTP_404"
-	CodeTimeout         = "HTTP_408"
-	CodeInternalError   = "HTTP_500"
+	CodeUnauthorized    = "UNAUTHORIZED"
+	CodeForbidden       = "FORBIDDEN"
+	CodeNotFound        = "NOT_FOUND"
+	CodeTimeout         = "TIMEOUT"
+	CodeInternalError   = "INTERNAL_ERROR"
 
 	CodeAuthPhoneExists        = "AUTH_PHONE_EXISTS"
 	CodeAuthInvalidCredentials = "AUTH_INVALID_CREDENTIALS" // #nosec G101

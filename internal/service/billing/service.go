@@ -80,15 +80,27 @@ func (s *Service) ListBillingRecords(ctx context.Context, patientID string) (*mo
 				createdAt = card.CreatedAt.UTC().Format("2006-01-02T15:04:05.000Z")
 			}
 
+			totalAmount := 0.0
+			if card.TotalAmount != nil {
+				totalAmount = *card.TotalAmount
+			}
+			insuranceAmount := 0.0
+			if card.InsuranceAmount != nil {
+				insuranceAmount = *card.InsuranceAmount
+			}
+			selfPayAmount := 0.0
+			if card.SelfPayAmount != nil {
+				selfPayAmount = *card.SelfPayAmount
+			}
 			records = append(records, model.BillingRecord{
 				PaymentID:       card.PaymentID,
 				SessionID:       card.SessionID,
 				SessionTitle:    sessionTitle,
 				Purpose:         card.Purpose,
 				Items:           lineItems,
-				TotalAmount:     card.TotalAmount,
-				InsuranceAmount: card.InsuranceAmount,
-				SelfPayAmount:   card.SelfPayAmount,
+				TotalAmount:     totalAmount,
+				InsuranceAmount: insuranceAmount,
+				SelfPayAmount:   selfPayAmount,
 				PaymentStatus:   card.PaymentStatus,
 				CreatedAt:       createdAt,
 			})
