@@ -809,8 +809,8 @@ func TestPatientHandler_VerifyIdentity(t *testing.T) {
 
 		h.VerifyIdentity(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("status = %d, want 400", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", w.Code)
 		}
 	})
 }
@@ -1227,59 +1227,59 @@ func TestWorkbenchHandler_ListTimeline(t *testing.T) {
 	})
 }
 
+// TestWorkbenchHandler_SendMessage tests the write endpoint for sending a patient message.
+func TestWorkbenchHandler_SendMessage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-	// TestWorkbenchHandler_SendMessage tests the write endpoint for sending a patient message.
-	func TestWorkbenchHandler_SendMessage(t *testing.T) {
-		gin.SetMode(gin.TestMode)
-
-		visitRepo := &mockVisitRepo{
-			findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
-				return &model.VisitSession{
-					ID: id, PatientID: "p001", Status: "chatting",
-					MachineState: string(model.VisitMachineStateChatting),
-				}, nil
-			},
-		}
-		timelineRepo := &mockTimelineRepo{
-			appendFunc: func(ctx context.Context, item *model.TimelineItem) error {
-				return nil
-			},
-		}
-		svc := newWorkbenchServiceForTest(visitRepo, timelineRepo)
-		h := handler.NewWorkbenchHandler(svc)
-
-		t.Run("valid request", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
-			body := `{"content":"hello"}`
-			c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
-			c.Request.Header.Set("Content-Type", "application/json")
-			c.Set("patientId", "p001")
-
-			h.SendMessage(c)
-
-			if w.Code != http.StatusOK {
-				t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
-			}
-		})
-
-		t.Run("auth denied - missing patientId", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
-			body := `{"content":"hello"}`
-			c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
-			c.Request.Header.Set("Content-Type", "application/json")
-			// Intentionally not setting patientId
-
-			h.SendMessage(c)
-
-			if w.Code != http.StatusForbidden {
-				t.Errorf("status = %d, want 403", w.Code)
-			}
-		})
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "p001", Status: "chatting",
+				MachineState: string(model.VisitMachineStateChatting),
+			}, nil
+		},
 	}
+	timelineRepo := &mockTimelineRepo{
+		appendFunc: func(ctx context.Context, item *model.TimelineItem) error {
+			return nil
+		},
+	}
+	svc := newWorkbenchServiceForTest(visitRepo, timelineRepo)
+	h := handler.NewWorkbenchHandler(svc)
+
+	t.Run("valid request", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		body := `{"content":"hello"}`
+		c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("patientId", "p001")
+
+		h.SendMessage(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("auth denied - missing patientId", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		body := `{"content":"hello"}`
+		c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		// Intentionally not setting patientId
+
+		h.SendMessage(c)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", w.Code)
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Address Handler tests
 // ---------------------------------------------------------------------------
@@ -1487,8 +1487,8 @@ func TestAddressHandler_CreateAddress_InvalidJSON(t *testing.T) {
 	c.Set("patientId", "p001")
 
 	h.CreateAddress(c)
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400, got %d", w.Code, w.Code)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want 422, got %d", w.Code, w.Code)
 	}
 }
 

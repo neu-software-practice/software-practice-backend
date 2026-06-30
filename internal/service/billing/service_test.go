@@ -13,6 +13,7 @@ import (
 var _ repository.VisitRepository = (*mockVisitRepo)(nil)
 
 func pf(v float64) *float64 { return &v }
+
 var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
 
 type mockVisitRepo struct {
