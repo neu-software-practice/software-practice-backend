@@ -170,14 +170,6 @@ jobs:
         run: bash tests/newman/run-smoke.sh http://localhost:8080
         timeout-minutes: 20
 
-      - name: Restart server to clear rate limits
-        if: success() || failure()
-        run: |
-          echo "Restarting app to clear rate limits before admin tests..."
-          docker compose restart app
-          sleep 5
-          curl -sf http://localhost:8080/api/health > /dev/null && echo "✅ Server ready"
-
       - name: Run Admin Smoke Tests
         id: smoke-admin
         if: success() || failure()
