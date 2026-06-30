@@ -1,6 +1,6 @@
 # NEUHIS Agent 结项 REST / SSE API 文档
 
-更新时间：2026-06-29
+更新时间：2026-06-30
 
 > 本文档由本前端工程**已实现并通过 mock/契约测试的 Zod schema 与 facade** 自动梳理而成，是结项交付的**权威 REST/SSE 合约**。所有 endpoint、请求/响应字段、枚举取值、SSE 事件均取自源码 schema，未作发明。后端实现、联调与验收以本文档为基线；若需调整字段或枚举，必须同步回改 `src/**` schema、mock、契约测试与本文档。
 >
@@ -90,6 +90,9 @@ NEUHIS Agent（产品名「东软云脑智能医疗」）是面向患者的「AI
 | `ADDRESS_NOT_FOUND` | 业务 | false | 收货地址不存在 |
 | `ADDRESS_LIMIT_EXCEEDED` | 业务 | false | 地址数量已达上限（最多 10 条） |
 | `ADDRESS_REQUIRED` | 业务 | false | 当前操作需先添加收货地址 |
+| `INVALID_CREDENTIALS` | 管理后台 | false | 管理员用户名或密码错误 |
+| `INVALID_REFRESH_TOKEN` | 管理后台 | false | 管理员 refreshToken 无效或已过期 |
+| `INVALID_SETTINGS` | 管理后台 | false | 系统设置值无效（如空字符串、负数等） |
 
 UI 文案命中的 HTTP 状态（`MESSAGE_BY_HTTP_STATUS`）：`401`（登录失效，不可重试）、`403`（无法访问该记录，不可重试）、`404`（找不到内容，不可重试）、`408`（请求超时，可重试）。其余 HTTP 错误按 `status >= 500` 可重试、`4xx` 不可重试兜底。
 
@@ -215,6 +218,17 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `DELETE` | `/patients/:patientId/addresses/:addressId` | `addressApi.deleteAddress` | 删除收货地址 | 否 |
 | `PUT` | `/patients/:patientId/addresses/:addressId/default` | `addressApi.setDefaultAddress` | 设置默认收货地址 | 否 |
 | `GET` | `/billing/records` | `billingApi.listBillingRecords` | 查询患者历史账单汇总 | 否 |
+| `GET` | `/medical-orders` | `medicalOrdersApi.listMedicalOrders` | 查询历史医嘱记录 | 否 |
+| `POST` | `/admin/auth/login` | `adminApi.login` | 管理员登录 | 否 |
+| `POST` | `/admin/auth/logout` | `adminApi.logout` | 管理员登出 | 否 |
+| `POST` | `/admin/auth/refresh` | `adminApi.refresh` | 管理员刷新令牌 | 否 |
+| `GET` | `/admin/dashboard/stats` | `adminApi.getDashboardStats` | 仪表盘统计 | 否 |
+| `GET` | `/admin/patients` | `adminApi.listPatients` | 分页查询患者列表 | 否 |
+| `GET` | `/admin/patients/:id` | `adminApi.getPatient` | 患者详情 | 否 |
+| `GET` | `/admin/sessions` | `adminApi.listSessions` | 分页查询问诊记录 | 否 |
+| `GET` | `/admin/sessions/:id` | `adminApi.getSession` | 问诊记录详情 | 否 |
+| `GET` | `/admin/settings` | `adminApi.getSettings` | 获取系统设置 | 否 |
+| `PUT` | `/admin/settings` | `adminApi.updateSettings` | 更新系统设置 | 否 |
 
 > 检验结果回填 `POST /visits/:sessionId/lab-results`（`special-designs/api.md` 列出）由 mock/后端内部驱动，前端 facade 不直接暴露方法，故不在本表 facade 列展开。
 
@@ -807,6 +821,64 @@ LLM 降级策略：大模型不可用时返回 503 或降级使用 `chiefComplai
 
 错误：`UNAUTHORIZED`（未认证，401）。
 
+### 5.14 medical-orders 域 — 医嘱记录（v8）
+
+#### `GET /medical-orders` — 历史医嘱记录
+
+聚合当前患者所有历史问诊中已完成（completed/confirmed）的医嘱和用药记录，按 `handledAt` 倒序排列。
+
+请求：无请求体。鉴权通过 Bearer token 识别当前患者。
+
+响应（`ListMedicalOrdersResult`）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | `MedicalOrderRecord[]` | 按 handledAt 降序 |
+
+`MedicalOrderRecord`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `recordId` | string | 是 | 记录 ID（对应卡片 ID） |
+| `sessionId` | SessionId | 是 | 关联会话 ID |
+| `sessionTitle` | string | 是 | 会话标题 |
+| `kind` | enum `advice` \| `medication` | 是 | 记录类型 |
+| `advices` | string[] | 否 | （kind=advice）医嘱建议 |
+| `watchItems` | string[] | 否 | （kind=advice）需观察项目 |
+| `followUpRecommendation` | string | 否 | （kind=advice）随访建议 |
+| `medications` | `MedicationItem[]` | 否 | （kind=medication）药品列表 |
+| `fulfillmentStatus` | enum `pending` \| `confirmed` \| `completed` | 否 | （kind=medication）履行状态 |
+| `deliveryAddress` | `DeliveryAddressSummary` | 否 | （kind=medication）配送地址 |
+| `handledAt` | ISO8601 | 是 | 处理时间 |
+| `createdAt` | ISO8601 | 是 | 创建时间 |
+
+`MedicationItem`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `name` | string | 药品名称 |
+| `spec` | string | 规格 |
+| `quantity` | number | 数量 |
+| `dosage` | string | 用法用量 |
+| `days` | number | 天数 |
+| `price` | number | 单价（元） |
+
+`DeliveryAddressSummary`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `name` | string | 收件人 |
+| `phone` | string | 手机号 |
+| `fullAddress` | string | 完整地址 |
+
+#### 数据来源
+
+从会话 timeline 中聚合以下卡片：
+- `advice_only`（status=completed，即患者已确认已知晓）
+- `medication_fulfillment`（fulfillmentStatus=completed 或 confirmed）
+
+错误：`UNAUTHORIZED`（未认证，401）。
+
 ---
 
 ## 6. 时间线条目与 SSE 事件目录
@@ -933,6 +1005,266 @@ SSE 流中每个事件的 payload：
 
 ---
 
+## 9. 管理后台 API（v7）
+
+管理后台端点统一以 `/admin` 前缀区分，使用 **独立 JWT 令牌体系**（与患者端 token 互不影响）。管理员登录后获取独立令牌对，accessToken 通过 `Authorization: Bearer <token>` header 传输，但密钥、载荷、过期策略与患者端完全分离。
+
+> 管理后台使用**页式分页**（`page` / `pageSize` / `total`），与患者端游标分页（§2.3）不同。
+
+### 9.1 管理员认证
+
+#### `POST /admin/auth/login` — 管理员登录
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `username` | string | 是 | 管理员用户名 |
+| `password` | string | 是 | 管理员密码 |
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `tokens` | `AdminTokens` | 令牌信息 |
+| `user` | `AdminUser` | 当前管理员信息 |
+
+`AdminTokens`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `accessToken` | string | JWT 访问令牌 |
+| `refreshToken` | string | 刷新令牌 |
+| `expiresIn` | number | accessToken 有效期（秒） |
+
+`AdminUser`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 管理员 ID |
+| `username` | string | 用户名 |
+| `role` | enum `super_admin` \| `admin` \| `operator` | 角色 |
+| `displayName` | string | 显示名称 |
+| `createdAt` | ISO8601 | 创建时间 |
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 401 | `INVALID_CREDENTIALS` | 用户名或密码错误 |
+
+#### `POST /admin/auth/logout` — 管理员登出
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `refreshToken` | string | 是 | 需要失效的刷新令牌 |
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `success` | boolean | 固定 `true` |
+
+无额外错误码。即使 refreshToken 无效也返回 success。
+
+#### `POST /admin/auth/refresh` — 管理员刷新令牌
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `refreshToken` | string | 是 | 当前有效的刷新令牌 |
+
+响应（200 OK）：返回新的 `AdminTokens`（`accessToken` + `refreshToken` + `expiresIn`）。
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 401 | `INVALID_REFRESH_TOKEN` | 刷新令牌无效或已过期 |
+
+### 9.2 仪表盘
+
+#### `GET /admin/dashboard/stats` — 统计概览
+
+需管理员 Bearer token 鉴权。无请求体。
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `totalPatients` | number | 患者总数 |
+| `totalSessions` | number | 问诊记录总数 |
+| `activeSessions` | number | 当前进行中的问诊数 |
+| `todayNewPatients` | number | 今日新增患者数 |
+| `todayNewSessions` | number | 今日新增问诊数 |
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+### 9.3 患者管理
+
+#### `GET /admin/patients` — 分页查询患者列表
+
+需管理员 Bearer token 鉴权。使用**页式分页**。
+
+查询参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `page` | number | 1 | 页码（从 1 开始） |
+| `pageSize` | number | 20 | 每页条数，上限 100 |
+| `search` | string | — | 可选，按 realName 或 phone 模糊匹配 |
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | `AdminPatientItem[]` | 患者列表 |
+| `total` | number | 总条数 |
+| `page` | number | 当前页码 |
+| `pageSize` | number | 每页条数 |
+
+`AdminPatientItem`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 患者 ID |
+| `realName` | string | 真实姓名 |
+| `phone` | string | 手机号 |
+| `gender` | enum `male` \| `female` \| `unknown` | 性别 |
+| `birthDate` | string (YYYY-MM-DD) | 出生日期 |
+| `createdAt` | ISO8601 | 注册时间 |
+| `sessionCount` | number | 历史问诊次数 |
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+#### `GET /admin/patients/:id` — 患者详情
+
+需管理员 Bearer token 鉴权。
+
+路径参数：`id`（患者 ID，string）。
+
+响应（200 OK）：返回完整 `PatientProfile` 对象（复用 §5.1 患者 Profile 结构，含过敏史、慢病、长期用药、地址列表）。
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 404 | `PATIENT_NOT_FOUND` | 患者不存在 |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+### 9.4 问诊记录管理
+
+#### `GET /admin/sessions` — 分页查询问诊记录
+
+需管理员 Bearer token 鉴权。使用**页式分页**。
+
+查询参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `page` | number | 1 | 页码（从 1 开始） |
+| `pageSize` | number | 20 | 每页条数，上限 100 |
+| `status` | string | — | 可选，按问诊状态筛选 |
+| `patientId` | string | — | 可选，按患者 ID 筛选 |
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | `AdminSessionItem[]` | 问诊记录列表 |
+| `total` | number | 总条数 |
+| `page` | number | 当前页码 |
+| `pageSize` | number | 每页条数 |
+
+`AdminSessionItem`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 会话 ID |
+| `patientId` | string | 患者 ID |
+| `patientName` | string | 患者姓名 |
+| `title` | string | 问诊标题 |
+| `status` | string | 会话状态 |
+| `createdAt` | ISO8601 | 创建时间 |
+| `updatedAt` | ISO8601 | 最后更新时间 |
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+#### `GET /admin/sessions/:id` — 问诊记录详情
+
+需管理员 Bearer token 鉴权。
+
+路径参数：`id`（会话 ID，string）。
+
+响应（200 OK）：返回完整 `VisitSession` 对象（复用 §5.2 会话详情结构，含完整 timeline）。
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 404 | `SESSION_NOT_FOUND` | 问诊记录不存在 |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+### 9.5 系统设置
+
+#### `GET /admin/settings` — 获取系统设置
+
+需管理员 Bearer token 鉴权。无请求体。
+
+响应（200 OK）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `siteName` | string | 站点名称 |
+| `maxConcurrentSessions` | number | 单患者最大并发问诊数 |
+| `sessionTimeoutMinutes` | number | 问诊超时时间（分钟） |
+| `enableRegistration` | boolean | 是否开放注册 |
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+#### `PUT /admin/settings` — 更新系统设置
+
+需管理员 Bearer token 鉴权。支持部分更新（仅传入需修改的字段）。
+
+请求体（全部可选）：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `siteName` | string | 否 | 站点名称 |
+| `maxConcurrentSessions` | number | 否 | 单患者最大并发问诊数 |
+| `sessionTimeoutMinutes` | number | 否 | 问诊超时时间（分钟） |
+| `enableRegistration` | boolean | 否 | 是否开放注册 |
+
+响应（200 OK）：返回完整的、更新后的 `SystemSettings` 对象（结构同 `GET /admin/settings` 响应）。
+
+错误码：
+
+| HTTP 状态码 | 错误码 | 说明 |
+| --- | --- | --- |
+| 400 | `INVALID_SETTINGS` | 设置值无效（如负数、空字符串等） |
+| 401 | `UNAUTHORIZED` | 未提供有效管理员 token |
+
+---
+
 ## 附：来源核对
 
 本文档的 endpoint、请求/响应字段、枚举与 SSE 事件均取自以下已实现源文件（结项时逐字核对）：
@@ -941,4 +1273,6 @@ SSE 流中每个事件的 payload：
 - `src/features/patient/api/{index,schemas}.ts`
 - `src/features/visits/api/{index,schemas}.ts`
 - `src/features/workbench/api/{index,schemas,timeline-schemas}.ts`
+- `src/features/admin/api/{index,schemas}.ts`
+- `src/features/medical-orders/api/{index,schemas}.ts`
 - 对齐文档：`agent-workspace/special-designs/api.md`
