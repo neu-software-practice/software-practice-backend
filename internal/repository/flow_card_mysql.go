@@ -76,7 +76,7 @@ func (r *flowCardMySQLRepo) FindByID(ctx context.Context, id string) (*model.Flo
 
 func (r *flowCardMySQLRepo) ListBySession(ctx context.Context, sessionID string) ([]model.FlowCard, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT content FROM flow_cards WHERE session_id = ? ORDER BY created_at ASC`,
+		`SELECT content, status FROM flow_cards WHERE session_id = ? ORDER BY created_at ASC`,
 		sessionID,
 	)
 	if err != nil {
@@ -87,13 +87,16 @@ func (r *flowCardMySQLRepo) ListBySession(ctx context.Context, sessionID string)
 	var cards []model.FlowCard
 	for rows.Next() {
 		var contentJSON string
-		if err := rows.Scan(&contentJSON); err != nil {
+		var dbStatus string
+		if err := rows.Scan(&contentJSON, &dbStatus); err != nil {
 			return nil, fmt.Errorf("scan flow card: %w", err)
 		}
 		var card model.FlowCard
 		if err := json.Unmarshal([]byte(contentJSON), &card); err != nil {
 			return nil, fmt.Errorf("unmarshal flow card: %w", err)
 		}
+		// Restore the DB column status (the content JSON may carry a stale value).
+		card.Status = dbStatus
 		cards = append(cards, card)
 	}
 	return cards, nil

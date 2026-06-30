@@ -29,14 +29,14 @@ func (r *visitMySQLRepo) Create(ctx context.Context, visit *model.VisitSession) 
 		`INSERT INTO visits (id, patient_id, entry_type, status, machine_state,
 		started_at, updated_at, ended_at, timeout_at, paused_at,
 		ask_round, ask_round_limit, lab_round, lab_round_limit,
-		parent_session_id, terminal_reason, active_card_id, timer_paused, summary)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		parent_session_id, terminal_reason, active_card_id, medagent_session_id, timer_paused, summary)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		visit.ID, visit.PatientID, visit.EntryType, visit.Status,
-		visit.Status, // machine_state mirrors status initially
+		visit.MachineState, // machine_state
 		visit.StartedAt, visit.UpdatedAt, visit.EndedAt, visit.TimeoutAt, visit.PausedAt,
 		visit.AskRound, visit.AskRoundLimit, visit.LabRound, visit.LabRoundLimit,
 		visit.ParentSessionID, visit.TerminalReason, visit.ActiveCardID,
-		visit.TimerPaused, string(summaryJSON),
+		visit.MedAgentSessionID, visit.TimerPaused, string(summaryJSON),
 	)
 	if err != nil {
 		return fmt.Errorf("create visit: %w", err)
@@ -53,13 +53,14 @@ func (r *visitMySQLRepo) FindByID(ctx context.Context, id string) (*model.VisitS
 		`SELECT id, patient_id, entry_type, status, machine_state,
 		started_at, updated_at, ended_at, timeout_at, paused_at,
 		ask_round, ask_round_limit, lab_round, lab_round_limit,
-		parent_session_id, terminal_reason, active_card_id, timer_paused, summary
+		parent_session_id, terminal_reason, active_card_id, medagent_session_id, timer_paused, summary
 		FROM visits WHERE id = ?`, id,
 	).Scan(&v.ID, &v.PatientID, &v.EntryType, &v.Status,
 		&machineState, // machine_state
 		&v.StartedAt, &v.UpdatedAt, &v.EndedAt, &v.TimeoutAt, &v.PausedAt,
 		&v.AskRound, &v.AskRoundLimit, &v.LabRound, &v.LabRoundLimit,
-		&v.ParentSessionID, &v.TerminalReason, &v.ActiveCardID, &v.TimerPaused,
+		&v.ParentSessionID, &v.TerminalReason, &v.ActiveCardID,
+		&v.MedAgentSessionID, &v.TimerPaused,
 		&summaryJSON,
 	)
 	if err == sql.ErrNoRows {
@@ -69,7 +70,7 @@ func (r *visitMySQLRepo) FindByID(ctx context.Context, id string) (*model.VisitS
 		return nil, fmt.Errorf("find visit by id: %w", err)
 	}
 
-	_ = machineState
+	v.MachineState = machineState
 	_ = json.Unmarshal([]byte(summaryJSON), &v.Summary)
 	return &v, nil
 }
@@ -167,11 +168,11 @@ func (r *visitMySQLRepo) Update(ctx context.Context, visit *model.VisitSession) 
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE visits SET status=?, machine_state=?, updated_at=?, ended_at=?,
 		timeout_at=?, paused_at=?, ask_round=?, lab_round=?,
-		terminal_reason=?, active_card_id=?, timer_paused=?, summary=?
+		terminal_reason=?, active_card_id=?, medagent_session_id=?, timer_paused=?, summary=?
 		WHERE id=?`,
-		visit.Status, visit.Status, visit.UpdatedAt, visit.EndedAt,
+		visit.Status, visit.MachineState, visit.UpdatedAt, visit.EndedAt,
 		visit.TimeoutAt, visit.PausedAt, visit.AskRound, visit.LabRound,
-		visit.TerminalReason, visit.ActiveCardID, visit.TimerPaused,
+		visit.TerminalReason, visit.ActiveCardID, visit.MedAgentSessionID, visit.TimerPaused,
 		string(summaryJSON), visit.ID,
 	)
 	if err != nil {

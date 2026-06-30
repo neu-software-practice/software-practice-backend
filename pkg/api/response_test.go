@@ -61,6 +61,38 @@ func TestSuccessResponse(t *testing.T) {
 	}
 }
 
+func TestSuccessResponseWithMeta(t *testing.T) {
+	type Meta struct {
+		Page int `json:"page"`
+	}
+	resp := api.SuccessResponseWithMeta("data", Meta{Page: 1})
+
+	if !resp.Success {
+		t.Errorf("SuccessResponseWithMeta.Success = false, want true")
+	}
+	if resp.Data == nil || *resp.Data != "data" {
+		t.Errorf("SuccessResponseWithMeta.Data = %v, want &data", resp.Data)
+	}
+	if resp.Meta == nil {
+		t.Fatal("SuccessResponseWithMeta.Meta = nil, want non-nil")
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	// meta should be present in JSON
+	if _, ok := parsed["meta"]; !ok {
+		t.Error("JSON meta field missing, want present")
+	}
+}
+
 func TestErrorResponse(t *testing.T) {
 	resp := api.ErrorResponse("something went wrong")
 

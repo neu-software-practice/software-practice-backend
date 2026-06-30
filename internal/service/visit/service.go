@@ -39,6 +39,7 @@ func (s *Service) CreateSession(ctx context.Context, input model.CreateSessionIn
 		PatientID:     input.PatientID,
 		EntryType:     string(model.VisitEntryTypeNew),
 		Status:        string(model.VisitStatusLoadingContext),
+		MachineState:  string(model.VisitMachineStateLoadingContext),
 		AskRoundLimit: 20,
 		LabRoundLimit: 10,
 		Summary:       model.VisitSummary{},
@@ -62,7 +63,12 @@ func (s *Service) CreateSession(ctx context.Context, input model.CreateSessionIn
 
 	// After context loaded, transition to chatting
 	session.Status = string(model.VisitStatusChatting)
+	session.MachineState = string(model.VisitMachineStateChatting)
 	session.UpdatedAt = now
+
+	if err := s.visitRepo.UpdateStatus(ctx, sessionID, session.Status, session.MachineState); err != nil {
+		return nil, fmt.Errorf("update session status to chatting: %w", err)
+	}
 
 	return &model.CreateSessionResult{
 		Session:         *session,
@@ -86,6 +92,7 @@ func (s *Service) CreateFollowUp(ctx context.Context, input model.CreateFollowUp
 		PatientID:       input.PatientID,
 		EntryType:       string(model.VisitEntryTypeFollowUp),
 		Status:          string(model.VisitStatusLoadingContext),
+		MachineState:    string(model.VisitMachineStateLoadingContext),
 		ParentSessionID: &input.ParentSessionID,
 		AskRoundLimit:   20,
 		LabRoundLimit:   10,
@@ -120,7 +127,12 @@ func (s *Service) CreateFollowUp(ctx context.Context, input model.CreateFollowUp
 	}
 
 	session.Status = string(model.VisitStatusChatting)
+	session.MachineState = string(model.VisitMachineStateChatting)
 	session.UpdatedAt = now
+
+	if err := s.visitRepo.UpdateStatus(ctx, sessionID, session.Status, session.MachineState); err != nil {
+		return nil, fmt.Errorf("update follow-up session status to chatting: %w", err)
+	}
 
 	return &model.CreateSessionResult{
 		Session:         *session,
@@ -166,7 +178,7 @@ func (s *Service) UpdateStatus(ctx context.Context, sessionID, newMachineState s
 		return err
 	}
 
-	currentState := session.Status // Use status as machine state proxy
+	currentState := session.MachineState
 	if _, err := Transition(currentState, newMachineState); err != nil {
 		return fmt.Errorf("state transition: %w", err)
 	}

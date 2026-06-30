@@ -56,14 +56,14 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 	payTL := adapter.BuildSystemEventTimelineItem(input.SessionID,
 		string(model.SystemEventTypePaymentSucceeded),
 		"支付成功",
-		fmt.Sprintf("%s 费用已支付 ¥%.2f", input.Purpose, card.TotalAmount),
+		fmt.Sprintf("%s 费用已支付 ¥%.2f", input.Purpose, model.DerefFloat64(card.TotalAmount)),
 	)
 	_ = s.timelineRepo.Append(ctx, &payTL)
 
 	switch input.Purpose {
 	case "lab":
 		// After lab payment, simulate lab results and advance to lab execution
-		_ = string(model.VisitMachineStateLabExecution) // transition recorded
+		session.MachineState = string(model.VisitMachineStateLabExecution)
 		status := string(model.VisitStatusDiagnosis)
 		session.Status = status
 		session.ActiveCardID = nil
@@ -84,7 +84,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 
 	case "medication":
 		// After medication payment, go to medication fulfillment
-		_ = string(model.VisitMachineStateMedicationFulfillment) // transition recorded
+		session.MachineState = string(model.VisitMachineStateMedicationFulfillment)
 		status := string(model.VisitStatusBlocked)
 		session.Status = status
 		_ = s.visitRepo.Update(ctx, session)

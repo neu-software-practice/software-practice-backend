@@ -55,6 +55,11 @@ func (s *Service) SendMessage(ctx context.Context, input SendMessageInput) (*Sen
 	}
 	placeholder = &placeholderItem
 
+	// Persist session mutations
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update visit session: %w", err)
+	}
+
 	return &SendMessageResult{
 		Session:              *session,
 		PatientMessage:       patientMsg,
@@ -93,22 +98,34 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 		lastMessage = "你好"
 	}
 
-	// Build patient profile for medAgent
-	patient, err := s.patientRepo.FindByID(ctx, session.PatientID)
-	if err != nil {
-		return fmt.Errorf("find patient: %w", err)
-	}
+	// Reuse existing medAgent session or create a new one
+	var maSessionID string
+	if session.MedAgentSessionID != nil && *session.MedAgentSessionID != "" {
+		maSessionID = *session.MedAgentSessionID
+	} else {
+		// Build patient profile for medAgent
+		patient, err := s.patientRepo.FindByID(ctx, session.PatientID)
+		if err != nil {
+			return fmt.Errorf("find patient: %w", err)
+		}
 
-	profile := map[string]interface{}{
-		"age":       patient.Age,
-		"gender":    patient.Gender,
-		"allergies": patient.Allergies,
-	}
+		profile := map[string]interface{}{
+			"age":       patient.Age,
+			"gender":    patient.Gender,
+			"allergies": patient.Allergies,
+		}
 
-	// Create medAgent session
-	maSessionID, err := s.medAgentClient.CreateSession(ctx, profile, session.EntryType == "new", nil)
-	if err != nil {
-		return fmt.Errorf("create medagent session: %w", err)
+		// Create medAgent session only on first invocation
+		maSessionID, err = s.medAgentClient.CreateSession(ctx, profile, session.EntryType == "new", nil)
+		if err != nil {
+			return fmt.Errorf("create medagent session: %w", err)
+		}
+
+		// Persist the medAgent session ID for subsequent calls
+		session.MedAgentSessionID = &maSessionID
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return fmt.Errorf("persist medagent session id: %w", err)
+		}
 	}
 
 	// Send patient message to medAgent
@@ -118,7 +135,16 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 	}
 
 	// Process the step and stream events
-	return s.processStep(ctx, input.SessionID, input.RequestID, maSessionID, session, step, callback)
+	if err := s.processStep(ctx, input.SessionID, input.RequestID, maSessionID, session, step, callback); err != nil {
+		return err
+	}
+
+	// Persist session mutations made by the step handler
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return fmt.Errorf("update visit session: %w", err)
+	}
+
+	return nil
 }
 
 // processStep handles a medAgent Step and produces SSE events.

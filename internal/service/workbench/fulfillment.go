@@ -70,10 +70,10 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	_ = s.timelineRepo.Append(ctx, &drugTL)
 
 	// Complete the session
-	_ = string(model.VisitMachineStateCompleted) // transition recorded
 	status := string(model.VisitStatusCompleted)
 	reason := "completed"
 	session.Status = status
+	session.MachineState = string(model.VisitMachineStateCompleted)
 	session.EndedAt = &now
 	session.TerminalReason = &reason
 	session.ActiveCardID = nil

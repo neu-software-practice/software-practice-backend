@@ -50,10 +50,10 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		}
 
 		// Update state to labPayment
-		_ = string(model.VisitMachineStateLabPayment) // transition recorded
 		status := string(model.VisitStatusBlocked)
 		cardID := paymentCard.ID
 		session.Status = status
+		session.MachineState = string(model.VisitMachineStateLabPayment)
 		session.ActiveCardID = &cardID
 		_ = s.visitRepo.Update(ctx, session)
 
@@ -79,9 +79,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		_ = s.flowCardRepo.Update(ctx, card)
 
 		// Go straight to diagnosis
-		_ = string(model.VisitMachineStateDiagnosis) // transition recorded
 		status := string(model.VisitStatusDiagnosis)
 		session.Status = status
+		session.MachineState = string(model.VisitMachineStateDiagnosis)
 		session.ActiveCardID = nil
 		_ = s.visitRepo.Update(ctx, session)
 
@@ -101,9 +101,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		_ = s.flowCardRepo.Update(ctx, card)
 
 		// Return to chatting
-		_ = string(model.VisitMachineStateChatting) // transition recorded
 		status := string(model.VisitStatusChatting)
 		session.Status = status
+		session.MachineState = string(model.VisitMachineStateChatting)
 		session.ActiveCardID = nil
 		_ = s.visitRepo.Update(ctx, session)
 

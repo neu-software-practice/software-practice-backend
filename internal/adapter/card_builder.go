@@ -30,7 +30,7 @@ func BuildLabDecisionCard(sessionID string, step *medagent.Step) *model.FlowCard
 	}
 
 	card.Reason = step.DoctorSay
-	card.EstimatedFee = 50.0 // 血常规固定费用
+	card.EstimatedFee = model.Float64Ptr(50.0) // 血常规固定费用
 
 	return card
 }
@@ -172,9 +172,9 @@ func BuildPaymentCard(sessionID, purpose string, items []model.PaymentLineItem, 
 		CreatedAt:       now,
 		Purpose:         purpose,
 		Items:           items,
-		TotalAmount:     totalAmount,
-		InsuranceAmount: 0,
-		SelfPayAmount:   totalAmount,
+		TotalAmount:     model.Float64Ptr(totalAmount),
+		InsuranceAmount: model.Float64Ptr(0),
+		SelfPayAmount:   model.Float64Ptr(totalAmount),
 		PaymentStatus:   string(model.PaymentStatusUnpaid),
 	}
 

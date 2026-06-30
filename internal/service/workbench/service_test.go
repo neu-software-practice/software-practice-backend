@@ -570,7 +570,7 @@ func TestSubmitPayment_Defer(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
-		card.TotalAmount = 100.0
+		card.TotalAmount = model.Float64Ptr(100.0)
 		return card, nil
 	}
 	svc := newSvc(mp, mv, mt, mf, ma)
@@ -591,7 +591,7 @@ func TestSubmitPayment_Lab(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
-		card.TotalAmount = 50.0
+		card.TotalAmount = model.Float64Ptr(50.0)
 		card.Purpose = "lab"
 		return card, nil
 	}
@@ -614,7 +614,7 @@ func TestSubmitPayment_Medication(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
-		card.TotalAmount = 100.0
+		card.TotalAmount = model.Float64Ptr(100.0)
 		card.Purpose = "medication"
 		return card, nil
 	}
@@ -652,7 +652,7 @@ func TestSubmitPayment_Lab_VisitUpdateFails(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
-		card.TotalAmount = 50.0
+		card.TotalAmount = model.Float64Ptr(50.0)
 		card.Purpose = "lab"
 		return card, nil
 	}
@@ -913,8 +913,8 @@ func TestExitVisit_NoFee(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExitVisit: %v", err)
 	}
-	if result.TerminalReason != "exited" {
-		t.Errorf("terminalReason = %s", result.TerminalReason)
+	if result.TerminalReason != "patient_request" {
+		t.Errorf("terminalReason = %s, want patient_request", result.TerminalReason)
 	}
 	if result.Consequence == nil || result.Consequence.Kind != "no_fee" {
 		t.Error("expected no_fee consequence for chatting exit")

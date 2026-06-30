@@ -84,6 +84,9 @@ func TestCreateSession(t *testing.T) {
 		createFunc: func(ctx context.Context, v *model.VisitSession) error {
 			return nil
 		},
+		updateStatusFunc: func(ctx context.Context, id string, status string, machineState string) error {
+			return nil
+		},
 	}
 	timelineRepo := &mockTimelineRepo{
 		appendBatchFunc: func(ctx context.Context, items []model.TimelineItem) error {
@@ -141,6 +144,9 @@ func TestCreateSession_EmptyPatientID(t *testing.T) {
 		createFunc: func(ctx context.Context, v *model.VisitSession) error {
 			return nil
 		},
+		updateStatusFunc: func(ctx context.Context, id string, status string, machineState string) error {
+			return nil
+		},
 	}
 	timelineRepo := &mockTimelineRepo{
 		appendBatchFunc: func(ctx context.Context, items []model.TimelineItem) error {
@@ -186,6 +192,9 @@ func TestCreateFollowUp(t *testing.T) {
 			return parentSession, nil
 		},
 		createFunc: func(ctx context.Context, v *model.VisitSession) error {
+			return nil
+		},
+		updateStatusFunc: func(ctx context.Context, id string, status string, machineState string) error {
 			return nil
 		},
 	}
@@ -366,6 +375,9 @@ func TestCreateSession_WithComplaint(t *testing.T) {
 
 	visitRepo := &mockVisitRepo{
 		createFunc: func(ctx context.Context, v *model.VisitSession) error {
+			return nil
+		},
+		updateStatusFunc: func(ctx context.Context, id string, status string, machineState string) error {
 			return nil
 		},
 	}
@@ -630,11 +642,12 @@ func TestUpdateStatus_Success(t *testing.T) {
 	visitRepo := &mockVisitRepo{
 		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
 			return &model.VisitSession{
-				ID:        id,
-				PatientID: "p001",
-				Status:    "chatting",
-				StartedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:           id,
+				PatientID:    "p001",
+				Status:       "chatting",
+				MachineState: string(model.VisitMachineStateChatting),
+				StartedAt:    time.Now(),
+				UpdatedAt:    time.Now(),
 			}, nil
 		},
 		updateStatusFunc: func(ctx context.Context, id, status, machineState string) error {

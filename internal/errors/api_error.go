@@ -12,14 +12,17 @@ type ApiError struct {
 }
 
 // NewApiError creates a new ApiError with the given code, message, and status.
-// Retriable is set to false for SESSION_NOT_FOUND, PATIENT_NOT_FOUND,
-// VALIDATION_ERROR, and CARD_NOT_FOUND. For all other codes, retriable is
+// Retriable is set to false for SESSION_NOT_FOUND, PATIENT_NOT_FOUND, and
+// VALIDATION_ERROR. CARD_NOT_FOUND is always retriable (spec: card
+// updated/invalidated, prompt refresh). For all other codes, retriable is
 // true when the status is 5xx.
 func NewApiError(code, message string, status int) *ApiError {
 	retriable := status >= 500
 	switch code {
-	case CodeSessionNotFound, CodePatientNotFound, CodeValidationError, CodeCardNotFound:
+	case CodeSessionNotFound, CodePatientNotFound, CodeValidationError:
 		retriable = false
+	case CodeCardNotFound:
+		retriable = true
 	}
 	return &ApiError{
 		Code:      code,
@@ -34,9 +37,9 @@ func (e *ApiError) Error() string {
 	return e.Message
 }
 
-// NewValidationError creates a validation error (400).
+// NewValidationError creates a validation error (422).
 func NewValidationError(message string) *ApiError {
-	return NewApiError(CodeValidationError, message, 400)
+	return NewApiError(CodeValidationError, message, 422)
 }
 
 // NewNotFoundError creates a not found error (404).

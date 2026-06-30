@@ -2,17 +2,24 @@ package workbench
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
 
+// emergencySymptomKeywords are symptom keywords that indicate potential emergency.
+var emergencySymptomKeywords = []string{
+	"胸痛", "胸闷", "呼吸困难", "意识模糊", "昏迷", "大出血", "抽搐", "窒息",
+}
+
 // ReportVitalsInput is the input for reporting vital signs.
 type ReportVitalsInput struct {
 	SessionID string
 	Source    string
 	Vitals    map[string]interface{}
+	Symptoms  []string
 }
 
 // EmergencyRecheckResult is the result of an emergency check.
@@ -47,6 +54,23 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 		}
 	}
 
+	// Symptom-based emergency detection
+	for _, symptom := range input.Symptoms {
+		lower := strings.ToLower(symptom)
+		for _, keyword := range emergencySymptomKeywords {
+			if strings.Contains(lower, keyword) {
+				emergency = true
+				if severity == "" {
+					severity = string(model.EmergencySeveritySuspected)
+				}
+				break
+			}
+		}
+		if emergency {
+			break
+		}
+	}
+
 	result := &EmergencyRecheckResult{
 		Emergency: emergency,
 		Severity:  severity,
@@ -70,6 +94,7 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 				now := time.Now()
 				reason := string(model.TerminalReasonEmergency)
 				session.Status = string(model.VisitStatusEmergencyTerminated)
+				session.MachineState = string(model.VisitMachineStateEmergencyPending)
 				session.EndedAt = &now
 				session.TerminalReason = &reason
 				_ = s.visitRepo.Update(ctx, session)
@@ -109,6 +134,7 @@ func (s *Service) DismissEmergency(ctx context.Context, input DismissEmergencyIn
 
 	// Recover to chatting
 	session.Status = string(model.VisitStatusChatting)
+	session.MachineState = string(model.VisitMachineStateChatting)
 	session.TerminalReason = nil
 	session.EndedAt = nil
 	_ = s.visitRepo.Update(ctx, session)

@@ -53,15 +53,15 @@ type FlowCard struct {
 	TestItems           []TestItem `json:"testItems,omitempty"`
 	Reason              string     `json:"reason,omitempty"`
 	DifferentialTargets []string   `json:"differentialTargets,omitempty"`
-	EstimatedFee        float64    `json:"estimatedFee,omitempty"`
+	EstimatedFee        *float64   `json:"estimatedFee,omitempty"`
 
 	// --- payment ---
 	PaymentID       string            `json:"paymentId,omitempty"`
 	Purpose         string            `json:"purpose,omitempty"`
 	Items           []PaymentLineItem `json:"items,omitempty"`
-	TotalAmount     float64           `json:"totalAmount,omitempty"`
-	InsuranceAmount float64           `json:"insuranceAmount,omitempty"`
-	SelfPayAmount   float64           `json:"selfPayAmount,omitempty"`
+	TotalAmount     *float64          `json:"totalAmount,omitempty"`
+	InsuranceAmount *float64          `json:"insuranceAmount,omitempty"`
+	SelfPayAmount   *float64          `json:"selfPayAmount,omitempty"`
 	PaymentStatus   string            `json:"paymentStatus,omitempty"`
 
 	// --- lab_execution ---

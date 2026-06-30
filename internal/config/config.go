@@ -39,7 +39,7 @@ func Load() (*Config, error) {
 	_ = godotenv.Load(".env")
 
 	// Try loading .env.local for overrides (ignore file not found)
-	_ = godotenv.Load(".env.local")
+	_ = godotenv.Overload(".env.local")
 
 	cfg := &Config{
 		ServerAddr:         getEnv("SERVER_ADDR", ":8080"),
@@ -95,6 +95,11 @@ func (c *Config) validate() error {
 	// Production mode cannot use wildcard CORS
 	if c.ServerMode == "release" && c.CORSAllowedOrigins == "*" {
 		return fmt.Errorf("CORS_ALLOWED_ORIGINS cannot be '*' in release mode")
+	}
+
+	// MEDAGENT_API_KEY is required
+	if c.MedAgentAPIKey == "" {
+		return fmt.Errorf("MEDAGENT_API_KEY is required")
 	}
 
 	return nil

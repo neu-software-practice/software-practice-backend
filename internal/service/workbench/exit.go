@@ -2,15 +2,28 @@ package workbench
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
 
+// validExitReasons is the set of allowed reason values for ExitVisit.
+var validExitReasons = map[string]bool{
+	"patient_request": true,
+	"timeout":         true,
+	"emergency":       true,
+	"other":           true,
+}
+
 // ExitVisit processes a patient's request to exit the visit.
 // Returns the settlement result with one of four consequences.
 func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*model.ExitSettlementResult, error) {
+	if !validExitReasons[input.Reason] {
+		return nil, fmt.Errorf("invalid exit reason: %q", input.Reason)
+	}
+
 	session, err := s.visitRepo.FindByID(ctx, input.SessionID)
 	if err != nil {
 		return nil, err
@@ -21,8 +34,9 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 	// Determine consequence based on session state
 	consequence := determineExitConsequence(session)
 
-	reason := "exited"
+	reason := input.Reason
 	session.Status = string(model.VisitStatusExited)
+	session.MachineState = string(model.VisitMachineStateExited)
 	session.EndedAt = &now
 	session.TerminalReason = &reason
 	_ = s.visitRepo.Update(ctx, session)
@@ -35,7 +49,7 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 	)
 
 	terminalTL := adapter.BuildTerminalTimelineItem(input.SessionID,
-		string(model.TerminalReasonExited),
+		reason,
 		"主动退出",
 		consequence.Text,
 	)
@@ -45,7 +59,7 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 
 	return &model.ExitSettlementResult{
 		SessionID:      input.SessionID,
-		TerminalReason: string(model.TerminalReasonExited),
+		TerminalReason: reason,
 		RefundAmount:   consequence.Amount,
 		PayableAmount:  0,
 		TimelineItem:   terminalTL,
