@@ -19,6 +19,7 @@ type Service struct {
 	visitRepo      repository.VisitRepository
 	timelineRepo   repository.TimelineRepository
 	flowCardRepo   repository.FlowCardRepository
+	addressRepo    repository.AddressRepository
 	medAgentClient *medagent.Client
 	medAgentMode   string
 	llmClient      LLMClient
@@ -30,6 +31,7 @@ func NewService(
 	visitRepo repository.VisitRepository,
 	timelineRepo repository.TimelineRepository,
 	flowCardRepo repository.FlowCardRepository,
+	addressRepo repository.AddressRepository,
 	medAgentClient *medagent.Client,
 	medAgentMode string,
 	llmClient LLMClient,
@@ -39,6 +41,7 @@ func NewService(
 		visitRepo:      visitRepo,
 		timelineRepo:   timelineRepo,
 		flowCardRepo:   flowCardRepo,
+		addressRepo:    addressRepo,
 		medAgentClient: medAgentClient,
 		medAgentMode:   medAgentMode,
 		llmClient:      llmClient,

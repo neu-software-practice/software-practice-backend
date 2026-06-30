@@ -28,6 +28,11 @@ func ParsePatientID(c *gin.Context) string {
 	return c.Param("patientId")
 }
 
+// ParseAddressID extracts the address ID from the URL path.
+func ParseAddressID(c *gin.Context) string {
+	return c.Param("addressId")
+}
+
 // ParseQueryInt parses an integer query parameter with a default value.
 func ParseQueryInt(c *gin.Context, key string, defaultVal int) int {
 	val := c.Query(key)

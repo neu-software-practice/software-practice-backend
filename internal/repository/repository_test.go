@@ -933,3 +933,92 @@ func TestPatientRepo_MedicalHistory(t *testing.T) {
 		t.Errorf("updated MedicalHistory = %v", updated.MedicalHistory)
 	}
 }
+
+func TestAddressRepo_CRUD(t *testing.T) {
+	db, cleanup := setupDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	patientRepo := repository.NewPatientRepository(db)
+	addrRepo := repository.NewAddressRepository(db)
+
+	patient := createPatient(ctx, t, patientRepo)
+
+	addr := &model.Address{
+		ID:        uuid.New().String(),
+		PatientID: patient.ID,
+		Name:      "李明",
+		Phone:     "13800002468",
+		Province:  "辽宁省",
+		City:      "沈阳市",
+		District:  "浑南区",
+		Detail:    "创新路195号",
+		IsDefault: true,
+		Tag:       "公司",
+	}
+	if err := addrRepo.Create(ctx, addr); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	found, err := addrRepo.FindByID(ctx, addr.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if found.Name != "李明" {
+		t.Errorf("Name = %s, want 李明", found.Name)
+	}
+	if !found.IsDefault {
+		t.Error("IsDefault should be true")
+	}
+
+	addrs, err := addrRepo.ListByPatient(ctx, patient.ID)
+	if err != nil {
+		t.Fatalf("ListByPatient: %v", err)
+	}
+	if len(addrs) != 1 {
+		t.Errorf("len = %d, want 1", len(addrs))
+	}
+
+	count, err := addrRepo.CountByPatient(ctx, patient.ID)
+	if err != nil {
+		t.Fatalf("CountByPatient: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("count = %d, want 1", count)
+	}
+
+	addr.Name = "张三"
+	if err := addrRepo.Update(ctx, addr); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	updated, err := addrRepo.FindByID(ctx, addr.ID)
+	if err != nil {
+		t.Fatalf("FindByID after update: %v", err)
+	}
+	if updated.Name != "张三" {
+		t.Errorf("Name = %s, want 张三", updated.Name)
+	}
+
+	if err := addrRepo.ClearDefaultByPatient(ctx, patient.ID); err != nil {
+		t.Fatalf("ClearDefaultByPatient: %v", err)
+	}
+
+	if err := addrRepo.SetDefault(ctx, addr.ID, patient.ID); err != nil {
+		t.Fatalf("SetDefault: %v", err)
+	}
+	afterSet, err := addrRepo.FindByID(ctx, addr.ID)
+	if err != nil {
+		t.Fatalf("FindByID after SetDefault: %v", err)
+	}
+	if !afterSet.IsDefault {
+		t.Error("IsDefault should be true after SetDefault")
+	}
+
+	if err := addrRepo.Delete(ctx, addr.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	_, err = addrRepo.FindByID(ctx, addr.ID)
+	if err != model.ErrAddressNotFound {
+		t.Errorf("expected ErrAddressNotFound after delete, got %v", err)
+	}
+}

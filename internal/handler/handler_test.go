@@ -7,13 +7,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/neuhis/software-practice-backend/internal/config"
 	"github.com/neuhis/software-practice-backend/internal/handler"
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
+	addresssvc "github.com/neuhis/software-practice-backend/internal/service/address"
 	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
+	billingsvc "github.com/neuhis/software-practice-backend/internal/service/billing"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
@@ -620,17 +623,107 @@ func (m *mockTimelineRepo) ListBySession(ctx context.Context, sid string, cursor
 }
 func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) error { return nil }
 
-type mockFlowCardRepo struct{}
+type mockFlowCardRepo struct {
+	listBySessionFunc func(ctx context.Context, sid string) ([]model.FlowCard, error)
+	findByIDFunc      func(ctx context.Context, id string) (*model.FlowCard, error)
+	createFunc        func(ctx context.Context, card *model.FlowCard) error
+	updateFunc        func(ctx context.Context, card *model.FlowCard) error
+	updateStatusFunc  func(ctx context.Context, id, status string) error
+}
 
-func (m *mockFlowCardRepo) Create(ctx context.Context, card *model.FlowCard) error { return nil }
+func (m *mockFlowCardRepo) Create(ctx context.Context, card *model.FlowCard) error {
+	if m.createFunc != nil {
+		return m.createFunc(ctx, card)
+	}
+	return nil
+}
 func (m *mockFlowCardRepo) FindByID(ctx context.Context, id string) (*model.FlowCard, error) {
+	if m.findByIDFunc != nil {
+		return m.findByIDFunc(ctx, id)
+	}
 	return nil, nil
 }
 func (m *mockFlowCardRepo) ListBySession(ctx context.Context, sid string) ([]model.FlowCard, error) {
+	if m.listBySessionFunc != nil {
+		return m.listBySessionFunc(ctx, sid)
+	}
 	return nil, nil
 }
-func (m *mockFlowCardRepo) UpdateStatus(ctx context.Context, id, status string) error { return nil }
-func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) error    { return nil }
+func (m *mockFlowCardRepo) UpdateStatus(ctx context.Context, id, status string) error {
+	if m.updateStatusFunc != nil {
+		return m.updateStatusFunc(ctx, id, status)
+	}
+	return nil
+}
+func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) error {
+	if m.updateFunc != nil {
+		return m.updateFunc(ctx, card)
+	}
+	return nil
+}
+
+type mockAddressRepo struct {
+	listByPatientFunc         func(ctx context.Context, patientID string) ([]model.Address, error)
+	findByIDFunc              func(ctx context.Context, id string) (*model.Address, error)
+	countByPatientFunc        func(ctx context.Context, patientID string) (int, error)
+	createFunc                func(ctx context.Context, addr *model.Address) error
+	updateFunc                func(ctx context.Context, addr *model.Address) error
+	deleteFunc                func(ctx context.Context, id string) error
+	clearDefaultByPatientFunc func(ctx context.Context, patientID string) error
+	setDefaultFunc            func(ctx context.Context, id, patientID string) error
+}
+
+func (m *mockAddressRepo) Create(ctx context.Context, addr *model.Address) error {
+	if m.createFunc != nil {
+		return m.createFunc(ctx, addr)
+	}
+	return nil
+}
+func (m *mockAddressRepo) FindByID(ctx context.Context, id string) (*model.Address, error) {
+	if m.findByIDFunc != nil {
+		return m.findByIDFunc(ctx, id)
+	}
+	return &model.Address{
+		ID: id, PatientID: "p001", Name: "李明", Phone: "13800002468",
+		Province: "辽宁省", City: "沈阳市", District: "浑南区", Detail: "创新路195号",
+	}, nil
+}
+func (m *mockAddressRepo) ListByPatient(ctx context.Context, patientID string) ([]model.Address, error) {
+	if m.listByPatientFunc != nil {
+		return m.listByPatientFunc(ctx, patientID)
+	}
+	return nil, nil
+}
+func (m *mockAddressRepo) CountByPatient(ctx context.Context, patientID string) (int, error) {
+	if m.countByPatientFunc != nil {
+		return m.countByPatientFunc(ctx, patientID)
+	}
+	return 0, nil
+}
+func (m *mockAddressRepo) Update(ctx context.Context, addr *model.Address) error {
+	if m.updateFunc != nil {
+		return m.updateFunc(ctx, addr)
+	}
+	return nil
+}
+func (m *mockAddressRepo) Delete(ctx context.Context, id string) error {
+	if m.deleteFunc != nil {
+		return m.deleteFunc(ctx, id)
+	}
+	return nil
+}
+func (m *mockAddressRepo) ClearDefaultByPatient(ctx context.Context, patientID string) error {
+	if m.clearDefaultByPatientFunc != nil {
+		return m.clearDefaultByPatientFunc(ctx, patientID)
+	}
+	return nil
+}
+func (m *mockAddressRepo) SetDefault(ctx context.Context, id, patientID string) error {
+	if m.setDefaultFunc != nil {
+		return m.setDefaultFunc(ctx, id, patientID)
+	}
+	return nil
+}
 
 type mockUserRepo struct{}
 
@@ -660,6 +753,7 @@ var _ repository.PatientRepository = (*mockPatientRepo)(nil)
 var _ repository.VisitRepository = (*mockVisitRepo)(nil)
 var _ repository.TimelineRepository = (*mockTimelineRepo)(nil)
 var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
+var _ repository.AddressRepository = (*mockAddressRepo)(nil)
 var _ repository.UserRepository = (*mockUserRepo)(nil)
 var _ repository.RefreshTokenRepository = (*mockRefreshTokenRepo)(nil)
 
@@ -959,6 +1053,7 @@ func newWorkbenchServiceForTest(
 		visitRepo,
 		timelineRepo,
 		&mockFlowCardRepo{},
+		&mockAddressRepo{},
 		nil, // medAgentClient — not used by simple read methods
 		"test",
 		nil, // llmClient — not used by simple read methods
@@ -1020,8 +1115,10 @@ func TestNewRouter(t *testing.T) {
 	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
 	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{})
 	authSvc := newTestAuthService()
+	addressSvc := addresssvc.NewService(&mockAddressRepo{})
+	billingSvc := billingsvc.NewService(&mockVisitRepo{}, &mockFlowCardRepo{})
 
-	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc)
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc, addressSvc, billingSvc)
 	if router.Patient == nil {
 		t.Error("Patient handler should not be nil")
 	}
@@ -1034,6 +1131,12 @@ func TestNewRouter(t *testing.T) {
 	if router.Auth == nil {
 		t.Error("Auth handler should not be nil")
 	}
+	if router.Address == nil {
+		t.Error("Address handler should not be nil")
+	}
+	if router.Billing == nil {
+		t.Error("Billing handler should not be nil")
+	}
 }
 
 func TestSetupRoutes(t *testing.T) {
@@ -1043,7 +1146,9 @@ func TestSetupRoutes(t *testing.T) {
 	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
 	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{})
 	authSvc := newTestAuthService()
-	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc)
+	addressSvc := addresssvc.NewService(&mockAddressRepo{})
+	billingSvc := billingsvc.NewService(&mockVisitRepo{}, &mockFlowCardRepo{})
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc, addressSvc, billingSvc)
 
 	cfg := &config.Config{
 		ServerMode:         "test",
@@ -1115,4 +1220,347 @@ func TestWorkbenchHandler_ListTimeline(t *testing.T) {
 			t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
 		}
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Address Handler tests
+// ---------------------------------------------------------------------------
+
+func TestAddressHandler_ListAddresses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		listByPatientFunc: func(ctx context.Context, patientID string) ([]model.Address, error) {
+			return []model.Address{}, nil
+		},
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	c.Request = httptest.NewRequest("GET", "/patients/p001/addresses", nil)
+	c.Set("patientId", "p001")
+
+	h.ListAddresses(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestAddressHandler_CreateAddress(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		countByPatientFunc:        func(ctx context.Context, patientID string) (int, error) { return 0, nil },
+		clearDefaultByPatientFunc: func(ctx context.Context, patientID string) error { return nil },
+		createFunc:                func(ctx context.Context, addr *model.Address) error { return nil },
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	body := `{"patientId":"p001","name":"李明","phone":"13800002468","province":"辽宁省","city":"沈阳市","district":"浑南区","detail":"创新路195号","tag":"公司"}`
+	c.Request = httptest.NewRequest("POST", "/patients/p001/addresses", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+
+	h.CreateAddress(c)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("status = %d, want 201, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_CreateAddress_LimitExceeded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		countByPatientFunc: func(ctx context.Context, patientID string) (int, error) { return 10, nil },
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	body := `{"patientId":"p001","name":"李明","phone":"13800002468","province":"辽宁省","city":"沈阳市","district":"浑南区","detail":"创新路195号"}`
+	c.Request = httptest.NewRequest("POST", "/patients/p001/addresses", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+
+	h.CreateAddress(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_UpdateAddress(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return &model.Address{
+				ID: id, PatientID: "p001", Name: "李明", Phone: "13800002468",
+				Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试",
+			}, nil
+		},
+		updateFunc: func(ctx context.Context, a *model.Address) error { return nil },
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "addr-1"}}
+	body := `{"name":"张三"}`
+	c.Request = httptest.NewRequest("PATCH", "/patients/p001/addresses/addr-1", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+
+	h.UpdateAddress(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_UpdateAddress_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return nil, model.ErrAddressNotFound
+		},
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "bad-id"}}
+	body := `{"name":"张三"}`
+	c.Request = httptest.NewRequest("PATCH", "/patients/p001/addresses/bad-id", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+
+	h.UpdateAddress(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_DeleteAddress(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return &model.Address{
+				ID: id, PatientID: "p001", Name: "李明", Phone: "13800002468",
+				Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试",
+			}, nil
+		},
+		deleteFunc: func(ctx context.Context, id string) error { return nil },
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "addr-1"}}
+	c.Request = httptest.NewRequest("DELETE", "/patients/p001/addresses/addr-1", nil)
+	c.Set("patientId", "p001")
+
+	h.DeleteAddress(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_SetDefaultAddress(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return &model.Address{
+				ID: id, PatientID: "p001", Name: "李明", Phone: "13800002468",
+				Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试",
+			}, nil
+		},
+		setDefaultFunc: func(ctx context.Context, id, patientID string) error { return nil },
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "addr-1"}}
+	c.Request = httptest.NewRequest("PUT", "/patients/p001/addresses/addr-1/default", nil)
+	c.Set("patientId", "p001")
+
+	h.SetDefaultAddress(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Address Handler edge cases
+// ---------------------------------------------------------------------------
+
+func TestAddressHandler_CreateAddress_InvalidJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	addrSvc := addresssvc.NewService(&mockAddressRepo{})
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	c.Request = httptest.NewRequest("POST", "/patients/p001/addresses", strings.NewReader(`not json`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+
+	h.CreateAddress(c)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400, got %d", w.Code, w.Code)
+	}
+}
+
+func TestAddressHandler_SetDefaultAddress_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return nil, model.ErrAddressNotFound
+		},
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "bad-id"}}
+	c.Request = httptest.NewRequest("PUT", "/patients/p001/addresses/bad-id/default", nil)
+	c.Set("patientId", "p001")
+
+	h.SetDefaultAddress(c)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", w.Code)
+	}
+}
+
+func TestAddressHandler_DeleteAddress_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return nil, model.ErrAddressNotFound
+		},
+	}
+	addrSvc := addresssvc.NewService(repo)
+	h := handler.NewAddressHandler(addrSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "bad-id"}}
+	c.Request = httptest.NewRequest("DELETE", "/patients/p001/addresses/bad-id", nil)
+	c.Set("patientId", "p001")
+
+	h.DeleteAddress(c)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", w.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Billing Handler tests
+// ---------------------------------------------------------------------------
+
+func TestBillingHandler_ListBillingRecords(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, c2 *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			return []model.VisitSessionSummary{}, nil, false, nil
+		},
+	}
+	flowCardRepo := &mockFlowCardRepo{
+		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
+			return nil, nil
+		},
+	}
+	billingSvc := billingsvc.NewService(visitRepo, flowCardRepo)
+	h := handler.NewBillingHandler(billingSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/billing/records", nil)
+	c.Set("patientId", "p001")
+
+	h.ListBillingRecords(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestBillingHandler_ListBillingRecords_Unauthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	billingSvc := billingsvc.NewService(&mockVisitRepo{}, &mockFlowCardRepo{})
+	h := handler.NewBillingHandler(billingSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/billing/records", nil)
+	// No patientId set — simulates unauthenticated
+
+	h.ListBillingRecords(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestBillingHandler_ListBillingRecords_WithData(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cc := "头痛"
+	handledAt := time.Now()
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, c2 *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			return []model.VisitSessionSummary{
+				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
+			}, nil, false, nil
+		},
+	}
+	flowCardRepo := &mockFlowCardRepo{
+		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
+			return []model.FlowCard{{
+				ID: "c1", SessionID: "s1", Kind: "payment", PaymentStatus: "paid",
+				PaymentID: "pay-1", Purpose: "lab", TotalAmount: 150.0,
+				InsuranceAmount: 100.0, SelfPayAmount: 50.0,
+				HandledAt: &handledAt,
+			}}, nil
+		},
+	}
+	billingSvc := billingsvc.NewService(visitRepo, flowCardRepo)
+	h := handler.NewBillingHandler(billingSvc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/billing/records", nil)
+	c.Set("patientId", "p001")
+
+	h.ListBillingRecords(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
 }

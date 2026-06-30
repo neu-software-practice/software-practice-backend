@@ -11,9 +11,10 @@ import (
 
 // SubmitFulfillmentInput is the input for medication fulfillment.
 type SubmitFulfillmentInput struct {
-	SessionID string
-	CardID    string
-	Mode      string // pickup, delivery
+	SessionID string `json:"sessionId"`
+	CardID    string `json:"cardId"`
+	Mode      string `json:"mode"`                // pickup, delivery
+	AddressID string `json:"addressId,omitempty"` // required when mode=delivery
 }
 
 // SubmitFulfillment processes medication fulfillment (pickup/delivery).
@@ -26,6 +27,26 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	card, err := s.flowCardRepo.FindByID(ctx, input.CardID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate and resolve delivery address
+	if input.Mode == string(model.FulfillmentModeDelivery) {
+		if input.AddressID == "" {
+			return nil, model.ErrAddressRequired
+		}
+		addr, err := s.addressRepo.FindByID(ctx, input.AddressID)
+		if err != nil {
+			return nil, err
+		}
+		if addr.PatientID != session.PatientID {
+			return nil, model.ErrAddressNotFound
+		}
+		// Write address summary to the card
+		card.DeliveryAddress = &model.DeliveryAddress{
+			Name:        addr.Name,
+			Phone:       addr.Phone,
+			FullAddress: fmt.Sprintf("%s%s%s%s", addr.Province, addr.City, addr.District, addr.Detail),
+		}
 	}
 
 	now := time.Now()
