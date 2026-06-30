@@ -105,9 +105,14 @@ smoke-test-admin-docker: ## 启动 Docker 服务 → 运行 Admin 黑盒测试 �
 # Combined Smoke Tests
 # ==========================
 
-smoke-test-all: ## 运行所有黑盒测试（患者端 + Admin）
+smoke-test-all: ## 运行所有黑盒测试（患者端 + Admin，需先启动服务）
 	@echo "=== Patient API Tests ==="
 	@bash tests/newman/run-smoke.sh http://localhost:8080; PATIENT_EXIT=$$?; \
+	echo "=== Restarting server to clear rate limits ==="; \
+	kill $$(lsof -ti:8080 2>/dev/null) 2>/dev/null || true; \
+	sleep 2; \
+	go run ./cmd/server &>/tmp/server_restart.log & \
+	sleep 4; \
 	echo "=== Admin API Tests ==="; \
 	bash tests/newman/run-admin-smoke.sh http://localhost:8080; ADMIN_EXIT=$$?; \
 	if [ $$PATIENT_EXIT -ne 0 ] || [ $$ADMIN_EXIT -ne 0 ]; then \
