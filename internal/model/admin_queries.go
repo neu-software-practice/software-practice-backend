@@ -2,11 +2,11 @@ package model
 
 // DashboardStats holds aggregated statistics for the admin dashboard.
 type DashboardStats struct {
-	TotalPatients     int `json:"totalPatients"`
-	TotalSessions     int `json:"totalSessions"`
-	ActiveSessions    int `json:"activeSessions"`
-	TodayNewPatients  int `json:"todayNewPatients"`
-	TodayNewSessions  int `json:"todayNewSessions"`
+	TotalPatients    int `json:"totalPatients"`
+	TotalSessions    int `json:"totalSessions"`
+	ActiveSessions   int `json:"activeSessions"`
+	TodayNewPatients int `json:"todayNewPatients"`
+	TodayNewSessions int `json:"todayNewSessions"`
 }
 
 // AdminPatientItem is a summary view of a patient for the admin patient list.
