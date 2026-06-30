@@ -2,6 +2,7 @@ package patient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,7 +29,7 @@ func NewService(patientRepo repository.PatientRepository, visitRepo repository.V
 // If the patient is not found, a new patient profile is created.
 func (s *Service) VerifyIdentity(ctx context.Context, input model.VerifyIdentityInput) (*model.VerifyIdentityResult, error) {
 	patient, err := s.patientRepo.FindByCredential(ctx, input.CredentialType, input.Credential)
-	if err == model.ErrPatientNotFound {
+	if errors.Is(err, model.ErrPatientNotFound) {
 		// Create new patient
 		patient = &model.PatientProfile{
 			ID:                  uuid.New().String(),
