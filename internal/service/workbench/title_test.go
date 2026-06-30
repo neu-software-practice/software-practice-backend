@@ -30,6 +30,7 @@ func newTestServiceWithLLM(
 		visitRepo,
 		timelineRepo,
 		&mockFlowCardRepo{},
+		&mockAddressRepo{},
 		nil,
 		"http",
 		llmClient,

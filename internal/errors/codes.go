@@ -22,4 +22,8 @@ const (
 
 	CodeTitleAlreadyExists = "TITLE_ALREADY_EXISTS"
 	CodeLLMUnavailable     = "LLM_UNAVAILABLE"
+
+	CodeAddressNotFound      = "ADDRESS_NOT_FOUND"
+	CodeAddressLimitExceeded = "ADDRESS_LIMIT_EXCEEDED"
+	CodeAddressRequired      = "ADDRESS_REQUIRED"
 )

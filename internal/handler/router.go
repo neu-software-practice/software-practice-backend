@@ -5,7 +5,9 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/config"
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
+	addresssvc "github.com/neuhis/software-practice-backend/internal/service/address"
 	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
+	billingsvc "github.com/neuhis/software-practice-backend/internal/service/billing"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
@@ -17,6 +19,8 @@ type Router struct {
 	Visit     *VisitHandler
 	Workbench *WorkbenchHandler
 	Auth      *AuthHandler
+	Address   *AddressHandler
+	Billing   *BillingHandler
 }
 
 // NewRouter creates a new Router.
@@ -25,12 +29,16 @@ func NewRouter(
 	visitSvc *visitsvc.Service,
 	workbenchSvc *wbsvc.Service,
 	authSvc *authsvc.Service,
+	addressSvc *addresssvc.Service,
+	billingSvc *billingsvc.Service,
 ) *Router {
 	return &Router{
 		Patient:   NewPatientHandler(patientSvc),
 		Visit:     NewVisitHandler(visitSvc),
 		Workbench: NewWorkbenchHandler(workbenchSvc),
 		Auth:      NewAuthHandler(authSvc),
+		Address:   NewAddressHandler(addressSvc),
+		Billing:   NewBillingHandler(billingSvc),
 	}
 }
 
@@ -88,6 +96,16 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 		auth.POST("/visits/:sessionId/timer", router.Workbench.ToggleTimer)
 		auth.POST("/visits/:sessionId/dismiss-emergency", router.Workbench.DismissEmergency)
 		auth.POST("/visits/:sessionId/generate-title", router.Workbench.GenerateTitle)
+
+		// Address routes (v5)
+		auth.GET("/patients/:patientId/addresses", router.Address.ListAddresses)
+		auth.POST("/patients/:patientId/addresses", router.Address.CreateAddress)
+		auth.PATCH("/patients/:patientId/addresses/:addressId", router.Address.UpdateAddress)
+		auth.DELETE("/patients/:patientId/addresses/:addressId", router.Address.DeleteAddress)
+		auth.PUT("/patients/:patientId/addresses/:addressId/default", router.Address.SetDefaultAddress)
+
+		// Billing routes (v6)
+		auth.GET("/billing/records", router.Billing.ListBillingRecords)
 	}
 
 	// Error handler for 404

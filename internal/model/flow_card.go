@@ -16,6 +16,13 @@ type PaymentLineItem struct {
 	Quantity int     `json:"quantity,omitempty"`
 }
 
+// DeliveryAddress holds the delivery address summary stored on a medication_fulfillment card.
+type DeliveryAddress struct {
+	Name        string `json:"name"`
+	Phone       string `json:"phone"`
+	FullAddress string `json:"fullAddress"`
+}
+
 // MedicationItem represents a single medication prescribed in a medication_fulfillment card.
 type MedicationItem struct {
 	Name     string  `json:"name"`
@@ -81,6 +88,7 @@ type FlowCard struct {
 	AvailableModes    []string         `json:"availableModes,omitempty"`
 	SelectedMode      *string          `json:"selectedMode,omitempty"`
 	FulfillmentStatus string           `json:"fulfillmentStatus,omitempty"`
+	DeliveryAddress   *DeliveryAddress `json:"deliveryAddress,omitempty"`
 
 	// --- treatment_execution ---
 	TreatmentName    string     `json:"treatmentName,omitempty"`

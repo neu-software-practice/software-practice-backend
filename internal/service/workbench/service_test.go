@@ -11,9 +11,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/neuhis/software-practice-backend/internal/model"
+	"github.com/neuhis/software-practice-backend/internal/repository"
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
 )
+
+var _ repository.AddressRepository = (*mockAddressRepo)(nil)
 
 // ---- Mock Repositories ----
 
@@ -105,6 +108,42 @@ func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) err
 	return m.updateFunc(ctx, card)
 }
 
+type mockAddressRepo struct {
+	createFunc                func(ctx context.Context, addr *model.Address) error
+	findByIDFunc              func(ctx context.Context, id string) (*model.Address, error)
+	listByPatientFunc         func(ctx context.Context, patientID string) ([]model.Address, error)
+	countByPatientFunc        func(ctx context.Context, patientID string) (int, error)
+	updateFunc                func(ctx context.Context, addr *model.Address) error
+	deleteFunc                func(ctx context.Context, id string) error
+	clearDefaultByPatientFunc func(ctx context.Context, patientID string) error
+	setDefaultFunc            func(ctx context.Context, id, patientID string) error
+}
+
+func (m *mockAddressRepo) Create(ctx context.Context, addr *model.Address) error {
+	return m.createFunc(ctx, addr)
+}
+func (m *mockAddressRepo) FindByID(ctx context.Context, id string) (*model.Address, error) {
+	return m.findByIDFunc(ctx, id)
+}
+func (m *mockAddressRepo) ListByPatient(ctx context.Context, patientID string) ([]model.Address, error) {
+	return m.listByPatientFunc(ctx, patientID)
+}
+func (m *mockAddressRepo) CountByPatient(ctx context.Context, patientID string) (int, error) {
+	return m.countByPatientFunc(ctx, patientID)
+}
+func (m *mockAddressRepo) Update(ctx context.Context, addr *model.Address) error {
+	return m.updateFunc(ctx, addr)
+}
+func (m *mockAddressRepo) Delete(ctx context.Context, id string) error {
+	return m.deleteFunc(ctx, id)
+}
+func (m *mockAddressRepo) ClearDefaultByPatient(ctx context.Context, patientID string) error {
+	return m.clearDefaultByPatientFunc(ctx, patientID)
+}
+func (m *mockAddressRepo) SetDefault(ctx context.Context, id, patientID string) error {
+	return m.setDefaultFunc(ctx, id, patientID)
+}
+
 // ---- Helpers ----
 
 func makeSession(patientID string) *model.VisitSession {
@@ -146,7 +185,7 @@ func makeCard(cardID, sessionID, kind string, blocking bool) *model.FlowCard {
 	}
 }
 
-func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mockFlowCardRepo) {
+func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mockFlowCardRepo, *mockAddressRepo) {
 	p := &mockPatientRepo{
 		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
 			return makePatient(), nil
@@ -174,11 +213,28 @@ func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mo
 		updateFunc:       func(ctx context.Context, card *model.FlowCard) error { return nil },
 		updateStatusFunc: func(ctx context.Context, id, status string) error { return nil },
 	}
-	return p, v, t, f
+	a := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return &model.Address{
+				ID:        id,
+				PatientID: "p001",
+				Name:      "李明",
+				Phone:     "13800002468",
+				Province:  "辽宁省",
+				City:      "沈阳市",
+				District:  "浑南区",
+				Detail:    "创新路195号",
+			}, nil
+		},
+		createFunc: func(ctx context.Context, addr *model.Address) error { return nil },
+		updateFunc: func(ctx context.Context, addr *model.Address) error { return nil },
+		deleteFunc: func(ctx context.Context, id string) error { return nil },
+	}
+	return p, v, t, f, a
 }
 
-func newSvc(p *mockPatientRepo, v *mockVisitRepo, t *mockTimelineRepo, f *mockFlowCardRepo) *wbsvc.Service {
-	return wbsvc.NewService(p, v, t, f, nil, "http", nil)
+func newSvc(p *mockPatientRepo, v *mockVisitRepo, t *mockTimelineRepo, f *mockFlowCardRepo, a *mockAddressRepo) *wbsvc.Service {
+	return wbsvc.NewService(p, v, t, f, a, nil, "http", nil)
 }
 
 // eventCollector collects SSE events for callback-based tests.
@@ -196,8 +252,8 @@ func (ec *eventCollector) callback(event model.AssistantStreamEvent) error {
 // ============================================================
 
 func TestGetSession(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	session, err := svc.GetSession(ctx, "s1")
@@ -210,11 +266,11 @@ func TestGetSession(t *testing.T) {
 }
 
 func TestGetSession_NotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.GetSession(ctx, "bad-id")
@@ -224,8 +280,8 @@ func TestGetSession_NotFound(t *testing.T) {
 }
 
 func TestListTimeline(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	items, _, hasMore, err := svc.ListTimeline(ctx, "s1", nil, 50)
@@ -241,11 +297,11 @@ func TestListTimeline(t *testing.T) {
 }
 
 func TestListTimeline_Empty(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mt.listFunc = func(ctx context.Context, sid string, c *string, ps int) ([]model.TimelineItem, *string, bool, error) {
 		return nil, nil, false, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	items, _, _, err := svc.ListTimeline(ctx, "s1", nil, 50)
@@ -262,8 +318,8 @@ func TestListTimeline_Empty(t *testing.T) {
 // ============================================================
 
 func TestSendMessage(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SendMessage(ctx, wbsvc.SendMessageInput{
@@ -283,11 +339,11 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestSendMessage_SessionNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SendMessage(ctx, wbsvc.SendMessageInput{
@@ -299,11 +355,11 @@ func TestSendMessage_SessionNotFound(t *testing.T) {
 }
 
 func TestSendMessage_TimelineAppendFails(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mt.appendFunc = func(ctx context.Context, item *model.TimelineItem) error {
 		return fmt.Errorf("db error")
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SendMessage(ctx, wbsvc.SendMessageInput{
@@ -318,7 +374,7 @@ func TestSendMessage_TimelineAppendFails(t *testing.T) {
 }
 
 func TestSendMessage_PlaceholderAppendFails(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	appendCount := 0
 	mt.appendFunc = func(ctx context.Context, item *model.TimelineItem) error {
 		appendCount++
@@ -327,7 +383,7 @@ func TestSendMessage_PlaceholderAppendFails(t *testing.T) {
 		}
 		return nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SendMessage(ctx, wbsvc.SendMessageInput{
@@ -346,8 +402,8 @@ func TestSendMessage_PlaceholderAppendFails(t *testing.T) {
 // ============================================================
 
 func TestSubmitLabDecision_Accepted(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -364,8 +420,8 @@ func TestSubmitLabDecision_Accepted(t *testing.T) {
 }
 
 func TestSubmitLabDecision_Skipped(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -380,8 +436,8 @@ func TestSubmitLabDecision_Skipped(t *testing.T) {
 }
 
 func TestSubmitLabDecision_Vetoed(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -396,8 +452,8 @@ func TestSubmitLabDecision_Vetoed(t *testing.T) {
 }
 
 func TestSubmitLabDecision_Invalid(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -409,11 +465,11 @@ func TestSubmitLabDecision_Invalid(t *testing.T) {
 }
 
 func TestSubmitLabDecision_SessionNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -425,11 +481,11 @@ func TestSubmitLabDecision_SessionNotFound(t *testing.T) {
 }
 
 func TestSubmitLabDecision_CardNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		return nil, model.ErrCardNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -441,11 +497,11 @@ func TestSubmitLabDecision_CardNotFound(t *testing.T) {
 }
 
 func TestSubmitLabDecision_Accepted_FlowCardCreateFails(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
 		return fmt.Errorf("create error")
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
@@ -457,7 +513,7 @@ func TestSubmitLabDecision_Accepted_FlowCardCreateFails(t *testing.T) {
 }
 
 func TestSubmitLabResults(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	appended := false
 	mt.appendFunc = func(ctx context.Context, item *model.TimelineItem) error {
 		if item.Kind == "system_event" && item.EventType == string(model.SystemEventTypeLabResultReceived) {
@@ -465,7 +521,7 @@ func TestSubmitLabResults(t *testing.T) {
 		}
 		return nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	err := svc.SubmitLabResults(ctx, wbsvc.SubmitLabResultsInput{
@@ -484,7 +540,7 @@ func TestSubmitLabResults(t *testing.T) {
 }
 
 func TestSubmitLabResults_Empty(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	appended := false
 	mt.appendFunc = func(ctx context.Context, item *model.TimelineItem) error {
 		if item.Kind == "system_event" {
@@ -492,7 +548,7 @@ func TestSubmitLabResults_Empty(t *testing.T) {
 		}
 		return nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	err := svc.SubmitLabResults(ctx, wbsvc.SubmitLabResultsInput{
@@ -511,13 +567,13 @@ func TestSubmitLabResults_Empty(t *testing.T) {
 // ============================================================
 
 func TestSubmitPayment_Defer(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
 		card.TotalAmount = 100.0
 		return card, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
@@ -532,7 +588,7 @@ func TestSubmitPayment_Defer(t *testing.T) {
 }
 
 func TestSubmitPayment_Lab(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
 		card.TotalAmount = 50.0
@@ -540,7 +596,7 @@ func TestSubmitPayment_Lab(t *testing.T) {
 		return card, nil
 	}
 	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error { return nil }
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
@@ -555,14 +611,14 @@ func TestSubmitPayment_Lab(t *testing.T) {
 }
 
 func TestSubmitPayment_Medication(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
 		card.TotalAmount = 100.0
 		card.Purpose = "medication"
 		return card, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
@@ -577,11 +633,11 @@ func TestSubmitPayment_Medication(t *testing.T) {
 }
 
 func TestSubmitPayment_CardNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		return nil, model.ErrCardNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
@@ -593,7 +649,7 @@ func TestSubmitPayment_CardNotFound(t *testing.T) {
 }
 
 func TestSubmitPayment_Lab_VisitUpdateFails(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		card := makeCard(id, "s1", "payment", true)
 		card.TotalAmount = 50.0
@@ -603,7 +659,7 @@ func TestSubmitPayment_Lab_VisitUpdateFails(t *testing.T) {
 	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
 		return fmt.Errorf("update error")
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	// The update error is silently ignored; function should still succeed.
@@ -623,8 +679,8 @@ func TestSubmitPayment_Lab_VisitUpdateFails(t *testing.T) {
 // ============================================================
 
 func TestSubmitFulfillment_Pickup(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
@@ -642,12 +698,12 @@ func TestSubmitFulfillment_Pickup(t *testing.T) {
 }
 
 func TestSubmitFulfillment_Delivery(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
-		SessionID: "s1", CardID: "f1", Mode: "delivery",
+		SessionID: "s1", CardID: "f1", Mode: "delivery", AddressID: "addr-1",
 	})
 	if err != nil {
 		t.Fatalf("SubmitFulfillment: %v", err)
@@ -658,11 +714,11 @@ func TestSubmitFulfillment_Delivery(t *testing.T) {
 }
 
 func TestSubmitFulfillment_SessionNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
@@ -674,11 +730,11 @@ func TestSubmitFulfillment_SessionNotFound(t *testing.T) {
 }
 
 func TestSubmitFulfillment_CardNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		return nil, model.ErrCardNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
@@ -694,8 +750,8 @@ func TestSubmitFulfillment_CardNotFound(t *testing.T) {
 // ============================================================
 
 func TestSubmitTreatmentExecution_Schedule(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -710,8 +766,8 @@ func TestSubmitTreatmentExecution_Schedule(t *testing.T) {
 }
 
 func TestSubmitTreatmentExecution_ConfirmArrival(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -726,8 +782,8 @@ func TestSubmitTreatmentExecution_ConfirmArrival(t *testing.T) {
 }
 
 func TestSubmitTreatmentExecution_Start(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -742,8 +798,8 @@ func TestSubmitTreatmentExecution_Start(t *testing.T) {
 }
 
 func TestSubmitTreatmentExecution_Complete(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -758,8 +814,8 @@ func TestSubmitTreatmentExecution_Complete(t *testing.T) {
 }
 
 func TestSubmitTreatmentExecution_Cancel(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -774,8 +830,8 @@ func TestSubmitTreatmentExecution_Cancel(t *testing.T) {
 }
 
 func TestSubmitTreatmentExecution_InvalidAction(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -787,11 +843,11 @@ func TestSubmitTreatmentExecution_InvalidAction(t *testing.T) {
 }
 
 func TestSubmitTreatmentExecution_CardNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		return nil, model.ErrCardNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
@@ -803,8 +859,8 @@ func TestSubmitTreatmentExecution_CardNotFound(t *testing.T) {
 }
 
 func TestAckAdvice(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
@@ -822,11 +878,11 @@ func TestAckAdvice(t *testing.T) {
 }
 
 func TestAckAdvice_CardNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		return nil, model.ErrCardNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
@@ -842,13 +898,13 @@ func TestAckAdvice_CardNotFound(t *testing.T) {
 // ============================================================
 
 func TestExitVisit_NoFee(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "chatting"
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -866,7 +922,7 @@ func TestExitVisit_NoFee(t *testing.T) {
 }
 
 func TestExitVisit_Refundable(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "blocked"
@@ -874,7 +930,7 @@ func TestExitVisit_Refundable(t *testing.T) {
 		s.Summary.Diagnosis = &diag
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -889,13 +945,13 @@ func TestExitVisit_Refundable(t *testing.T) {
 }
 
 func TestExitVisit_ExecutedNoRefund(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "diagnosis"
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -910,13 +966,13 @@ func TestExitVisit_ExecutedNoRefund(t *testing.T) {
 }
 
 func TestExitVisit_MedicationDispensed(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "completed"
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -931,11 +987,11 @@ func TestExitVisit_MedicationDispensed(t *testing.T) {
 }
 
 func TestExitVisit_SessionNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -947,14 +1003,14 @@ func TestExitVisit_SessionNotFound(t *testing.T) {
 }
 
 func TestExitVisit_BlockedNoDiagnosis(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "blocked"
 		// No diagnosis set -> should fall through to no_fee within blocked case
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -969,13 +1025,13 @@ func TestExitVisit_BlockedNoDiagnosis(t *testing.T) {
 }
 
 func TestExitVisit_DefaultCase(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "transferred"
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ExitVisit(ctx, model.ExitVisitInput{
@@ -994,8 +1050,8 @@ func TestExitVisit_DefaultCase(t *testing.T) {
 // ============================================================
 
 func TestReportVitals_Normal(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
@@ -1015,8 +1071,8 @@ func TestReportVitals_Normal(t *testing.T) {
 }
 
 func TestReportVitals_Critical(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
@@ -1039,13 +1095,13 @@ func TestReportVitals_Critical(t *testing.T) {
 }
 
 func TestReportVitals_HighTemp(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	updateCalled := false
 	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
 		updateCalled = true
 		return nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
@@ -1070,8 +1126,8 @@ func TestReportVitals_HighTemp(t *testing.T) {
 }
 
 func TestReportVitals_LowTemp(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
@@ -1093,8 +1149,8 @@ func TestReportVitals_LowTemp(t *testing.T) {
 }
 
 func TestReportVitals_LowSPO2_NonCritical(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	// spo2 91 is < 90 = false, so no emergency; exercises the spo2 code path.
@@ -1117,13 +1173,13 @@ func TestReportVitals_LowSPO2_NonCritical(t *testing.T) {
 }
 
 func TestDismissEmergency(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		s := makeSession("p001")
 		s.Status = "emergency_terminated"
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	session, tlItem, err := svc.DismissEmergency(ctx, wbsvc.DismissEmergencyInput{
@@ -1141,8 +1197,8 @@ func TestDismissEmergency(t *testing.T) {
 }
 
 func TestDismissEmergency_NotEmergency(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, _, err := svc.DismissEmergency(ctx, wbsvc.DismissEmergencyInput{
@@ -1154,11 +1210,11 @@ func TestDismissEmergency_NotEmergency(t *testing.T) {
 }
 
 func TestDismissEmergency_SessionNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, _, err := svc.DismissEmergency(ctx, wbsvc.DismissEmergencyInput{
@@ -1174,8 +1230,8 @@ func TestDismissEmergency_SessionNotFound(t *testing.T) {
 // ============================================================
 
 func TestClassifyIntent_FollowUp(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ClassifyIntent(ctx, wbsvc.ClassifyIntentInput{
@@ -1191,8 +1247,8 @@ func TestClassifyIntent_FollowUp(t *testing.T) {
 }
 
 func TestClassifyIntent_Consultation(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	result, err := svc.ClassifyIntent(ctx, wbsvc.ClassifyIntentInput{
@@ -1208,8 +1264,8 @@ func TestClassifyIntent_Consultation(t *testing.T) {
 }
 
 func TestClassifyIntent_Uncertain(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	// Content with no matching keywords should default to consultation with low confidence.
@@ -1229,7 +1285,7 @@ func TestClassifyIntent_Uncertain(t *testing.T) {
 }
 
 func TestStreamConsultationReply(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	// Session with diagnosis
 	diag := "感冒"
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
@@ -1237,7 +1293,7 @@ func TestStreamConsultationReply(t *testing.T) {
 		s.Summary.Diagnosis = &diag
 		return s, nil
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	ec := &eventCollector{}
@@ -1260,11 +1316,11 @@ func TestStreamConsultationReply(t *testing.T) {
 }
 
 func TestStreamConsultationReply_SessionNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	err := svc.StreamConsultationReply(ctx, "bad-id", "test", "req-1", func(evt model.AssistantStreamEvent) error {
@@ -1276,8 +1332,8 @@ func TestStreamConsultationReply_SessionNotFound(t *testing.T) {
 }
 
 func TestAskLockedQuestion(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	ec := &eventCollector{}
@@ -1300,11 +1356,11 @@ func TestAskLockedQuestion(t *testing.T) {
 }
 
 func TestAskLockedQuestion_CardNotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
 		return nil, model.ErrCardNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	err := svc.AskLockedQuestion(ctx, "s1", "bad-card", "这是什么检查", "req-1", func(evt model.AssistantStreamEvent) error {
@@ -1320,8 +1376,8 @@ func TestAskLockedQuestion_CardNotFound(t *testing.T) {
 // ============================================================
 
 func TestPauseTimer(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	session, err := svc.PauseTimer(ctx, "s1")
@@ -1337,8 +1393,8 @@ func TestPauseTimer(t *testing.T) {
 }
 
 func TestResumeTimer(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
-	svc := newSvc(mp, mv, mt, mf)
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	session, err := svc.ResumeTimer(ctx, "s1")
@@ -1351,11 +1407,11 @@ func TestResumeTimer(t *testing.T) {
 }
 
 func TestPauseTimer_NotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.PauseTimer(ctx, "bad-id")
@@ -1365,11 +1421,11 @@ func TestPauseTimer_NotFound(t *testing.T) {
 }
 
 func TestResumeTimer_NotFound(t *testing.T) {
-	mp, mv, mt, mf := newDefaultMocks()
+	mp, mv, mt, mf, ma := newDefaultMocks()
 	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return nil, model.ErrSessionNotFound
 	}
-	svc := newSvc(mp, mv, mt, mf)
+	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
 	_, err := svc.ResumeTimer(ctx, "bad-id")
@@ -1396,7 +1452,7 @@ func newMedAgentTestServer(handler func(method, path string, body []byte) (int, 
 	}))
 }
 
-func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path string, body []byte) (int, string)) (*wbsvc.Service, *mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mockFlowCardRepo) {
+func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path string, body []byte) (int, string)) (*wbsvc.Service, *mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mockFlowCardRepo, *mockAddressRepo) {
 	t.Helper()
 	srv := newMedAgentTestServer(medAgentHandler)
 	t.Cleanup(srv.Close)
@@ -1431,11 +1487,22 @@ func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path stri
 	mf := &mockFlowCardRepo{
 		createFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
 	}
-	return wbsvc.NewService(mp, mv, mt, mf, client, "http", nil), mp, mv, mt, mf
+	ma := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return &model.Address{
+				ID: id, PatientID: "p001", Name: "李明", Phone: "13800002468",
+				Province: "辽宁省", City: "沈阳市", District: "浑南区", Detail: "创新路195号",
+			}, nil
+		},
+		createFunc: func(ctx context.Context, addr *model.Address) error { return nil },
+		updateFunc: func(ctx context.Context, addr *model.Address) error { return nil },
+		deleteFunc: func(ctx context.Context, id string) error { return nil },
+	}
+	return wbsvc.NewService(mp, mv, mt, mf, ma, client, "http", nil), mp, mv, mt, mf, ma
 }
 
 func TestStreamAssistantMessage_Ask(t *testing.T) {
-	svc, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		switch {
 		case path == "/sessions":
 			return 200, `{"session_id":"ma-001"}`
@@ -1469,7 +1536,7 @@ func TestStreamAssistantMessage_Ask(t *testing.T) {
 }
 
 func TestStreamAssistantMessage_Emergency(t *testing.T) {
-	svc, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		switch {
 		case path == "/sessions":
 			return 200, `{"session_id":"ma-001"}`
@@ -1499,7 +1566,7 @@ func TestStreamAssistantMessage_Emergency(t *testing.T) {
 }
 
 func TestStreamAssistantMessage_NeedTests(t *testing.T) {
-	svc, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		switch {
 		case path == "/sessions":
 			return 200, `{"session_id":"ma-001"}`
@@ -1536,7 +1603,7 @@ func TestStreamAssistantMessage_NeedTests(t *testing.T) {
 }
 
 func TestStreamAssistantMessage_DrugQuery(t *testing.T) {
-	svc, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		switch {
 		case path == "/sessions":
 			return 200, `{"session_id":"ma-001"}`
@@ -1569,7 +1636,7 @@ func TestStreamAssistantMessage_DrugQuery(t *testing.T) {
 }
 
 func TestStreamAssistantMessage_Done(t *testing.T) {
-	svc, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		switch {
 		case path == "/sessions":
 			return 200, `{"session_id":"ma-001"}`
@@ -1600,7 +1667,7 @@ func TestStreamAssistantMessage_Done(t *testing.T) {
 }
 
 func TestStreamAssistantMessage_PatientNotFound(t *testing.T) {
-	svc, mp, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, mp, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		return 200, `{"session_id":"ma-001"}`
 	})
 	mp.findByIDFunc = func(ctx context.Context, id string) (*model.PatientProfile, error) {
@@ -1616,7 +1683,7 @@ func TestStreamAssistantMessage_PatientNotFound(t *testing.T) {
 }
 
 func TestStreamAssistantMessage_NoPatientMessage(t *testing.T) {
-	svc, _, _, mt, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+	svc, _, _, mt, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
 		switch {
 		case path == "/sessions":
 			return 200, `{"session_id":"ma-001"}`
