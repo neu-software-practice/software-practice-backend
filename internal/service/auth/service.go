@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -161,7 +162,7 @@ func (s *Service) resolvePatientID(ctx context.Context, phone, realName string) 
 	if err == nil {
 		return existing.ID, nil
 	}
-	if err != model.ErrPatientNotFound {
+	if !errors.Is(err, model.ErrPatientNotFound) {
 		return "", fmt.Errorf("find patient by phone: %w", err)
 	}
 

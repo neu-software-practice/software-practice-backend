@@ -106,9 +106,12 @@ jobs:
         run: go test -v -race -count=1 -timeout 600s ./internal/repository/...
 
   smoke:
-    name: Smoke Test
+    name: Smoke Test (Docker Compose + Newman)
     runs-on: ubuntu-latest
     needs: integration
+    env:
+      MEDAGENT_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      MEDAGENT_BASE_URL: ${{ secrets.DEEPSEEK_BASE_URL || 'http://medagent:8080' }}
 
     steps:
       - name: Checkout
@@ -122,62 +125,12 @@ jobs:
       - name: Create .env
         run: |
           cp .env.example .env
-          # Override JWT_SECRET with CI value for consistent token generation
           sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET}|" .env
-
-      - name: Start services
-        run: docker compose up -d --build
-
-      - name: Wait for services
-        run: |
-          for i in $(seq 1 30); do
-            curl -s http://localhost:8080/api/health && break
-            sleep 2
-          done
-
-      - name: Install MySQL client
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client
-
-      - name: Run database migrations
-        run: |
-          for f in db/migrations/*.up.sql; do
-            echo "Running migration: $f"
-            mysql -h 127.0.0.1 -u root -ppassword neuhis < "$f"
-          done
-
-      - name: Create test patient
-        run: |
-          RESP=$(curl -s -X POST http://localhost:8080/api/patients/verify \
-            -H "Content-Type: application/json" \
-            -d '{"credentialType":"phone","credential":"13900000001","name":"测试患者"}')
-          echo "Verify response: $RESP"
-          PATIENT_ID=$(echo "$RESP" | jq -r '.data.patient.id')
-          if [ "$PATIENT_ID" = "null" ] || [ -z "$PATIENT_ID" ]; then
-            echo "ERROR: Failed to create test patient"
-            exit 1
-          fi
-          echo "PATIENT_ID=$PATIENT_ID" >> $GITHUB_ENV
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25.0"
-          cache: true
-
-      - name: Generate JWT token
-        run: |
-          TOKEN=$(go run ./cmd/jwtgen "$PATIENT_ID")
-          if [ -z "$TOKEN" ]; then
-            echo "ERROR: Failed to generate JWT token"
-            exit 1
-          fi
-          echo "TOKEN generated"
-
-          # Update the Newman environment file with real token and patient ID
-          jq --arg token "$TOKEN" --arg pid "$PATIENT_ID" \
-            '.values |= map(if .key == "token" then .value = $token elif .key == "patientId" then .value = $pid else . end)' \
-            tests/newman/neuhis-agent.postman_environment.json > /tmp/env.json
-          mv /tmp/env.json tests/newman/neuhis-agent.postman_environment.json
+          sed -i "s|^DATABASE_DSN=.*|DATABASE_DSN=root:password@tcp(mysql:3306)/neuhis?charset=utf8mb4&parseTime=True&loc=Local|" .env
+          sed -i "s|^MEDAGENT_API_KEY=.*|MEDAGENT_API_KEY=$MEDAGENT_API_KEY|" .env
+          sed -i "s|^MEDAGENT_BASE_URL=.*|MEDAGENT_BASE_URL=$MEDAGENT_BASE_URL|" .env
+          echo "=== .env (secrets masked) ==="
+          cat .env | sed 's/\(MEDAGENT_API_KEY=\)[^ ]*/\1******/'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -187,11 +140,18 @@ jobs:
       - name: Install Newman
         run: npm install -g newman
 
-      - name: Run Newman
+      - name: Run Smoke Tests
+        id: smoke
+        run: make smoke-test-docker
+        timeout-minutes: 20
+
+      - name: Collect logs on failure
+        if: failure() && steps.smoke.outcome == 'failure'
         run: |
-          newman run tests/newman/neuhis-agent.postman_collection.json \
-            -e tests/newman/neuhis-agent.postman_environment.json \
-            --timeout-request 30000
+          echo "=== App logs ==="
+          docker compose logs app || true
+          echo "=== Newman report ==="
+          cat tests/newman/reports/summary_*.txt 2>/dev/null || echo "No report found"
 
       - name: Cleanup
         if: always()
