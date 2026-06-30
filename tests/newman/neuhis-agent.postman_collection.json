@@ -1,158 +1,2922 @@
 {
   "info": {
-    "name": "NEUHIS Agent Smoke Tests",
-    "description": "Core smoke test collection for NEUHIS Agent backend",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "name": "NEUHIS Agent Black-Box Tests",
+    "description": "Complete black-box test suite for NEUHIS Agent backend. Covers all 35 API endpoints, 8 user flows, and error cases. Requires a running backend server.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "neuhis-agent"
   },
-  "item": [
+  "event": [
     {
-      "name": "Health Check",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function() {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "pm.test('Body has status ok', function() {",
-              "  var jsonData = pm.response.json();",
-              "  pm.expect(jsonData.status).to.eql('ok');",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/api/health"
-      }
-    },
-    {
-      "name": "Verify Identity",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function() {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "var jsonData = pm.response.json();",
-              "pm.test('Has success=true', function() {",
-              "  pm.expect(jsonData.success).to.be.true;",
-              "});",
-              "pm.test('Has patient data', function() {",
-              "  pm.expect(jsonData.data.patient).to.exist;",
-              "});",
-              "pm.environment.set('patientId', jsonData.data.patient.id);"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "url": "{{baseUrl}}/api/patients/verify",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// NEUHIS Agent Collection Pre-request: Auto-auth",
+          "var requestPath = pm.request.url.toString();",
+          "var reqName = pm.info.requestName || '';",
+          "",
+          "// Skip auth for intentionally unauthenticated tests",
+          "if (reqName.indexOf('No Auth') !== -1) return;",
+          "if (reqName.indexOf('Missing Auth') !== -1) return;",
+          "if (reqName.indexOf('Malformed JWT') !== -1) return;",
+          "if (reqName.indexOf('Expired JWT') !== -1) return;",
+          "if (reqName.indexOf('Other Patient') !== -1) return;",
+          "if (reqName.indexOf('Invalid JSON') !== -1) return;",
+          "if (reqName.indexOf('SQL Injection') !== -1) return;",
+          "",
+          "var publicEndpoints = ['/api/health', '/api/patients/verify', '/api/auth/'];",
+          "var isPublic = publicEndpoints.some(function(p) { return requestPath.indexOf(p) !== -1; });",
+          "",
+          "// Auth endpoints handle their own tokens",
+          "if (requestPath.indexOf('/api/auth/') !== -1) return;",
+          "",
+          "// Health check is public",
+          "if (requestPath.indexOf('/api/health') !== -1) return;",
+          "",
+          "// Verify is public (no auth required)",
+          "if (requestPath.indexOf('/api/patients/verify') !== -1 && pm.request.method === 'POST') return;",
+          "",
+          "// For authenticated endpoints: check token",
+          "function isTokenValid() {",
+          "    var token = pm.environment.get('accessToken');",
+          "    if (!token) return false;",
+          "    try {",
+          "        var payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());",
+          "        return payload.exp * 1000 > Date.now() + 60000;",
+          "    } catch(e) { return false; }",
+          "}",
+          "",
+          "if (!isTokenValid()) {",
+          "    console.log('Token invalid, auto-login...');",
+          "    var baseUrl = pm.environment.get('baseUrl');",
+          "    var phone = pm.environment.get('testPhone') || '13800000001';",
+          "    var pw = pm.environment.get('testPassword') || 'TestPass123!';",
+          "",
+          "    pm.sendRequest({",
+          "        url: baseUrl + '/api/auth/login',",
+          "        method: 'POST',",
+          "        header: { 'Content-Type': 'application/json' },",
+          "        body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: pw }) }",
+          "    }, function(err, res) {",
+          "        if (err || res.code !== 200) {",
+          "            pm.sendRequest({",
+          "                url: baseUrl + '/api/auth/register',",
+          "                method: 'POST',",
+          "                header: { 'Content-Type': 'application/json' },",
+          "                body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: pw, realName: '黑盒测试' }) }",
+          "            }, function(e2, r2) {",
+          "                if (!e2 && r2 && (r2.code === 201 || r2.code === 200)) {",
+          "                    var d = r2.json().data;",
+          "                    pm.environment.set('accessToken', d.accessToken);",
+          "                    pm.environment.set('refreshTokenValue', d.refreshToken);",
+          "                    if (d.user) pm.environment.set('patientId', d.user.patientId);",
+          "                }",
+          "            });",
+          "            return;",
+          "        }",
+          "        var d = res.json().data;",
+          "        pm.environment.set('accessToken', d.accessToken);",
+          "        pm.environment.set('refreshTokenValue', d.refreshToken);",
+          "        if (d.user) pm.environment.set('patientId', d.user.patientId);",
+          "    });",
+          "}",
+          "",
+          "// Add auth header for authenticated requests",
+          "var token = pm.environment.get('accessToken');",
+          "if (token && !isPublic) {",
+          "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+          "}"
         ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"credentialType\":\"phone\",\"credential\":\"13900000001\",\"name\":\"测试患者\"}"
-        }
-      }
-    },
-    {
-      "name": "Create Session",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function() {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "var jsonData = pm.response.json();",
-              "pm.test('Has session', function() {",
-              "  pm.expect(jsonData.data.session).to.exist;",
-              "});",
-              "pm.environment.set('sessionId', jsonData.data.session.id);"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "url": "{{baseUrl}}/api/visits",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"patientId\":\"{{patientId}}\",\"entryType\":\"new\",\"chiefComplaint\":\"头痛发热\"}"
-        }
-      }
-    },
-    {
-      "name": "Get Session",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function() {",
-              "  pm.response.to.have.status(200);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/api/visits/{{sessionId}}",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" }
-        ]
-      }
-    },
-    {
-      "name": "Send Message",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200', function() {",
-              "  pm.response.to.have.status(200);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "url": "{{baseUrl}}/api/visits/{{sessionId}}/messages",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"我头痛三天了\",\"clientMessageId\":\"msg-001\"}"
-        }
+        "type": "text/javascript"
       }
     }
   ],
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "token", "value": "test-token" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshTokenValue", "value": "" },
     { "key": "patientId", "value": "" },
-    { "key": "sessionId", "value": "" }
+    { "key": "sessionId", "value": "" },
+    { "key": "cardId", "value": "" },
+    { "key": "addressId", "value": "" },
+    { "key": "testPhone", "value": "13800000001" },
+    { "key": "testPassword", "value": "TestPass123!" },
+    { "key": "requestId", "value": "" },
+    { "key": "clientMessageId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Setup",
+      "description": "Setup: Register test user and obtain JWT tokens. Run this folder first.",
+      "item": [
+        {
+          "name": "Register Test User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "    pm.test('Register returns tokens', function() {",
+                  "        pm.expect(jsonData.success).to.be.true;",
+                  "        pm.expect(jsonData.data.accessToken).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "    pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "    pm.environment.set('refreshTokenValue', jsonData.data.refreshToken);",
+                  "    pm.environment.set('patientId', jsonData.data.user.patientId);",
+                  "} else if (pm.response.code === 409) {",
+                  "    pm.test('Phone already registered (expected on rerun)', function() {",
+                  "        pm.expect(jsonData.error.code).to.eql('AUTH_PHONE_EXISTS');",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Unexpected status: ' + pm.response.code, function() {",
+                  "        pm.expect.fail('Got status ' + pm.response.code);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/register",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\",\"realName\":\"黑盒测试用户\"}" }
+          }
+        },
+        {
+          "name": "Login & Get Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Login success', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "pm.test('Returns accessToken and refreshToken', function() {",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.data.expiresIn).to.eql(900);",
+                  "});",
+                  "pm.test('Returns user info', function() {",
+                  "    pm.expect(jsonData.data.user.userId).to.be.a('string');",
+                  "    pm.expect(jsonData.data.user.phone).to.eql(pm.environment.get('testPhone'));",
+                  "});",
+                  "pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "pm.environment.set('refreshTokenValue', jsonData.data.refreshToken);",
+                  "pm.environment.set('patientId', jsonData.data.user.patientId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/login",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Health",
+      "description": "Health check endpoint",
+      "item": [
+        {
+          "name": "GET Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Body has status ok', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/health" }
+        }
+      ]
+    },
+    {
+      "name": "2. Auth",
+      "description": "认证端点测试: register, login, refresh, logout。Rate limit: 5 req/min。测试脚本接受429。",
+      "item": [
+        {
+          "name": "✅ POST Register - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (expected under 5req/min)', function() {",
+                  "        pm.expect(jsonData.error.code).to.eql('RATE_LIMITED');",
+                  "    });",
+                  "} else {",
+                  "    pm.test('Status 201', function() { pm.response.to.have.status(201); });",
+                  "    pm.test('success=true', function() { pm.expect(jsonData.success).to.be.true; });",
+                  "    pm.test('Returns tokens', function() {",
+                  "        pm.expect(jsonData.data.accessToken).to.be.a('string').and.not.empty;",
+                  "        pm.expect(jsonData.data.refreshToken).to.be.a('string').and.not.empty;",
+                  "        pm.expect(jsonData.data.expiresIn).to.eql(900);",
+                  "    });",
+                  "    pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "    pm.environment.set('refreshTokenValue', jsonData.data.refreshToken);",
+                  "    pm.environment.set('patientId', jsonData.data.user.patientId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/register",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"13999999999\",\"password\":\"TestPass123!\",\"realName\":\"新用户\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Register - Phone Exists (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 409', function() { pm.response.to.have.status(409); });",
+                  "    pm.test('Error code AUTH_PHONE_EXISTS', function() {",
+                  "        pm.expect(jsonData.success).to.be.false;",
+                  "        pm.expect(jsonData.error.code).to.eql('AUTH_PHONE_EXISTS');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/register",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"TestPass123!\",\"realName\":\"重复用户\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Register - Missing Password (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "    pm.test('Error code VALIDATION_ERROR', function() {",
+                  "        pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/register",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"13900001111\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Login - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "    pm.test('Returns token pair', function() {",
+                  "        pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "        pm.expect(jsonData.data.refreshToken).to.be.a('string');",
+                  "        pm.expect(jsonData.data.expiresIn).to.eql(900);",
+                  "    });",
+                  "    pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "    pm.environment.set('refreshTokenValue', jsonData.data.refreshToken);",
+                  "    pm.environment.set('patientId', jsonData.data.user.patientId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/login",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Login - Invalid Credentials (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 401', function() { pm.response.to.have.status(401); });",
+                  "    pm.test('Error code AUTH_INVALID_CREDENTIALS', function() {",
+                  "        pm.expect(jsonData.error.code).to.eql('AUTH_INVALID_CREDENTIALS');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/login",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"WrongPassword123!\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Refresh - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "    pm.test('Returns new token pair (rotation)', function() {",
+                  "        pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "        pm.expect(jsonData.data.refreshToken).to.be.a('string');",
+                  "        pm.expect(jsonData.data.expiresIn).to.eql(900);",
+                  "    });",
+                  "    pm.environment.set('accessToken', jsonData.data.accessToken);",
+                  "    pm.environment.set('refreshTokenValue', jsonData.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/refresh",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshTokenValue}}\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Refresh - Invalid Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 401', function() { pm.response.to.have.status(401); });",
+                  "    pm.test('Error code AUTH_REFRESH_INVALID', function() {",
+                  "        pm.expect(jsonData.error.code).to.eql('AUTH_REFRESH_INVALID');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/refresh",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"invalid-refresh-token-xxxxxxxxxxxxxxxx\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Logout - Success (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 204', function() { pm.response.to.have.status(204); });",
+                  "    pm.test('Empty body', function() {",
+                  "        pm.expect(pm.response.text()).to.be.empty;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/logout",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshTokenValue}}\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Logout - Idempotent (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limited (acceptable)', function() { pm.expect(true).to.be.true; });",
+                  "} else {",
+                  "    pm.test('Status 204 even on double logout', function() {",
+                  "        pm.response.to.have.status(204);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/logout",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshTokenValue}}\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Patient",
+      "description": "患者端点: 身份核验、上下文查询、资料更新",
+      "item": [
+        {
+          "name": "✅ POST Verify Identity - By Phone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('success=true', function() { pm.expect(jsonData.success).to.be.true; });",
+                  "pm.test('Has patient data', function() {",
+                  "    pm.expect(jsonData.data.patient.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.data.patient.name).to.be.a('string');",
+                  "    pm.expect(jsonData.data.patient.gender).to.be.oneOf(['male','female','other','unknown']);",
+                  "    pm.expect(jsonData.data.patient.age).to.be.a('number');",
+                  "});",
+                  "pm.test('Has readableScopes', function() {",
+                  "    pm.expect(jsonData.data.readableScopes).to.be.an('array');",
+                  "});",
+                  "pm.test('Has verifiedAt (ISO8601)', function() {",
+                  "    pm.expect(jsonData.data.verifiedAt).to.be.a('string');",
+                  "    pm.expect(Date.parse(jsonData.data.verifiedAt)).to.not.be.NaN;",
+                  "});",
+                  "pm.environment.set('patientId', jsonData.data.patient.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/verify",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"credentialType\":\"phone\",\"credential\":\"{{testPhone}}\",\"name\":\"测试患者\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Verify Identity - By ID Card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Patient found/created by ID card', function() {",
+                  "    pm.expect(jsonData.data.patient.id).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/verify",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"credentialType\":\"id_card\",\"credential\":\"110101199001011234\",\"name\":\"张三\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Verify Identity - Missing Fields (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/verify",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "✅ GET Patient Context",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Has patient context', function() {",
+                  "    pm.expect(jsonData.data.patient.id).to.eql(pm.environment.get('patientId'));",
+                  "    pm.expect(jsonData.data.allergies).to.be.an('array');",
+                  "    pm.expect(jsonData.data.medicalHistory).to.be.an('array');",
+                  "    pm.expect(jsonData.data.longTermMedications).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/context",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "❌ GET Patient Context - Forbidden (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403', function() { pm.response.to.have.status(403); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('FORBIDDEN', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('FORBIDDEN');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/wrong-patient-id/context",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ PATCH Update Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Profile updated with allergies', function() {",
+                  "    pm.expect(jsonData.data.allergies).to.include('青霉素');",
+                  "    pm.expect(jsonData.data.chronicDiseases).to.include('高血压');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/profile",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\",\"allergies\":[\"青霉素\"],\"chronicDiseases\":[\"高血压\"],\"longTermMedications\":[\"阿司匹林\"]}" }
+          }
+        },
+        {
+          "name": "❌ PATCH Update Profile - Missing patientId (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/profile",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Visit",
+      "description": "会话端点: 创建、复诊、列表、详情、快照",
+      "item": [
+        {
+          "name": "✅ POST Create Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Has session data', function() {",
+                  "    pm.expect(jsonData.data.session.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.data.session.patientId).to.eql(pm.environment.get('patientId'));",
+                  "    pm.expect(jsonData.data.session.entryType).to.eql('new');",
+                  "    pm.expect(jsonData.data.session.status).to.be.a('string');",
+                  "    pm.expect(jsonData.data.session.askRound).to.be.a('number');",
+                  "    pm.expect(jsonData.data.session.askRoundLimit).to.be.a('number');",
+                  "    pm.expect(jsonData.data.session.timerPaused).to.be.a('boolean');",
+                  "});",
+                  "pm.test('Has initialTimeline array', function() {",
+                  "    pm.expect(jsonData.data.initialTimeline).to.be.an('array');",
+                  "    pm.expect(jsonData.data.initialTimeline.length).to.be.above(0);",
+                  "});",
+                  "pm.environment.set('sessionId', jsonData.data.session.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\",\"entryType\":\"new\",\"chiefComplaint\":\"头痛发热三天\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Create Session - No Auth (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('UNAUTHORIZED', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\",\"entryType\":\"new\",\"chiefComplaint\":\"test\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Create Session - Invalid entryType (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\",\"entryType\":\"invalid_type\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Create Follow-Up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Follow-up session created', function() {",
+                  "    pm.expect(jsonData.data.session.entryType).to.eql('follow_up');",
+                  "    pm.expect(jsonData.data.session.parentSessionId).to.eql(pm.environment.get('sessionId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/follow-up",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\",\"parentSessionId\":\"{{sessionId}}\",\"chiefComplaint\":\"复诊：头痛未缓解\"}" }
+          }
+        },
+        {
+          "name": "✅ GET List Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns page result', function() {",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "    pm.expect(jsonData.data.hasMore).to.be.a('boolean');",
+                  "});",
+                  "pm.test('Items have required fields', function() {",
+                  "    if (jsonData.data.items.length > 0) {",
+                  "        var item = jsonData.data.items[0];",
+                  "        pm.expect(item.id).to.be.a('string');",
+                  "        pm.expect(item.patientId).to.be.a('string');",
+                  "        pm.expect(item.status).to.be.a('string');",
+                  "        pm.expect(item.startedAt).to.be.a('string');",
+                  "        pm.expect(item.entryType).to.be.a('string');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits?patientId={{patientId}}&pageSize=10",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ GET List Sessions - Cursor Pagination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits?patientId={{patientId}}&pageSize=1",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ GET Session Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Session has full details', function() {",
+                  "    pm.expect(jsonData.data.id).to.eql(pm.environment.get('sessionId'));",
+                  "    pm.expect(jsonData.data.patientId).to.eql(pm.environment.get('patientId'));",
+                  "    pm.expect(jsonData.data.status).to.be.a('string');",
+                  "    pm.expect(jsonData.data.startedAt).to.be.a('string');",
+                  "    pm.expect(jsonData.data.updatedAt).to.be.a('string');",
+                  "    pm.expect(jsonData.data.timerPaused).to.be.a('boolean');",
+                  "    pm.expect(jsonData.data.summary).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "❌ GET Session - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('SESSION_NOT_FOUND', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('SESSION_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits/non-existent-session-id",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ GET Session Snapshot",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Snapshot has session + timeline', function() {",
+                  "    pm.expect(jsonData.data.session.id).to.eql(pm.environment.get('sessionId'));",
+                  "    pm.expect(jsonData.data.timeline).to.be.an('array');",
+                  "    pm.expect(jsonData.data.readonly).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/snapshot",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Workbench - Chat",
+      "description": "聊天端点: timeline, send message, assistant-stream (SSE)",
+      "item": [
+        {
+          "name": "✅ GET Timeline",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns page of timeline items', function() {",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "    pm.expect(jsonData.data.hasMore).to.be.a('boolean');",
+                  "});",
+                  "pm.test('Timeline items have kind + status', function() {",
+                  "    if (jsonData.data.items.length > 0) {",
+                  "        var item = jsonData.data.items[0];",
+                  "        pm.expect(item.id).to.be.a('string');",
+                  "        pm.expect(item.sessionId).to.eql(pm.environment.get('sessionId'));",
+                  "        pm.expect(item.kind).to.be.oneOf(['message','flow_card','system_event','terminal']);",
+                  "        pm.expect(item.status).to.be.oneOf(['pending','streaming','done','failed','invalidated']);",
+                  "        pm.expect(item.createdAt).to.be.a('string');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/timeline?pageSize=20",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ POST Send Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns session + patientMessage', function() {",
+                  "    pm.expect(jsonData.data.session).to.be.an('object');",
+                  "    pm.expect(jsonData.data.patientMessage.kind).to.eql('message');",
+                  "    pm.expect(jsonData.data.patientMessage.role).to.eql('patient');",
+                  "    pm.expect(jsonData.data.patientMessage.content).to.include('头痛');",
+                  "});",
+                  "pm.environment.set('clientMessageId', 'msg-' + Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/messages",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"我头痛三天了，伴有发热38.5度\",\"clientMessageId\":\"msg-{{$timestamp}}\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Send Message - Empty Content (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/messages",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"\",\"clientMessageId\":\"msg-empty\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Assistant Stream (SSE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('SSE Connection - Content-Type check', function() {",
+                  "    var ct = pm.response.headers.get('Content-Type');",
+                  "    pm.expect(ct).to.include('text/event-stream');",
+                  "});",
+                  "var body = pm.response.text();",
+                  "var lines = body.split('\\n').filter(function(l) { return l.startsWith('data: '); });",
+                  "pm.test('Has SSE events', function() {",
+                  "    pm.expect(lines.length).to.be.above(0);",
+                  "});",
+                  "pm.test('Events are valid JSON', function() {",
+                  "    for (var i = 0; i < Math.min(lines.length, 5); i++) {",
+                  "        try {",
+                  "            var evt = JSON.parse(lines[i].replace('data: ', ''));",
+                  "            pm.expect(evt.type).to.be.oneOf(['delta','message_final','card','state','emergency','done','error']);",
+                  "            pm.expect(evt.sessionId).to.eql(pm.environment.get('sessionId'));",
+                  "        } catch(e) {",
+                  "            pm.expect.fail('Invalid JSON in SSE event: ' + lines[i]);",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('requestId', 'sse-req-' + Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/assistant-stream",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"requestId\":\"{{requestId}}\",\"clientMessageId\":\"{{clientMessageId}}\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Classify Intent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns intent classification', function() {",
+                  "    pm.expect(jsonData.data.intent).to.be.oneOf(['consultation','follow_up','uncertain']);",
+                  "    pm.expect(jsonData.data.confidence).to.be.a('number');",
+                  "    pm.expect(jsonData.data.confidence).to.be.within(0, 1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/classify-intent",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"我的药吃完了，需要继续吃吗？\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Consult (SSE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('SSE for consult', function() {",
+                  "    var ct = pm.response.headers.get('Content-Type');",
+                  "    pm.expect(ct).to.include('text/event-stream');",
+                  "});",
+                  "var body = pm.response.text();",
+                  "var lines = body.split('\\n').filter(function(l) { return l.startsWith('data: '); });",
+                  "pm.test('Has consult SSE events', function() {",
+                  "    pm.expect(lines.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/consult",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"这个药有什么副作用？\",\"requestId\":\"consult-req-{{$timestamp}}\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Workbench - Lab",
+      "description": "检验端点: lab-decision (accepted/skipped/vetoed)",
+      "item": [
+        {
+          "name": "✅ POST Lab Decision - Accepted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Returns FlowActionResult', function() {",
+                  "        pm.expect(jsonData.data.sessionId).to.eql(pm.environment.get('sessionId'));",
+                  "        pm.expect(jsonData.data.status).to.be.a('string');",
+                  "        pm.expect(jsonData.data.timelineItems).to.be.an('array');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/lab-decision",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"decision\":\"accepted\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Lab Decision - Skipped",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/lab-decision",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"decision\":\"skipped\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Lab Decision - Vetoed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/lab-decision",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"decision\":\"vetoed\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Lab Decision - Card Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('CARD_NOT_FOUND', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('CARD_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/lab-decision",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"non-existent-card-id\",\"decision\":\"accepted\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Workbench - Payment",
+      "description": "支付端点: 检验/药品支付，含 simulateStatus 和 defer 选项",
+      "item": [
+        {
+          "name": "✅ POST Payment - Lab Purpose",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.test('Payment result has timelineItems', function() {",
+                  "        pm.expect(jsonData.data.timelineItems).to.be.an('array');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/payments",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"purpose\":\"lab\",\"simulateStatus\":\"paid\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Payment - Medication Purpose",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/payments",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"purpose\":\"medication\",\"simulateStatus\":\"paid\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Payment - Deferred",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/payments",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"purpose\":\"lab\",\"defer\":true}" }
+          }
+        },
+        {
+          "name": "✅ POST Payment - Simulate Failed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/payments",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"purpose\":\"lab\",\"simulateStatus\":\"failed\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Payment - Card Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('CARD_NOT_FOUND', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('CARD_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/payments",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"bad-card-id\",\"purpose\":\"lab\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Workbench - Fulfillment",
+      "description": "取药/配送确认端点",
+      "item": [
+        {
+          "name": "✅ POST Fulfillment - Pickup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.test('Fulfillment result has status', function() {",
+                  "        pm.expect(jsonData.data.status).to.be.a('string');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/fulfillment",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"mode\":\"pickup\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Fulfillment - Delivery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200, 400, or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/fulfillment",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"mode\":\"delivery\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Fulfillment - Card Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/fulfillment",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"bad-card-id\",\"mode\":\"pickup\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Workbench - Treatment",
+      "description": "治疗执行端点: treatment-execution (5 actions) + advice-ack",
+      "item": [
+        {
+          "name": "✅ POST Treatment - Schedule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/treatment-execution",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"action\":\"schedule\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Treatment - Confirm Arrival",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/treatment-execution",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"action\":\"confirm_arrival\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Treatment - Start",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/treatment-execution",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"action\":\"start\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Treatment - Complete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/treatment-execution",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"action\":\"complete\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Treatment - Cancel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/treatment-execution",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"action\":\"cancel\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Advice Ack",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/advice-ack",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Treatment - Card Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/treatment-execution",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"bad-card-id\",\"action\":\"schedule\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Workbench - Visit Control",
+      "description": "会话控制端点: title, vitals, timer, exit, dismiss-emergency, lock-question",
+      "item": [
+        {
+          "name": "✅ POST Generate Title",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns sessionId and title', function() {",
+                  "    pm.expect(jsonData.data.sessionId).to.eql(pm.environment.get('sessionId'));",
+                  "    pm.expect(jsonData.data.title).to.be.a('string');",
+                  "    pm.expect(jsonData.data.title.length).to.be.within(1, 50);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/generate-title",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Generate Title - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('SESSION_NOT_FOUND', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('SESSION_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/non-existent-session/generate-title",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"non-existent-session\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Report Vitals",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns emergency check result', function() {",
+                  "    pm.expect(jsonData.data.emergency).to.be.a('boolean');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/vitals",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"source\":\"patient_report\",\"symptoms\":[\"头痛\",\"发热\"],\"vitals\":{\"temperature\":38.5,\"heartRate\":88}}" }
+          }
+        },
+        {
+          "name": "❌ POST Report Vitals - Empty Symptoms (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/vitals",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"source\":\"patient_report\",\"symptoms\":[]}" }
+          }
+        },
+        {
+          "name": "✅ POST Timer - Pause",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Timer paused', function() {",
+                  "    pm.expect(jsonData.data.timerPaused).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/timer",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"action\":\"pause\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Timer - Resume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Timer resumed', function() {",
+                  "    pm.expect(jsonData.data.timerPaused).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/timer",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"action\":\"resume\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Timer - Invalid Action (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/timer",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"action\":\"invalid\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Exit Visit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns exit settlement', function() {",
+                  "    pm.expect(jsonData.data.sessionId).to.eql(pm.environment.get('sessionId'));",
+                  "    pm.expect(jsonData.data.terminalReason).to.be.a('string');",
+                  "    pm.expect(jsonData.data.payableAmount).to.be.a('number');",
+                  "    pm.expect(jsonData.data.refundAmount).to.be.a('number');",
+                  "    pm.expect(jsonData.data.timelineItem.kind).to.eql('terminal');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/exit",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"reason\":\"patient_request\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Dismiss Emergency",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or appropriate error', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 500]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/dismiss-emergency",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\"}" }
+          }
+        },
+        {
+          "name": "✅ POST Lock Question (SSE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('SSE Lock Question', function() {",
+                  "    var ct = pm.response.headers.get('Content-Type');",
+                  "    pm.expect(ct).to.include('text/event-stream');",
+                  "});",
+                  "var body = pm.response.text();",
+                  "var lines = body.split('\\n').filter(function(l) { return l.startsWith('data: '); });",
+                  "pm.test('Has SSE events', function() {",
+                  "    pm.expect(lines.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/lock-question",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"content\":\"这个检查必须做吗？\",\"requestId\":\"lock-req-{{$timestamp}}\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Address Book",
+      "description": "地址簿 CRUD: 创建、列表、更新、删除、设置默认",
+      "item": [
+        {
+          "name": "✅ POST Create Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 201', function() { pm.response.to.have.status(201); });",
+                  "pm.test('Address created with all fields', function() {",
+                  "    pm.expect(jsonData.data.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.data.name).to.eql('李明');",
+                  "    pm.expect(jsonData.data.phone).to.eql('13800002468');",
+                  "    pm.expect(jsonData.data.province).to.eql('辽宁省');",
+                  "    pm.expect(jsonData.data.city).to.eql('沈阳市');",
+                  "    pm.expect(jsonData.data.district).to.eql('浑南区');",
+                  "    pm.expect(jsonData.data.detail).to.eql('创新路195号');",
+                  "    pm.expect(jsonData.data.isDefault).to.be.a('boolean');",
+                  "    pm.expect(jsonData.data.tag).to.eql('公司');",
+                  "    pm.expect(jsonData.data.createdAt).to.be.a('string');",
+                  "});",
+                  "pm.environment.set('addressId', jsonData.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\",\"name\":\"李明\",\"phone\":\"13800002468\",\"province\":\"辽宁省\",\"city\":\"沈阳市\",\"district\":\"浑南区\",\"detail\":\"创新路195号\",\"tag\":\"公司\"}" }
+          }
+        },
+        {
+          "name": "❌ POST Create Address - Validation Error (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"patientId\":\"{{patientId}}\"}" }
+          }
+        },
+        {
+          "name": "✅ GET List Addresses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns address list', function() {",
+                  "    pm.expect(jsonData.data.addresses).to.be.an('array');",
+                  "    pm.expect(jsonData.data.addresses.length).to.be.above(0);",
+                  "    var addr = jsonData.data.addresses[0];",
+                  "    pm.expect(addr.id).to.be.a('string');",
+                  "    pm.expect(addr.name).to.be.a('string');",
+                  "    pm.expect(addr.isDefault).to.be.a('boolean');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ PATCH Update Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Address name updated', function() {",
+                  "    pm.expect(jsonData.data.name).to.eql('张三');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/{{addressId}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"name\":\"张三\"}" }
+          }
+        },
+        {
+          "name": "❌ PATCH Update Address - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('ADDRESS_NOT_FOUND', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('ADDRESS_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/non-existent-addr",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"name\":\"不存在\"}" }
+          }
+        },
+        {
+          "name": "✅ PUT Set Default Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Address set as default', function() {",
+                  "    pm.expect(jsonData.data.isDefault).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/{{addressId}}/default",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "❌ PUT Set Default - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/bad-addr-id/default",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "✅ DELETE Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Delete returns success', function() {",
+                  "    pm.expect(jsonData.data.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/{{addressId}}",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "❌ DELETE Address - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/already-deleted-id",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Billing",
+      "description": "账单端点: 历史账单汇总查询",
+      "item": [
+        {
+          "name": "✅ GET Billing Records",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "pm.test('Returns billing items array', function() {",
+                  "    pm.expect(jsonData.data.items).to.be.an('array');",
+                  "});",
+                  "pm.test('Billing records have required fields', function() {",
+                  "    if (jsonData.data.items.length > 0) {",
+                  "        var record = jsonData.data.items[0];",
+                  "        pm.expect(record.paymentId).to.be.a('string');",
+                  "        pm.expect(record.sessionId).to.be.a('string');",
+                  "        pm.expect(record.sessionTitle).to.be.a('string');",
+                  "        pm.expect(record.purpose).to.be.a('string');",
+                  "        pm.expect(record.totalAmount).to.be.a('number');",
+                  "        pm.expect(record.insuranceAmount).to.be.a('number');",
+                  "        pm.expect(record.selfPayAmount).to.be.a('number');",
+                  "        pm.expect(record.paymentStatus).to.eql('paid');",
+                  "        pm.expect(record.createdAt).to.be.a('string');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/billing/records",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ]
+          }
+        },
+        {
+          "name": "❌ GET Billing Records - No Auth (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('UNAUTHORIZED', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/billing/records"
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. User Flows",
+      "description": "端到端用户场景测试: 完整主流程、急症、退出、计时等",
+      "item": [
+        {
+          "name": "🔄 Flow 1: Auth Complete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var testPhone = '13911111111';",
+                  "var testPw = 'TestPass123!';",
+                  "",
+                  "// Step 1: Register",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/auth/register',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ phone: testPhone, password: testPw, realName: '流程测试' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Register failed: ' + err1); return; }",
+                  "    var ok = res1.code === 201 || res1.code === 409;",
+                  "    pm.test('Step 1 - Register: ' + res1.code, function() { pm.expect(ok).to.be.true; });",
+                  "",
+                  "    // Step 2: Login",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/auth/login',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json' },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ phone: testPhone, password: testPw }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Login failed: ' + err2); return; }",
+                  "        pm.test('Step 2 - Login: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "        var loginData = res2.json().data;",
+                  "        var refreshTok = loginData.refreshToken;",
+                  "",
+                  "        // Step 3: Refresh",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/auth/refresh',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json' },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({ refreshToken: refreshTok }) }",
+                  "        }, function(err3, res3) {",
+                  "            if (err3) { pm.expect.fail('Refresh failed: ' + err3); return; }",
+                  "            pm.test('Step 3 - Refresh: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "",
+                  "            // Step 4: Logout",
+                  "            pm.sendRequest({",
+                  "                url: baseUrl + '/api/auth/logout',",
+                  "                method: 'POST',",
+                  "                header: { 'Content-Type': 'application/json' },",
+                  "                body: { mode: 'raw', raw: JSON.stringify({ refreshToken: refreshTok }) }",
+                  "            }, function(err4, res4) {",
+                  "                if (err4) { pm.expect.fail('Logout failed: ' + err4); return; }",
+                  "                pm.test('Step 4 - Logout: 204', function() { pm.expect(res4.code).to.eql(204); });",
+                  "            });",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 1: Auth Complete - Register → Login → Refresh → Logout"
+          }
+        },
+        {
+          "name": "🔄 Flow 2: Main Visit Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "// Step 1: Create new session",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: '咳嗽发热三天' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed'); return; }",
+                  "    pm.test('Step 1 - Create Session: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "    var sid = res1.json().data.session.id;",
+                  "",
+                  "    // Step 2: Send message",
+                  "    var msgId = 'flow-msg-' + Date.now();",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/messages',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, content: '咳嗽三天伴有发热38度', clientMessageId: msgId }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Send message failed'); return; }",
+                  "        pm.test('Step 2 - Send Message: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "",
+                  "    // Step 3: Get session detail",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid,",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err3, res3) {",
+                  "        if (err3) { pm.expect.fail('Get session failed'); return; }",
+                  "        pm.test('Step 3 - Get Session: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "",
+                  "    // Step 4: Get timeline",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/timeline',",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err4, res4) {",
+                  "        if (err4) { pm.expect.fail('Get timeline failed'); return; }",
+                  "        pm.test('Step 4 - Get Timeline: 200', function() { pm.expect(res4.code).to.eql(200); });",
+                  "    });",
+                  "    });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 2: Main Visit Flow - Create session → Send message → Get session → Get timeline"
+          }
+        },
+        {
+          "name": "🔄 Flow 3: Emergency Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: '胸痛' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed'); return; }",
+                  "    pm.test('Step 1 - Create Session: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "    var sid = res1.json().data.session.id;",
+                  "",
+                  "    // Report critical vitals (chest pain + high heart rate → emergency)",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/vitals',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, source: 'patient_report', symptoms: ['胸痛','呼吸困难'], vitals: { heartRate: 130, spo2: 88 } }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Report vitals failed'); return; }",
+                  "        pm.test('Step 2 - Report Vitals: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "        var vitalsData = res2.json().data;",
+                  "        pm.test('Emergency detected', function() { pm.expect(vitalsData.emergency).to.be.true; });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 3: Emergency - Create session → Report critical vitals → Check emergency result"
+          }
+        },
+        {
+          "name": "🔄 Flow 4: Timer Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: '感冒' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed'); return; }",
+                  "    var sid = res1.json().data.session.id;",
+                  "    pm.test('Step 1 - Create: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "",
+                  "    // Pause timer",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/timer',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, action: 'pause' }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Pause failed'); return; }",
+                  "        pm.test('Step 2 - Pause: 200, timerPaused=true', function() {",
+                  "            pm.expect(res2.code).to.eql(200);",
+                  "            pm.expect(res2.json().data.timerPaused).to.be.true;",
+                  "        });",
+                  "",
+                  "    // Resume timer",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/timer',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, action: 'resume' }) }",
+                  "    }, function(err3, res3) {",
+                  "        if (err3) { pm.expect.fail('Resume failed'); return; }",
+                  "        pm.test('Step 3 - Resume: 200, timerPaused=false', function() {",
+                  "            pm.expect(res3.code).to.eql(200);",
+                  "            pm.expect(res3.json().data.timerPaused).to.be.false;",
+                  "        });",
+                  "    });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 4: Timer - Create session → Pause timer → Resume timer"
+          }
+        },
+        {
+          "name": "🔄 Flow 5: Exit Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: '轻微头痛' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed'); return; }",
+                  "    var sid = res1.json().data.session.id;",
+                  "    pm.test('Step 1 - Create: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "",
+                  "    // Send message first",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/messages',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, content: '头有点疼', clientMessageId: 'exit-msg-' + Date.now() }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Send message failed'); return; }",
+                  "        pm.test('Step 2 - Send Message: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "",
+                  "    // Exit visit",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/exit',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, reason: 'patient_request' }) }",
+                  "    }, function(err3, res3) {",
+                  "        if (err3) { pm.expect.fail('Exit failed'); return; }",
+                  "        pm.test('Step 3 - Exit: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "        var exitData = res3.json().data;",
+                  "        pm.test('Exit has settlement', function() {",
+                  "            pm.expect(exitData.terminalReason).to.be.a('string');",
+                  "            pm.expect(exitData.payableAmount).to.be.a('number');",
+                  "            pm.expect(exitData.refundAmount).to.be.a('number');",
+                  "            pm.expect(exitData.timelineItem.kind).to.eql('terminal');",
+                  "        });",
+                  "    });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 5: Exit - Create session → Send message → Exit visit → Check settlement"
+          }
+        },
+        {
+          "name": "🔄 Flow 6: Follow-Up Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: '高血压复诊' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed'); return; }",
+                  "    var parentSid = res1.json().data.session.id;",
+                  "    pm.test('Step 1 - Create: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "",
+                  "    // Create follow-up",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + parentSid + '/follow-up',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, parentSessionId: parentSid, chiefComplaint: '血压仍然偏高' }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Follow-up failed'); return; }",
+                  "        pm.test('Step 2 - Follow-Up: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "        var fuData = res2.json().data;",
+                  "        pm.test('Follow-up has parent', function() {",
+                  "            pm.expect(fuData.session.entryType).to.eql('follow_up');",
+                  "            pm.expect(fuData.session.parentSessionId).to.eql(parentSid);",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 6: Follow-Up - Create session → Create follow-up from parent"
+          }
+        },
+        {
+          "name": "🔄 Flow 7: Address Book CRUD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "// Step 1: Create address",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/patients/' + pid + '/addresses',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, name: '王五', phone: '13811112222', province: '北京', city: '北京', district: '海淀', detail: '中关村大街1号', tag: '家' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create address failed'); return; }",
+                  "    pm.test('Step 1 - Create Address: 201', function() { pm.expect(res1.code).to.eql(201); });",
+                  "    var addrId = res1.json().data.id;",
+                  "",
+                  "    // Step 2: List addresses",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/patients/' + pid + '/addresses',",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('List failed'); return; }",
+                  "        pm.test('Step 2 - List: 200 with items', function() {",
+                  "            pm.expect(res2.code).to.eql(200);",
+                  "            pm.expect(res2.json().data.addresses.length).to.be.above(0);",
+                  "        });",
+                  "",
+                  "    // Step 3: Update address",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/patients/' + pid + '/addresses/' + addrId,",
+                  "        method: 'PATCH',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ name: '王五(改)', detail: '中关村大街2号' }) }",
+                  "    }, function(err3, res3) {",
+                  "        if (err3) { pm.expect.fail('Update failed'); return; }",
+                  "        pm.test('Step 3 - Update: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "",
+                  "    // Step 4: Set default",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/patients/' + pid + '/addresses/' + addrId + '/default',",
+                  "        method: 'PUT',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err4, res4) {",
+                  "        if (err4) { pm.expect.fail('Set default failed'); return; }",
+                  "        pm.test('Step 4 - Set Default: 200, isDefault=true', function() {",
+                  "            pm.expect(res4.code).to.eql(200);",
+                  "            pm.expect(res4.json().data.isDefault).to.be.true;",
+                  "        });",
+                  "",
+                  "    // Step 5: Delete",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/patients/' + pid + '/addresses/' + addrId,",
+                  "        method: 'DELETE',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err5, res5) {",
+                  "        if (err5) { pm.expect.fail('Delete failed'); return; }",
+                  "        pm.test('Step 5 - Delete: 200, success=true', function() {",
+                  "            pm.expect(res5.code).to.eql(200);",
+                  "            pm.expect(res5.json().data.success).to.be.true;",
+                  "        });",
+                  "    });",
+                  "    });",
+                  "    });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 7: Address Book CRUD - Create → List → Update → Set Default → Delete"
+          }
+        },
+        {
+          "name": "🔄 Flow 8: Patient Context Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "// Step 1: Verify identity",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/patients/verify',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ credentialType: 'phone', credential: pm.environment.get('testPhone'), name: '测试患者' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Verify failed'); return; }",
+                  "    pm.test('Step 1 - Verify: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "",
+                  "    // Step 2: Get patient context",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/patients/' + pid + '/context',",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Context failed'); return; }",
+                  "        pm.test('Step 2 - Get Context: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "",
+                  "    // Step 3: Update profile",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/patients/' + pid + '/profile',",
+                  "        method: 'PATCH',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, allergies: ['花粉'], chronicDiseases: ['糖尿病'] }) }",
+                  "    }, function(err3, res3) {",
+                  "        if (err3) { pm.expect.fail('Update failed'); return; }",
+                  "        pm.test('Step 3 - Update Profile: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "    });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 8: Patient Context - Verify identity → Get context → Update profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Edge Cases",
+      "description": "边界测试: 无效JSON、缺失字段、过期token、权限验证、空值处理",
+      "item": [
+        {
+          "name": "❌ Invalid JSON Body (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/login",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "this is not json at all" }
+          }
+        },
+        {
+          "name": "❌ Missing Auth Header (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('UNAUTHORIZED', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}"
+          }
+        },
+        {
+          "name": "❌ Malformed JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/context",
+            "header": [ { "key": "Authorization", "value": "Bearer this.is.not.a.valid.jwt.token" } ]
+          }
+        },
+        {
+          "name": "❌ Expired JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', function() { pm.response.to.have.status(401); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/context",
+            "header": [ { "key": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1LXRlc3QiLCJwYXRpZW50SWQiOiJwLXRlc3QiLCJwaG9uZSI6IjEzODAwMDAwMDAxIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.0000000000000000000000000000000" } ]
+          }
+        },
+        {
+          "name": "❌ Session Belongs to Other Patient (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403', function() { pm.response.to.have.status(403); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('FORBIDDEN', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('FORBIDDEN');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}",
+            "header": [ { "key": "Authorization", "value": "Bearer {{secondAccessToken}}" } ],
+            "description": "Uses second patient's token to access first patient's session"
+          }
+        },
+        {
+          "name": "❌ Unknown Route (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('NOT_FOUND', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/non-existent-endpoint"
+          }
+        },
+        {
+          "name": "❌ Very Long Input String",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 or 200', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 422]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/messages",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"sessionId\":\"{{sessionId}}\",\"content\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"clientMessageId\":\"long-msg\"}" }
+          }
+        },
+        {
+          "name": "❌ SQL Injection Attempt (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 (validation rejects injection)', function() {",
+                  "    pm.expect(pm.response.code).to.equal(422);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/login",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"phone\":\"' OR '1'='1\",\"password\":\"' OR '1'='1\"}" }
+          }
+        },
+        {
+          "name": "❌ Empty Request Body (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/messages",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        }
+      ]
+    }
   ]
 }

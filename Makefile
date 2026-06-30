@@ -52,25 +52,41 @@ migrate-down:
 # ==========================
 
 docker-up:
-	docker-compose up -d
+	docker compose up -d
 
 docker-down:
-	docker-compose down
+	docker compose down
 
 docker-build:
 	docker build -t neuhis-backend .
 
 # ==========================
-# Smoke Test
+# Smoke Test (Newman Black-Box)
 # ==========================
 
-smoke-test:
-	newman run tests/newman/neuhis-agent.postman_collection.json \
-		-e tests/newman/neuhis-agent.postman_environment.json
+smoke-test: ## 运行 Newman 黑盒测试 (默认 localhost:8080)
+	@bash tests/newman/run-smoke.sh http://localhost:8080
+
+smoke-test-remote: ## 运行 Newman 黑盒测试 (指定地址: make smoke-test-remote BASE_URL=http://host:8080)
+	@bash tests/newman/run-smoke.sh $(BASE_URL)
+
+smoke-test-docker: ## 启动 Docker 服务 → 运行黑盒测试 → 清理
+	@docker compose up -d --build
+	@sleep 8
+	@bash tests/newman/run-smoke.sh http://localhost:8080; EXIT_CODE=$$?; \
+	docker compose down; \
+	exit $$EXIT_CODE
+
+smoke-test-quick: ## 快速冒烟测试 (仅运行基础端点)
+	@echo "Running quick smoke test..."
+	@curl -sf http://localhost:8080/api/health && echo "✅ Health OK" || echo "❌ Health FAIL"
+	@curl -sf -X POST http://localhost:8080/api/auth/register \
+		-H "Content-Type: application/json" \
+		-d '{"phone":"13800000001","password":"TestPass123!","realName":"测试"}' > /dev/null && echo "✅ Auth OK" || echo "⚠️ Auth (may already exist)"
 
 # ==========================
 # Clean
 # ==========================
 
 clean:
-	rm -rf bin/ coverage.out coverage.html
+	rm -rf bin/ coverage.out coverage.html tests/newman/reports/
