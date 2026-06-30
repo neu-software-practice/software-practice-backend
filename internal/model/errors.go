@@ -23,4 +23,8 @@ var (
 	ErrAddressNotFound      = errors.New("address not found")
 	ErrAddressLimitExceeded = errors.New("address limit exceeded (max 10)")
 	ErrAddressRequired      = errors.New("addressId is required for delivery mode")
+
+	ErrAdminInvalidCredentials  = errors.New("invalid admin credentials")
+	ErrAdminInvalidRefreshToken = errors.New("invalid admin refresh token")
+	ErrAdminNotFound            = errors.New("admin not found")
 )
