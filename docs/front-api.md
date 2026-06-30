@@ -87,6 +87,9 @@ NEUHIS Agent（产品名「东软云脑智能医疗」）是面向患者的「AI
 | `RATE_LIMITED` | 业务 | false | 超出速率限制 |
 | `TITLE_ALREADY_EXISTS` | 业务 | false | 会话已有标题（幂等保护） |
 | `LLM_UNAVAILABLE` | 业务 | true | 大模型服务不可用 |
+| `ADDRESS_NOT_FOUND` | 业务 | false | 收货地址不存在 |
+| `ADDRESS_LIMIT_EXCEEDED` | 业务 | false | 地址数量已达上限（最多 10 条） |
+| `ADDRESS_REQUIRED` | 业务 | false | 当前操作需先添加收货地址 |
 
 UI 文案命中的 HTTP 状态（`MESSAGE_BY_HTTP_STATUS`）：`401`（登录失效，不可重试）、`403`（无法访问该记录，不可重试）、`404`（找不到内容，不可重试）、`408`（请求超时，可重试）。其余 HTTP 错误按 `status >= 500` 可重试、`4xx` 不可重试兜底。
 
@@ -206,6 +209,12 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `POST` | `/visits/:sessionId/timer` | `workbenchApi.pauseVisitTimer` / `resumeVisitTimer` | 暂停/恢复整次导诊总计时 | 否 |
 | `POST` | `/visits/:sessionId/generate-title` | `workbenchApi.generateTitle` | 调用 LLM 生成会话标题 | 否 |
 | `POST` | `/visits/:sessionId/dismiss-emergency` | `workbenchApi.dismissEmergency` | 误报申诉，解除急症态 | 是 |
+| `GET` | `/patients/:patientId/addresses` | `addressApi.listAddresses` | 查询患者收货地址列表 | 否 |
+| `POST` | `/patients/:patientId/addresses` | `addressApi.createAddress` | 新增收货地址 | 否 |
+| `PATCH` | `/patients/:patientId/addresses/:addressId` | `addressApi.updateAddress` | 修改收货地址 | 否 |
+| `DELETE` | `/patients/:patientId/addresses/:addressId` | `addressApi.deleteAddress` | 删除收货地址 | 否 |
+| `PUT` | `/patients/:patientId/addresses/:addressId/default` | `addressApi.setDefaultAddress` | 设置默认收货地址 | 否 |
+| `GET` | `/billing/records` | `billingApi.listBillingRecords` | 查询患者历史账单汇总 | 否 |
 
 > 检验结果回填 `POST /visits/:sessionId/lab-results`（`special-designs/api.md` 列出）由 mock/后端内部驱动，前端 facade 不直接暴露方法，故不在本表 facade 列展开。
 
@@ -282,6 +291,94 @@ SSE 事件类型（7 值）：`delta`、`message_final`、`card`、`state`、`em
 | `medicalHistory` | string[] | 否 | 既往病史（整体替换）；不传则不修改，传 `[]` 则清空 |
 
 响应：更新后的 `PatientProfile`。注意错误：`PATIENT_NOT_FOUND`、`VALIDATION_ERROR`。
+
+#### 地址簿（v5）
+
+地址簿接口管理患者的收货地址，上限 10 条，首条自动设为默认。
+
+##### `GET /patients/:patientId/addresses` — 地址列表
+
+路径参数：`patientId`。无需请求体。
+
+响应：`AddressListResponse`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `addresses` | `Address[]` | 是 | 地址列表，按创建时间倒序 |
+
+其中 `Address` 字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | AddressId | 是 | 地址 ID（UUID） |
+| `patientId` | PatientId | 是 | 所属患者 ID |
+| `name` | string(1–20) | 是 | 收件人姓名 |
+| `phone` | string(11) | 是 | 大陆手机号（1 开头 11 位） |
+| `province` | string | 是 | 省 |
+| `city` | string | 是 | 市 |
+| `district` | string | 是 | 区 |
+| `detail` | string(1–200) | 是 | 详细地址 |
+| `isDefault` | boolean | 是 | 是否默认地址 |
+| `tag` | string | 是 | 标签：`家` \| `公司` \| `医院` \| `其他` \| `""` |
+| `createdAt` | ISO8601 | 是 | 创建时间 |
+| `updatedAt` | ISO8601 | 是 | 更新时间 |
+
+##### `POST /patients/:patientId/addresses` — 新增地址
+
+路径参数：`patientId`。请求体（`CreateAddressInput`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `patientId` | PatientId | 是 | 患者 ID（与路径一致） |
+| `name` | string(1–20) | 是 | 收件人姓名 |
+| `phone` | string(11) | 是 | 大陆手机号 |
+| `province` | string | 是 | 省 |
+| `city` | string | 是 | 市 |
+| `district` | string | 是 | 区 |
+| `detail` | string(1–200) | 是 | 详细地址 |
+| `isDefault` | boolean | 否 | 是否设为默认（首条强制 true） |
+| `tag` | string | 否 | 标签，默认 `""` |
+
+响应：`201 Created`，返回创建的 `Address`。错误：`ADDRESS_LIMIT_EXCEEDED`（已达 10 条上限）、`VALIDATION_ERROR`。
+
+> 首条地址自动设为默认（`isDefault: true`）。若 `isDefault: true`，会清除其他地址的默认标记。
+
+##### `PATCH /patients/:patientId/addresses/:addressId` — 修改地址
+
+路径参数：`patientId`、`addressId`。请求体（`UpdateAddressInput`，全部可选，仅更新非 `nil` 字段）：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string(1–20) \| null | 否 | 收件人姓名 |
+| `phone` | string(11) \| null | 否 | 大陆手机号 |
+| `province` | string \| null | 否 | 省 |
+| `city` | string \| null | 否 | 市 |
+| `district` | string \| null | 否 | 区 |
+| `detail` | string(1–200) \| null | 否 | 详细地址 |
+| `isDefault` | boolean \| null | 否 | 是否设为默认 |
+| `tag` | string \| null | 否 | 标签 |
+
+响应：更新后的 `Address`。错误：`ADDRESS_NOT_FOUND`（地址不存在或不属于该患者）、`VALIDATION_ERROR`。
+
+##### `DELETE /patients/:patientId/addresses/:addressId` — 删除地址
+
+路径参数：`patientId`、`addressId`。无需请求体。
+
+响应：`DeleteAddressResponse`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `success` | boolean | 是 | 固定 `true` |
+
+> 若删除的是默认地址，则自动将剩余第一条地址提升为默认。
+
+错误：`ADDRESS_NOT_FOUND`。
+
+##### `PUT /patients/:patientId/addresses/:addressId/default` — 设置默认
+
+路径参数：`patientId`、`addressId`。无需请求体。
+
+响应：更新后的 `Address`（`isDefault: true`）。错误：`ADDRESS_NOT_FOUND`。
 
 ### 5.2 visits 域
 
@@ -662,6 +759,53 @@ facade `pauseVisitTimer` / `resumeVisitTimer` 共用此 endpoint。请求体为 
 输入上下文：患者消息（`role: "patient"`）+ 助手前 2 条消息 + 已有诊断（若有则优先）。
 
 LLM 降级策略：大模型不可用时返回 503 或降级使用 `chiefComplaint` 截断（≤50 字符）。
+
+### 5.13 billing 域 — 账单记录（v6）
+
+#### `GET /billing/records` — 历史账单汇总
+
+查询当前患者的全部已支付账单，按时间倒序排列，适合对账与费用回溯。
+
+请求：无路径参数和请求体，需携带有效的 `Authorization` header（JWT accessToken），患者身份从 token 的 `patientId` claim 中提取。
+
+响应（`BillingRecordsResponse`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `items` | `BillingRecord[]` | 是 | 账单记录列表，无记录时为空数组 `[]` |
+
+其中 `BillingRecord`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `paymentId` | string | 是 | 支付 ID（UUID） |
+| `sessionId` | SessionId | 是 | 所属就诊会话 ID |
+| `sessionTitle` | string | 是 | 就诊标题（`chiefComplaint` > `diagnosis` > `title` 降级，兜底 "未知就诊"） |
+| `purpose` | string | 是 | 费用用途说明（如 "lab"、"medication"） |
+| `items` | `BillingLineItem[]` | 是 | 费用明细行 |
+| `totalAmount` | number | 是 | 总金额（元） |
+| `insuranceAmount` | number | 是 | 医保报销金额（元） |
+| `selfPayAmount` | number | 是 | 自付金额（元） |
+| `paymentStatus` | PaymentStatus | 是 | 支付状态（固定 `"paid"`，仅展示已支付记录） |
+| `createdAt` | ISO8601 | 是 | 支付完成时间 |
+
+`BillingLineItem`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 项目名称（如 "血常规"、"阿莫西林"） |
+| `amount` | number | 是 | 单价（元） |
+| `quantity` | number \| null | 否 | 数量（仅 >1 时返回） |
+
+#### 后端实现要求
+
+**数据来源**：遍历患者所有 visit session 的 `FlowCard`，仅取 `kind=payment` 且 `paymentStatus=paid` 的卡片。
+
+**会话标题降级**：`chiefComplaint` → `diagnosis` → `title` → `"未知就诊"`（当前端未调用 `generate-title` 时 `title` 为空）。
+
+**时间戳**：优先使用 `handledAt`（支付处理时间），降级使用 `createdAt`（卡片创建时间）。
+
+错误：`UNAUTHORIZED`（未认证，401）。
 
 ---
 
