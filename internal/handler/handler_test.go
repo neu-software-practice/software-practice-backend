@@ -1123,7 +1123,7 @@ func TestNewRouter(t *testing.T) {
 	addressSvc := addresssvc.NewService(&mockAddressRepo{})
 	billingSvc := billingsvc.NewService(&mockVisitRepo{}, &mockFlowCardRepo{})
 
-	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc, addressSvc, billingSvc, nil)
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc, addressSvc, billingSvc, nil, nil)
 	if router.Patient == nil {
 		t.Error("Patient handler should not be nil")
 	}
@@ -1153,7 +1153,7 @@ func TestSetupRoutes(t *testing.T) {
 	authSvc := newTestAuthService()
 	addressSvc := addresssvc.NewService(&mockAddressRepo{})
 	billingSvc := billingsvc.NewService(&mockVisitRepo{}, &mockFlowCardRepo{})
-	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc, addressSvc, billingSvc, nil)
+	router := handler.NewRouter(patientSvc, visitSvc, wbSvc, authSvc, addressSvc, billingSvc, nil, nil)
 
 	cfg := &config.Config{
 		ServerMode:         "test",

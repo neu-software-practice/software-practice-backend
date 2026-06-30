@@ -18,6 +18,7 @@ import (
 	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
 	billingsvc "github.com/neuhis/software-practice-backend/internal/service/billing"
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
+	medicalordersvc "github.com/neuhis/software-practice-backend/internal/service/medicalorder"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
@@ -83,10 +84,11 @@ func main() {
 	authSvc := authsvc.NewService(userRepo, refreshTokenRepo, patientRepo, cfg.JWTSecret)
 	addressSvc := addresssvc.NewService(addressRepo)
 	billingSvc := billingsvc.NewService(visitRepo, flowCardRepo)
+	medicalOrderSvc := medicalordersvc.NewService(visitRepo, flowCardRepo)
 	adminSvc := adminsvc.NewService(adminRepo, adminRefreshTokenRepo, dashboardRepo, settingsRepo, patientRepo, visitRepo, cfg.JWTSecret)
 
 	// Initialize handlers
-	router := handler.NewRouter(patientSvc, visitSvc, workbenchSvc, authSvc, addressSvc, billingSvc, adminSvc)
+	router := handler.NewRouter(patientSvc, visitSvc, workbenchSvc, authSvc, addressSvc, billingSvc, medicalOrderSvc, adminSvc)
 
 	// Create Gin engine
 	engine := gin.New()

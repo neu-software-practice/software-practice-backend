@@ -9,6 +9,7 @@ import (
 	adminsvc "github.com/neuhis/software-practice-backend/internal/service/admin"
 	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
 	billingsvc "github.com/neuhis/software-practice-backend/internal/service/billing"
+	medicalordersvc "github.com/neuhis/software-practice-backend/internal/service/medicalorder"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
@@ -16,13 +17,14 @@ import (
 
 // Router holds all route handlers.
 type Router struct {
-	Patient   *PatientHandler
-	Visit     *VisitHandler
-	Workbench *WorkbenchHandler
-	Auth      *AuthHandler
-	Address   *AddressHandler
-	Billing   *BillingHandler
-	Admin     *AdminHandler
+	Patient      *PatientHandler
+	Visit        *VisitHandler
+	Workbench    *WorkbenchHandler
+	Auth         *AuthHandler
+	Address      *AddressHandler
+	Billing      *BillingHandler
+	MedicalOrder *MedicalOrderHandler
+	Admin        *AdminHandler
 }
 
 // NewRouter creates a new Router.
@@ -33,16 +35,18 @@ func NewRouter(
 	authSvc *authsvc.Service,
 	addressSvc *addresssvc.Service,
 	billingSvc *billingsvc.Service,
+	medicalOrderSvc *medicalordersvc.Service,
 	adminSvc *adminsvc.Service,
 ) *Router {
 	return &Router{
-		Patient:   NewPatientHandler(patientSvc),
-		Visit:     NewVisitHandler(visitSvc),
-		Workbench: NewWorkbenchHandler(workbenchSvc),
-		Auth:      NewAuthHandler(authSvc),
-		Address:   NewAddressHandler(addressSvc),
-		Billing:   NewBillingHandler(billingSvc),
-		Admin:     NewAdminHandler(adminSvc),
+		Patient:      NewPatientHandler(patientSvc),
+		Visit:        NewVisitHandler(visitSvc),
+		Workbench:    NewWorkbenchHandler(workbenchSvc),
+		Auth:         NewAuthHandler(authSvc),
+		Address:      NewAddressHandler(addressSvc),
+		Billing:      NewBillingHandler(billingSvc),
+		MedicalOrder: NewMedicalOrderHandler(medicalOrderSvc),
+		Admin:        NewAdminHandler(adminSvc),
 	}
 }
 
@@ -110,6 +114,9 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 
 		// Billing routes (v6)
 		auth.GET("/billing/records", router.Billing.ListBillingRecords)
+
+		// Medical order routes (v8)
+		auth.GET("/medical-orders", router.MedicalOrder.ListMedicalOrders)
 	}
 
 	// Admin panel routes (v7) — under /admin prefix, independent JWT system
