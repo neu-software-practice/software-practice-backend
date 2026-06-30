@@ -171,6 +171,7 @@ jobs:
         timeout-minutes: 20
 
       - name: Restart server to clear rate limits
+        if: success() || failure()
         run: |
           echo "Restarting app to clear rate limits before admin tests..."
           docker compose restart app
@@ -179,6 +180,7 @@ jobs:
 
       - name: Run Admin Smoke Tests
         id: smoke-admin
+        if: success() || failure()
         run: bash tests/newman/run-admin-smoke.sh http://localhost:8080
         timeout-minutes: 10
 
@@ -193,6 +195,20 @@ jobs:
           cat tests/newman/reports/summary_*.txt 2>/dev/null || echo "No report found"
           echo "=== Admin Newman report ==="
           cat tests/newman/reports/admin-summary_*.txt 2>/dev/null || echo "No report found"
+
+      - name: Summarize results
+        if: success() || failure()
+        run: |
+          PATIENT_RESULT="${{ steps.smoke-patient.outcome }}"
+          ADMIN_RESULT="${{ steps.smoke-admin.outcome }}"
+          echo "=== Smoke Test Summary ==="
+          echo "Patient: ${PATIENT_RESULT}"
+          echo "Admin:   ${ADMIN_RESULT}"
+          if [ "${PATIENT_RESULT}" != "success" ] || [ "${ADMIN_RESULT}" != "success" ]; then
+            echo "❌ One or more smoke test suites failed"
+            exit 1
+          fi
+          echo "✅ All smoke test suites passed"
 
       - name: Cleanup
         if: always()
