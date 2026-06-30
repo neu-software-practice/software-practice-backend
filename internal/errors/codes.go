@@ -26,4 +26,9 @@ const (
 	CodeAddressNotFound      = "ADDRESS_NOT_FOUND"
 	CodeAddressLimitExceeded = "ADDRESS_LIMIT_EXCEEDED"
 	CodeAddressRequired      = "ADDRESS_REQUIRED"
+
+	// Admin error codes
+	CodeAdminInvalidCredentials  = "INVALID_CREDENTIALS"
+	CodeAdminInvalidRefreshToken = "INVALID_REFRESH_TOKEN"
+	CodeAdminInvalidSettings     = "INVALID_SETTINGS"
 )

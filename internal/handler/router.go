@@ -6,6 +6,7 @@ import (
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
 	addresssvc "github.com/neuhis/software-practice-backend/internal/service/address"
+	adminsvc "github.com/neuhis/software-practice-backend/internal/service/admin"
 	authsvc "github.com/neuhis/software-practice-backend/internal/service/auth"
 	billingsvc "github.com/neuhis/software-practice-backend/internal/service/billing"
 	patientsvc "github.com/neuhis/software-practice-backend/internal/service/patient"
@@ -21,6 +22,7 @@ type Router struct {
 	Auth      *AuthHandler
 	Address   *AddressHandler
 	Billing   *BillingHandler
+	Admin     *AdminHandler
 }
 
 // NewRouter creates a new Router.
@@ -31,6 +33,7 @@ func NewRouter(
 	authSvc *authsvc.Service,
 	addressSvc *addresssvc.Service,
 	billingSvc *billingsvc.Service,
+	adminSvc *adminsvc.Service,
 ) *Router {
 	return &Router{
 		Patient:   NewPatientHandler(patientSvc),
@@ -39,6 +42,7 @@ func NewRouter(
 		Auth:      NewAuthHandler(authSvc),
 		Address:   NewAddressHandler(addressSvc),
 		Billing:   NewBillingHandler(billingSvc),
+		Admin:     NewAdminHandler(adminSvc),
 	}
 }
 
@@ -106,6 +110,32 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 
 		// Billing routes (v6)
 		auth.GET("/billing/records", router.Billing.ListBillingRecords)
+	}
+
+	// Admin panel routes (v7) — under /admin prefix, independent JWT system
+	adminGroup := engine.Group("/admin")
+	{
+		// Admin auth routes (public)
+		adminAuth := adminGroup.Group("/auth")
+		adminAuth.Use(middleware.RateLimitMiddleware(5.0/60.0, 5))
+		{
+			adminAuth.POST("/login", router.Admin.Login)
+			adminAuth.POST("/logout", router.Admin.Logout)
+			adminAuth.POST("/refresh", router.Admin.Refresh)
+		}
+
+		// Admin authenticated routes
+		adminProtected := adminGroup.Group("")
+		adminProtected.Use(middleware.AdminAuthMiddleware(cfg.JWTSecret))
+		{
+			adminProtected.GET("/dashboard/stats", router.Admin.GetDashboardStats)
+			adminProtected.GET("/patients", router.Admin.ListPatients)
+			adminProtected.GET("/patients/:id", router.Admin.GetPatientDetail)
+			adminProtected.GET("/sessions", router.Admin.ListSessions)
+			adminProtected.GET("/sessions/:id", router.Admin.GetSessionDetail)
+			adminProtected.GET("/settings", router.Admin.GetSettings)
+			adminProtected.PUT("/settings", router.Admin.UpdateSettings)
+		}
 	}
 
 	// Error handler for 404
