@@ -429,8 +429,33 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Ensure we have a fresh admin token (login if needed)",
-                  "// Skipped if rate limited; test handles 429 gracefully"
+                  "",
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var adminUsername = pm.environment.get('adminUsername') || 'admin';",
+                  "var adminPassword = pm.environment.get('adminPassword') || 'admin123';",
+                  "",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/admin/auth/login',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: {",
+                  "        mode: 'raw',",
+                  "        raw: JSON.stringify({",
+                  "            username: adminUsername,",
+                  "            password: adminPassword",
+                  "        })",
+                  "    }",
+                  "}, function (err, res) {",
+                  "    if (!err && res.code === 200) {",
+                  "        var body = res.json();",
+                  "        var data = body.data || body;",
+                  "        if (data.tokens) {",
+                  "            pm.environment.set('adminAccessToken', data.tokens.accessToken);",
+                  "            pm.environment.set('adminRefreshToken', data.tokens.refreshToken);",
+                  "            console.log('Refresh pre-request: re-login OK');",
+                  "        }",
+                  "    }",
+                  "});"
                 ]
               }
             }
