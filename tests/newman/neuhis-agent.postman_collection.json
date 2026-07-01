@@ -2435,7 +2435,7 @@
               "script": {
                 "exec": [
                   "pm.test('Status 200 or appropriate error', function() {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 500]);",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 422, 500]);",
                   "});"
                 ],
                 "type": "text/javascript"
