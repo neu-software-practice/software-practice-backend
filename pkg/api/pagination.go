@@ -8,7 +8,12 @@ type PageResult[T any] struct {
 }
 
 // NewPageResult creates a new PageResult.
+// Ensures Items is never nil so it serializes as [] instead of null in JSON,
+// which matches the frontend Zod schema expectation (z.array(...)).
 func NewPageResult[T any](items []T, nextCursor *string, hasMore bool) PageResult[T] {
+	if items == nil {
+		items = make([]T, 0)
+	}
 	return PageResult[T]{
 		Items:      items,
 		NextCursor: nextCursor,

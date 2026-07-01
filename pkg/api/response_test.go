@@ -206,6 +206,35 @@ func TestPageResultEmpty(t *testing.T) {
 	}
 }
 
+func TestPageResult_NilItemsSerializesAsEmptyArray(t *testing.T) {
+	// Regression test: Go's nil slice serializes to null in JSON, but the
+	// frontend Zod schema expects items to be an array (z.array(...)).  Ensure
+	// NewPageResult converts nil to an empty slice so the JSON emits [].
+	page := api.NewPageResult[any](nil, nil, false)
+
+	if page.Items == nil {
+		t.Fatal("NewPageResult must convert nil items to non-nil empty slice")
+	}
+	if len(page.Items) != 0 {
+		t.Errorf("items length = %d, want 0", len(page.Items))
+	}
+
+	b, err := json.Marshal(page)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	// The items field must be [] in JSON, not null.
+	if string(parsed["items"]) != "[]" {
+		t.Errorf("JSON items = %s, want []", string(parsed["items"]))
+	}
+}
+
 func TestNewPageResponse(t *testing.T) {
 	items := []string{"a", "b", "c"}
 	resp := api.NewPageResponse(items, 10, 1, 20)

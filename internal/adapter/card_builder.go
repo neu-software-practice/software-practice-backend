@@ -43,7 +43,17 @@ func BuildLabDecisionCard(sessionID string, step *medagent.Step) *model.FlowCard
 		})
 	}
 
+	// reason is required by the frontend schema (z.string().trim().min(1)); fall
+	// back to a clinical default when medAgent does not provide a doctor message.
 	card.Reason = step.DoctorSay
+	if card.Reason == "" {
+		card.Reason = "根据病情需要进一步检验以明确诊断"
+	}
+
+	// differentialTargets is required by the frontend schema (z.array(...));
+	// always emit at least an empty array so the JSON key is present with [].
+	card.DifferentialTargets = []string{}
+
 	card.EstimatedFee = model.Float64Ptr(50.0) // 血常规固定费用
 
 	return card
@@ -142,6 +152,7 @@ func BuildPaymentCard(sessionID, purpose string, items []model.PaymentLineItem, 
 	card.InsuranceAmount = model.Float64Ptr(0)
 	card.SelfPayAmount = model.Float64Ptr(totalAmount)
 	card.PaymentStatus = string(model.PaymentStatusUnpaid)
+	card.PaymentID = card.ID
 
 	return card
 }

@@ -29,6 +29,32 @@ func TestBuildLabDecisionCard(t *testing.T) {
 	if len(card.TestItems) != 1 {
 		t.Errorf("testItems length = %d, want 1", len(card.TestItems))
 	}
+	if card.Reason != "需要检查血常规" {
+		t.Errorf("reason = %q, want %q", card.Reason, "需要检查血常规")
+	}
+	if card.DifferentialTargets == nil {
+		t.Error("differentialTargets should not be nil (must serialize as [])")
+	}
+	if card.EstimatedFee == nil || *card.EstimatedFee != 50.0 {
+		t.Error("estimatedFee should be 50.0")
+	}
+}
+
+func TestBuildLabDecisionCard_EmptyDoctorSay(t *testing.T) {
+	step := &medagent.Step{
+		Kind:      medagent.StepNeedTests,
+		DoctorSay: "",
+		TestItems: []string{"血常规"},
+	}
+
+	card := adapter.BuildLabDecisionCard("s1", step)
+	// reason must be non-empty to satisfy the frontend z.string().trim().min(1) schema
+	if card.Reason == "" {
+		t.Error("reason should fall back to a default when DoctorSay is empty")
+	}
+	if card.DifferentialTargets == nil {
+		t.Error("differentialTargets should not be nil")
+	}
 }
 
 func TestBuildDiagnosisCard(t *testing.T) {
@@ -115,6 +141,12 @@ func TestBuildPaymentCard(t *testing.T) {
 	}
 	if card.PaymentStatus != "unpaid" {
 		t.Errorf("paymentStatus = %s", card.PaymentStatus)
+	}
+	if card.PaymentID == "" {
+		t.Error("paymentId should not be empty")
+	}
+	if card.PaymentID != card.ID {
+		t.Errorf("paymentId = %s, want %s (should equal card.ID)", card.PaymentID, card.ID)
 	}
 }
 
