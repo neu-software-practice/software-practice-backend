@@ -12,16 +12,32 @@ jobs:
       COMPOSE_FILE: docker-compose.yml:docker-compose.yml.local
 
     steps:
-      - name: Pull latest code
-        working-directory: /root/app/software-practice-backend
+      - name: Set deploy directory
+        run: echo "APP_DIR=$HOME/app/software-practice-backend" >> $GITHUB_ENV
+
+      - name: Clone or pull latest code
         run: |
           set -euo pipefail
-          git pull origin main
-          git submodule update --init --recursive
+          if [ -d "${APP_DIR}/.git" ]; then
+            echo "Existing repo found, pulling latest main..."
+            cd "${APP_DIR}"
+            git fetch origin main
+            git reset --hard origin/main
+            git submodule update --init --recursive
+          else
+            echo "First deployment, cloning repository..."
+            mkdir -p "${APP_DIR}"
+            git clone --branch main --depth 1 \
+              https://github.com/neuhis/software-practice-backend.git \
+              "${APP_DIR}"
+            cd "${APP_DIR}"
+            git submodule update --init --recursive
+          fi
+          echo "Deploying commit: $(git -C "${APP_DIR}" rev-parse --short HEAD)"
 
       - name: Rebuild and restart app
         id: docker-up
-        working-directory: /root/app/software-practice-backend
+        working-directory: ${{ env.APP_DIR }}
         run: |
           set -euo pipefail
           docker compose up -d --build app
@@ -38,7 +54,7 @@ jobs:
           curl -s http://localhost:8080/api/health | python3 -m json.tool || true
 
       - name: Run database migrations
-        working-directory: /root/app/software-practice-backend
+        working-directory: ${{ env.APP_DIR }}
         run: |
           set -euo pipefail
           echo "Running database migrations..."
@@ -50,7 +66,7 @@ jobs:
 
       - name: Verify deployment
         id: verify
-        working-directory: /root/app/software-practice-backend
+        working-directory: ${{ env.APP_DIR }}
         run: |
           set -euo pipefail
           STATUS=$(curl -sf http://localhost:8080/api/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
@@ -59,7 +75,7 @@ jobs:
 
       - name: Collect logs on failure
         if: failure() && steps.docker-up.outcome == 'success'
-        working-directory: /root/app/software-practice-backend
+        working-directory: ${{ env.APP_DIR }}
         run: |
           echo "=== App logs (last 50 lines) ==="
           docker compose logs --tail=50 app || true
@@ -67,6 +83,6 @@ jobs:
           docker compose logs --tail=20 mysql || true
 
       - name: Cleanup old images
-        working-directory: /root/app/software-practice-backend
+        working-directory: ${{ env.APP_DIR }}
         run: |
           docker image prune -f

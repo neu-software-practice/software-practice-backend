@@ -9,11 +9,13 @@ jobs:
     name: Deploy Dev
     runs-on: [self-hosted, cd]
     env:
-      DEV_DIR: /root/software-practice-backend-dev
       COMPOSE_PROJECT_NAME: neuhis-dev
       COMPOSE_FILE: docker-compose.yml:docker-compose.dev.yml
 
     steps:
+      - name: Set deploy directory
+        run: echo "DEV_DIR=$HOME/software-practice-backend-dev" >> $GITHUB_ENV
+
       - name: Clone or pull latest code
         run: |
           set -euo pipefail
@@ -24,16 +26,13 @@ jobs:
             git reset --hard origin/dev
             git submodule update --init --recursive
           else
-            echo "=============================================="
-            echo "  FIRST-TIME SETUP REQUIRED"
-            echo "  Run the following on the server as root:"
-            echo ""
-            echo "  mkdir -p ${DEV_DIR}"
-            echo "  chown -R \$(whoami) ${DEV_DIR}"
-            echo ""
-            echo "  (The runner user needs write access to this directory)"
-            echo "=============================================="
-            exit 1
+            echo "First deployment, cloning repository..."
+            mkdir -p "${DEV_DIR}"
+            git clone --branch dev --depth 1 \
+              https://github.com/neuhis/software-practice-backend.git \
+              "${DEV_DIR}"
+            cd "${DEV_DIR}"
+            git submodule update --init --recursive
           fi
           echo "Deploying commit: $(git -C "${DEV_DIR}" rev-parse --short HEAD)"
 
