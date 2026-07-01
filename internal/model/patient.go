@@ -26,9 +26,9 @@ type PatientProfile struct {
 type PatientContext struct {
 	Patient             PatientProfile     `json:"patient"`
 	ChiefComplaint      string             `json:"chiefComplaint,omitempty"`
-	Allergies            []string           `json:"allergies"`
-	MedicalHistory       []string           `json:"medicalHistory"`
-	LongTermMedications  []string           `json:"longTermMedications"`
+	Allergies           []string           `json:"allergies"`
+	MedicalHistory      []string           `json:"medicalHistory"`
+	LongTermMedications []string           `json:"longTermMedications"`
 	PriorVisit          *PatientPriorVisit `json:"priorVisit,omitempty"`
 }
 
