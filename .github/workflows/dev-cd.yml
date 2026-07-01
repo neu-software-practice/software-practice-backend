@@ -32,7 +32,7 @@ jobs:
             echo "First deployment, cloning repository..."
             mkdir -p "${DEV_DIR}"
             git clone --branch dev --depth 1 \
-              https://github.com/neuhis/software-practice-backend.git \
+              https://github.com/neu-software-practice/software-practice-backend.git \
               "${DEV_DIR}"
             cd "${DEV_DIR}"
             git submodule update --init --recursive
