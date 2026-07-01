@@ -25,9 +25,11 @@ type RefreshToken struct {
 
 // RegisterInput carries the fields for user registration.
 type RegisterInput struct {
-	Phone    string `json:"phone"`
-	Password string `json:"password"`
-	RealName string `json:"realName,omitempty"`
+	Phone     string `json:"phone"`
+	Password  string `json:"password"`
+	RealName  string `json:"realName"`
+	Gender    string `json:"gender"`
+	BirthDate string `json:"birthDate"`
 }
 
 // LoginInput carries the fields for user login.

@@ -3549,7 +3549,7 @@ func TestAuthHandler_Register_PhoneExists(t *testing.T) {
 	h := handler.NewAuthHandler(authSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234"}`))
+	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234","realName":"张三","gender":"男","birthDate":"1990-05-15"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	h.Register(c)
 	if w.Code != http.StatusConflict {
@@ -3568,7 +3568,7 @@ func TestAuthHandler_Register_InternalError(t *testing.T) {
 	h := handler.NewAuthHandler(authSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234"}`))
+	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234","realName":"张三","gender":"男","birthDate":"1990-05-15"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	h.Register(c)
 	if w.Code != http.StatusInternalServerError {
@@ -3590,7 +3590,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	h := handler.NewAuthHandler(authSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234","realName":"张三"}`))
+	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234","realName":"张三","gender":"男","birthDate":"1990-05-15"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	h.Register(c)
 	if w.Code != http.StatusCreated {
@@ -3598,7 +3598,22 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	}
 }
 
+func TestAuthHandler_Register_ValidationError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authSvc := authsvc.NewService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{}, handlerTestSecret)
+	h := handler.NewAuthHandler(authSvc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/auth/register", strings.NewReader(`{"phone":"13800138000","password":"pass1234","realName":"张三","gender":"","birthDate":"1990-05-15"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.Register(c)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want 422, body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestAuthHandler_Login_InvalidBody(t *testing.T) {
+
 	gin.SetMode(gin.TestMode)
 	authSvc := authsvc.NewService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{}, handlerTestSecret)
 	h := handler.NewAuthHandler(authSvc)
