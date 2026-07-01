@@ -3047,7 +3047,12 @@ func TestPatientHandler_GetContext_ValidFull(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	patientRepo := &mockPatientRepo{
 		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
-			return &model.PatientProfile{ID: id, Name: "Test", Gender: "male", Age: 30}, nil
+			return &model.PatientProfile{
+				ID: id, Name: "Test", Gender: "male", Age: 30,
+				Allergies:           []string{"penicillin"},
+				MedicalHistory:      []string{"hypertension"},
+				LongTermMedications: []string{"aspirin"},
+			}, nil
 		},
 	}
 	visitRepo := &mockVisitRepo{
@@ -3065,6 +3070,23 @@ func TestPatientHandler_GetContext_ValidFull(t *testing.T) {
 	h.GetContext(c)
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", w.Code)
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	data, ok := resp["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("response data missing")
+	}
+	for _, field := range []string{"allergies", "medicalHistory", "longTermMedications"} {
+		arr, ok := data[field].([]interface{})
+		if !ok {
+			t.Errorf("field %q should be an array, got %T: %v", field, data[field], data[field])
+		}
+		if len(arr) == 0 {
+			t.Errorf("field %q should not be empty", field)
+		}
 	}
 }
 
