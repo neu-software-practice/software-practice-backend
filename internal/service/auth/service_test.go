@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,10 +82,16 @@ func newTestService(
 	return auth.NewService(userRepo, tokenRepo, patientRepo, testSecret)
 }
 
+// validRegisterFields returns standard valid values for the new v10 fields.
+func validRegisterFields() (realName, gender, birthDate string) {
+	return "张三", "男", "1990-05-15"
+}
+
 // --- Register tests ---
 
 func TestRegister_Success_NewPatient(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -110,15 +117,25 @@ func TestRegister_Success_NewPatient(t *testing.T) {
 		findByCredFunc: func(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
 			return nil, model.ErrPatientNotFound
 		},
-		createFunc: func(ctx context.Context, p *model.PatientProfile) error { return nil },
+		createFunc: func(ctx context.Context, p *model.PatientProfile) error {
+			if p.Gender != gender {
+				t.Errorf("PatientProfile.Gender = %q, want %q", p.Gender, gender)
+			}
+			if p.Age < 0 {
+				t.Errorf("PatientProfile.Age = %d, expected non-negative", p.Age)
+			}
+			return nil
+		},
 	}
 
 	svc := newTestService(userRepo, tokenRepo, patientRepo)
 
 	resp, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
-		RealName: "张三",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err != nil {
 		t.Fatalf("Register: %v", err)
@@ -142,6 +159,7 @@ func TestRegister_Success_NewPatient(t *testing.T) {
 
 func TestRegister_Success_ExistingPatient(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -166,8 +184,11 @@ func TestRegister_Success_ExistingPatient(t *testing.T) {
 	svc := newTestService(userRepo, tokenRepo, patientRepo)
 
 	resp, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800002222",
-		Password: "password123",
+		Phone:     "13800002222",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err != nil {
 		t.Fatalf("Register: %v", err)
@@ -179,6 +200,7 @@ func TestRegister_Success_ExistingPatient(t *testing.T) {
 
 func TestRegister_PhoneExists(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -191,8 +213,11 @@ func TestRegister_PhoneExists(t *testing.T) {
 	svc := newTestService(userRepo, tokenRepo, patientRepo)
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if !errors.Is(err, model.ErrPhoneExists) {
 		t.Errorf("err = %v, want ErrPhoneExists", err)
@@ -202,6 +227,7 @@ func TestRegister_PhoneExists(t *testing.T) {
 func TestRegister_InvalidPhone(t *testing.T) {
 	ctx := context.Background()
 	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	realName, gender, birthDate := validRegisterFields()
 
 	tests := []struct {
 		name  string
@@ -217,8 +243,11 @@ func TestRegister_InvalidPhone(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := svc.Register(ctx, model.RegisterInput{
-				Phone:    tt.phone,
-				Password: "password123",
+				Phone:     tt.phone,
+				Password:  "password123",
+				RealName:  realName,
+				Gender:    gender,
+				BirthDate: birthDate,
 			})
 			if !errors.Is(err, model.ErrValidation) {
 				t.Errorf("err = %v, want ErrValidation", err)
@@ -230,10 +259,14 @@ func TestRegister_InvalidPhone(t *testing.T) {
 func TestRegister_PasswordTooShort(t *testing.T) {
 	ctx := context.Background()
 	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	realName, gender, birthDate := validRegisterFields()
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "short",
+		Phone:     "13800001111",
+		Password:  "short",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if !errors.Is(err, model.ErrValidation) {
 		t.Errorf("err = %v, want ErrValidation", err)
@@ -309,6 +342,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 
 func TestLogin_WrongPassword(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -334,8 +368,11 @@ func TestLogin_WrongPassword(t *testing.T) {
 		return nil
 	}
 	_, _ = svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "correctpassword",
+		Phone:     "13800001111",
+		Password:  "correctpassword",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 
 	userRepo.findByPhoneFunc = func(ctx context.Context, phone string) (*model.User, error) {
@@ -527,6 +564,7 @@ func TestLogout_UnknownToken_Idempotent(t *testing.T) {
 
 func TestRegister_CreateUserFails(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -546,8 +584,11 @@ func TestRegister_CreateUserFails(t *testing.T) {
 	svc := newTestService(userRepo, tokenRepo, patientRepo)
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -556,6 +597,7 @@ func TestRegister_CreateUserFails(t *testing.T) {
 
 func TestRegister_FindPhoneError(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -566,8 +608,11 @@ func TestRegister_FindPhoneError(t *testing.T) {
 	svc := newTestService(userRepo, &mockRefreshTokenRepo{}, &mockPatientRepo{})
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -576,6 +621,7 @@ func TestRegister_FindPhoneError(t *testing.T) {
 
 func TestRegister_PatientLookupError(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -591,8 +637,11 @@ func TestRegister_PatientLookupError(t *testing.T) {
 	svc := newTestService(userRepo, &mockRefreshTokenRepo{}, patientRepo)
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err == nil {
 		t.Fatal("expected error from patient lookup")
@@ -601,6 +650,7 @@ func TestRegister_PatientLookupError(t *testing.T) {
 
 func TestRegister_CreatePatientFails(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -619,8 +669,11 @@ func TestRegister_CreatePatientFails(t *testing.T) {
 	svc := newTestService(userRepo, &mockRefreshTokenRepo{}, patientRepo)
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err == nil {
 		t.Fatal("expected error from patient creation")
@@ -629,6 +682,7 @@ func TestRegister_CreatePatientFails(t *testing.T) {
 
 func TestRegister_StoreRefreshTokenFails(t *testing.T) {
 	ctx := context.Background()
+	realName, gender, birthDate := validRegisterFields()
 
 	userRepo := &mockUserRepo{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
@@ -650,8 +704,11 @@ func TestRegister_StoreRefreshTokenFails(t *testing.T) {
 	svc := newTestService(userRepo, tokenRepo, patientRepo)
 
 	_, err := svc.Register(ctx, model.RegisterInput{
-		Phone:    "13800001111",
-		Password: "password123",
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: birthDate,
 	})
 	if err == nil {
 		t.Fatal("expected error from token storage")
@@ -768,5 +825,247 @@ func TestRefresh_StoreNewTokenFails(t *testing.T) {
 	_, err := svc.Refresh(ctx, "some-token")
 	if err == nil {
 		t.Fatal("expected error from storing new refresh token")
+	}
+}
+
+// --- v10 validation tests ---
+
+func TestRegister_RealNameEmpty(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	_, gender, birthDate := validRegisterFields()
+
+	tests := []struct {
+		name     string
+		realName string
+	}{
+		{"empty", ""},
+		{"whitespace", "   "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.Register(ctx, model.RegisterInput{
+				Phone:     "13800001111",
+				Password:  "password123",
+				RealName:  tt.realName,
+				Gender:    gender,
+				BirthDate: birthDate,
+			})
+			if !errors.Is(err, model.ErrValidation) {
+				t.Errorf("err = %v, want ErrValidation", err)
+			}
+		})
+	}
+}
+
+func TestRegister_RealNameTooLong(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	_, gender, birthDate := validRegisterFields()
+
+	longName := strings.Repeat("张", 33)
+
+	_, err := svc.Register(ctx, model.RegisterInput{
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  longName,
+		Gender:    gender,
+		BirthDate: birthDate,
+	})
+	if !errors.Is(err, model.ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
+func TestRegister_GenderEmpty(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	realName, _, birthDate := validRegisterFields()
+
+	tests := []struct {
+		name   string
+		gender string
+	}{
+		{"empty", ""},
+		{"whitespace", "   "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.Register(ctx, model.RegisterInput{
+				Phone:     "13800001111",
+				Password:  "password123",
+				RealName:  realName,
+				Gender:    tt.gender,
+				BirthDate: birthDate,
+			})
+			if !errors.Is(err, model.ErrValidation) {
+				t.Errorf("err = %v, want ErrValidation", err)
+			}
+		})
+	}
+}
+
+func TestRegister_BirthDate_InvalidFormat(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	realName, gender, _ := validRegisterFields()
+
+	tests := []struct {
+		name      string
+		birthDate string
+	}{
+		{"wrong format", "1990-1-1"},
+		{"not a date", "not-a-date"},
+		{"slashes", "1990/05/15"},
+		{"empty", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.Register(ctx, model.RegisterInput{
+				Phone:     "13800001111",
+				Password:  "password123",
+				RealName:  realName,
+				Gender:    gender,
+				BirthDate: tt.birthDate,
+			})
+			if !errors.Is(err, model.ErrValidation) {
+				t.Errorf("err = %v, want ErrValidation for birthDate=%q", err, tt.birthDate)
+			}
+		})
+	}
+}
+
+func TestRegister_BirthDate_InvalidDate(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	realName, gender, _ := validRegisterFields()
+
+	tests := []struct {
+		name      string
+		birthDate string
+	}{
+		{"Feb 30", "2016-02-30"},
+		{"Feb 29 non-leap", "2021-02-29"},
+		{"month 13", "1990-13-01"},
+		{"day 32", "1990-01-32"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.Register(ctx, model.RegisterInput{
+				Phone:     "13800001111",
+				Password:  "password123",
+				RealName:  realName,
+				Gender:    gender,
+				BirthDate: tt.birthDate,
+			})
+			if !errors.Is(err, model.ErrValidation) {
+				t.Errorf("err = %v, want ErrValidation for birthDate=%q", err, tt.birthDate)
+			}
+		})
+	}
+}
+
+func TestRegister_BirthDate_FutureDate(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(&mockUserRepo{}, &mockRefreshTokenRepo{}, &mockPatientRepo{})
+	realName, gender, _ := validRegisterFields()
+
+	_, err := svc.Register(ctx, model.RegisterInput{
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  realName,
+		Gender:    gender,
+		BirthDate: "2099-01-01",
+	})
+	if !errors.Is(err, model.ErrValidation) {
+		t.Errorf("err = %v, want ErrValidation", err)
+	}
+}
+
+func TestRegister_AgeCalculation_Passed(t *testing.T) {
+	ctx := context.Background()
+
+	var capturedAge int
+	userRepo := &mockUserRepo{
+		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
+			return nil, model.ErrUserNotFound
+		},
+		createFunc: func(ctx context.Context, user *model.User) error { return nil },
+	}
+	tokenRepo := &mockRefreshTokenRepo{
+		createFunc: func(ctx context.Context, token *model.RefreshToken) error { return nil },
+	}
+	patientRepo := &mockPatientRepo{
+		findByCredFunc: func(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+		createFunc: func(ctx context.Context, p *model.PatientProfile) error {
+			capturedAge = p.Age
+			return nil
+		},
+	}
+
+	svc := newTestService(userRepo, tokenRepo, patientRepo)
+
+	// Birth year: 1990, current year: 2026, birthday Jan 15 (already passed in July)
+	_, err := svc.Register(ctx, model.RegisterInput{
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  "张三",
+		Gender:    "男",
+		BirthDate: "1990-01-15",
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	// 2026 - 1990 = 36, birthday passed => 36
+	if capturedAge != 36 {
+		t.Errorf("age = %d, want 36", capturedAge)
+	}
+}
+
+func TestRegister_AgeCalculation_NotPassed(t *testing.T) {
+	ctx := context.Background()
+
+	var capturedAge int
+	userRepo := &mockUserRepo{
+		findByPhoneFunc: func(ctx context.Context, phone string) (*model.User, error) {
+			return nil, model.ErrUserNotFound
+		},
+		createFunc: func(ctx context.Context, user *model.User) error { return nil },
+	}
+	tokenRepo := &mockRefreshTokenRepo{
+		createFunc: func(ctx context.Context, token *model.RefreshToken) error { return nil },
+	}
+	patientRepo := &mockPatientRepo{
+		findByCredFunc: func(ctx context.Context, credType, credential string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+		createFunc: func(ctx context.Context, p *model.PatientProfile) error {
+			capturedAge = p.Age
+			return nil
+		},
+	}
+
+	svc := newTestService(userRepo, tokenRepo, patientRepo)
+
+	// Birth year: 1990, current year: 2026, birthday Dec 25 (not yet passed in July)
+	_, err := svc.Register(ctx, model.RegisterInput{
+		Phone:     "13800001111",
+		Password:  "password123",
+		RealName:  "张三",
+		Gender:    "男",
+		BirthDate: "1990-12-25",
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	// 2026 - 1990 - 1 = 35
+	if capturedAge != 35 {
+		t.Errorf("age = %d, want 35", capturedAge)
 	}
 }

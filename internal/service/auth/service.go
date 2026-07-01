@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -53,6 +54,12 @@ func NewService(
 
 // Register creates a new user account, reusing or creating a patient profile.
 func (s *Service) Register(ctx context.Context, input model.RegisterInput) (*model.AuthResponse, error) {
+	now := time.Now()
+	birthDate, err := validateRegisterInput(input, now)
+	if err != nil {
+		return nil, err
+	}
+
 	if !phoneRegexp.MatchString(input.Phone) {
 		return nil, fmt.Errorf("%w: invalid phone format", model.ErrValidation)
 	}
@@ -60,7 +67,7 @@ func (s *Service) Register(ctx context.Context, input model.RegisterInput) (*mod
 		return nil, fmt.Errorf("%w: password must be at least 8 characters", model.ErrValidation)
 	}
 
-	_, err := s.userRepo.FindByPhone(ctx, input.Phone)
+	_, err = s.userRepo.FindByPhone(ctx, input.Phone)
 	if err == nil {
 		return nil, model.ErrPhoneExists
 	}
@@ -73,7 +80,8 @@ func (s *Service) Register(ctx context.Context, input model.RegisterInput) (*mod
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	patientID, err := s.resolvePatientID(ctx, input.Phone, input.RealName)
+	age := calculateAge(birthDate, now)
+	patientID, err := s.resolvePatientID(ctx, input.Phone, input.RealName, input.Gender, age)
 	if err != nil {
 		return nil, fmt.Errorf("resolve patient: %w", err)
 	}
@@ -157,7 +165,7 @@ func (s *Service) Logout(ctx context.Context, rawToken string) error {
 	return nil
 }
 
-func (s *Service) resolvePatientID(ctx context.Context, phone, realName string) (string, error) {
+func (s *Service) resolvePatientID(ctx context.Context, phone, realName, gender string, age int) (string, error) {
 	existing, err := s.patientRepo.FindByCredential(ctx, "phone", phone)
 	if err == nil {
 		return existing.ID, nil
@@ -168,8 +176,9 @@ func (s *Service) resolvePatientID(ctx context.Context, phone, realName string) 
 
 	p := &model.PatientProfile{
 		ID:                  uuid.New().String(),
-		Name:                realName,
-		Gender:              "unknown",
+		Name:                strings.TrimSpace(realName),
+		Gender:              strings.TrimSpace(gender),
+		Age:                 age,
 		Allergies:           []string{},
 		ChronicDiseases:     []string{},
 		LongTermMedications: []string{},
@@ -180,6 +189,39 @@ func (s *Service) resolvePatientID(ctx context.Context, phone, realName string) 
 		return "", fmt.Errorf("create patient: %w", err)
 	}
 	return p.ID, nil
+}
+
+// validateRegisterInput validates the register input fields and returns the parsed birthDate.
+func validateRegisterInput(input model.RegisterInput, now time.Time) (time.Time, error) {
+	realName := strings.TrimSpace(input.RealName)
+	if len(realName) < 1 || len(realName) > 32 {
+		return time.Time{}, fmt.Errorf("%w: realName must be 1-32 characters", model.ErrValidation)
+	}
+
+	gender := strings.TrimSpace(input.Gender)
+	if gender == "" {
+		return time.Time{}, fmt.Errorf("%w: gender must not be empty", model.ErrValidation)
+	}
+
+	birthDate, err := time.Parse("2006-01-02", input.BirthDate)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%w: birthDate must be a valid YYYY-MM-DD date", model.ErrValidation)
+	}
+	if birthDate.After(now) {
+		return time.Time{}, fmt.Errorf("%w: birthDate must not be in the future", model.ErrValidation)
+	}
+
+	return birthDate, nil
+}
+
+// calculateAge computes age from a birth date relative to now.
+func calculateAge(birthDate, now time.Time) int {
+	age := now.Year() - birthDate.Year()
+	if now.Month() < birthDate.Month() ||
+		(now.Month() == birthDate.Month() && now.Day() < birthDate.Day()) {
+		age--
+	}
+	return age
 }
 
 func (s *Service) buildAuthResponse(ctx context.Context, user *model.User) (*model.AuthResponse, error) {
