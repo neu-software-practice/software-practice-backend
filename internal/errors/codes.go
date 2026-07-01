@@ -10,7 +10,6 @@ const (
 	CodeUnauthorized    = "UNAUTHORIZED"
 	CodeForbidden       = "FORBIDDEN"
 	CodeNotFound        = "NOT_FOUND"
-	CodeTimeout         = "TIMEOUT"
 	CodeInternalError   = "INTERNAL_ERROR"
 
 	CodeAuthPhoneExists        = "AUTH_PHONE_EXISTS"
@@ -19,9 +18,6 @@ const (
 	CodeAuthRefreshInvalid     = "AUTH_REFRESH_INVALID"
 	CodeAuthRefreshExpired     = "AUTH_REFRESH_EXPIRED"
 	CodeRateLimited            = "RATE_LIMITED"
-
-	CodeTitleAlreadyExists = "TITLE_ALREADY_EXISTS"
-	CodeLLMUnavailable     = "LLM_UNAVAILABLE"
 
 	CodeInvalidState = "INVALID_STATE"
 

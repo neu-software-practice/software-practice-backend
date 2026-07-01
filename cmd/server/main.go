@@ -90,7 +90,7 @@ func main() {
 	addressSvc := addresssvc.NewService(addressRepo)
 	billingSvc := billingsvc.NewService(visitRepo, flowCardRepo)
 	medicalOrderSvc := medicalordersvc.NewService(visitRepo, flowCardRepo)
-	adminSvc := adminsvc.NewService(adminRepo, adminRefreshTokenRepo, dashboardRepo, settingsRepo, patientRepo, visitRepo, cfg.JWTSecret)
+	adminSvc := adminsvc.NewService(adminRepo, adminRefreshTokenRepo, dashboardRepo, settingsRepo, patientRepo, visitRepo, cfg.AdminJWTSecret)
 
 	// Initialize handlers
 	router := handler.NewRouter(patientSvc, visitSvc, workbenchSvc, authSvc, addressSvc, billingSvc, medicalOrderSvc, adminSvc)

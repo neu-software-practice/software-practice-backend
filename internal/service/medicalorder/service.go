@@ -28,7 +28,7 @@ func NewService(visitRepo repository.VisitRepository, flowCardRepo repository.Fl
 // from completed advice_only and confirmed/completed medication_fulfillment
 // flow cards across all their visit sessions.
 func (s *Service) ListMedicalOrders(ctx context.Context, patientID string) (*model.MedicalOrdersResponse, error) {
-	sessions, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, nil, 1000)
+	sessions, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, "", nil, 1000)
 	if err != nil {
 		return nil, fmt.Errorf("list visits: %w", err)
 	}

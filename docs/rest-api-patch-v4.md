@@ -81,8 +81,6 @@
 |-------------|--------|------|
 | 404 | `SESSION_NOT_FOUND` | 会话不存在 |
 | 422 | `VALIDATION_ERROR` | 请求体校验失败 |
-| 409 | `TITLE_ALREADY_EXISTS` | 会话已有标题（幂等保护，可选实现） |
-| 503 | `LLM_UNAVAILABLE` | 大模型服务不可用（降级：返回空或使用 chiefComplaint 截断） |
 
 #### 幂等性
 

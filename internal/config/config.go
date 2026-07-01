@@ -15,6 +15,7 @@ type Config struct {
 	ServerMode         string // debug, test, release
 	DatabaseDSN        string
 	JWTSecret          string
+	AdminJWTSecret     string
 	CORSAllowedOrigins string
 	MedAgentMode       string // http, embedded
 	MedAgentBaseURL    string
@@ -49,6 +50,7 @@ func Load() (*Config, error) {
 		ServerMode:         getEnv("SERVER_MODE", "release"),
 		DatabaseDSN:        os.Getenv("DATABASE_DSN"),
 		JWTSecret:          os.Getenv("JWT_SECRET"),
+		AdminJWTSecret:     os.Getenv("ADMIN_JWT_SECRET"),
 		CORSAllowedOrigins: getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"),
 		MedAgentMode:       getEnv("MEDAGENT_MODE", "http"),
 		MedAgentBaseURL:    getEnv("MEDAGENT_BASE_URL", "http://localhost:8080"),
@@ -58,6 +60,12 @@ func Load() (*Config, error) {
 		RateLimitRPS:       getEnvInt("RATE_LIMIT_RPS", 10),
 		RateLimitBurst:     getEnvInt("RATE_LIMIT_BURST", 20),
 		LogLevel:           getEnv("LOG_LEVEL", "info"),
+	}
+
+	// Fallback: if ADMIN_JWT_SECRET is not set, use JWT_SECRET with a warning.
+	if cfg.AdminJWTSecret == "" {
+		fmt.Fprintf(os.Stderr, "[config] WARNING: ADMIN_JWT_SECRET not set, falling back to JWT_SECRET (recommend setting a separate ADMIN_JWT_SECRET)\n")
+		cfg.AdminJWTSecret = cfg.JWTSecret
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -104,6 +112,18 @@ func (c *Config) validate() error {
 	for _, weak := range weakJWTSecrets {
 		if strings.Contains(c.JWTSecret, weak) {
 			return fmt.Errorf("JWT_SECRET is too weak (matches blacklisted pattern)")
+		}
+	}
+
+	// ADMIN_JWT_SECRET must be at least 32 bytes
+	if len(c.AdminJWTSecret) < JWTSecretMinLen {
+		return fmt.Errorf("ADMIN_JWT_SECRET must be at least %d bytes, got %d bytes", JWTSecretMinLen, len(c.AdminJWTSecret))
+	}
+
+	// ADMIN_JWT_SECRET weak password blacklist check
+	for _, weak := range weakJWTSecrets {
+		if strings.Contains(c.AdminJWTSecret, weak) {
+			return fmt.Errorf("ADMIN_JWT_SECRET is too weak (matches blacklisted pattern)")
 		}
 	}
 

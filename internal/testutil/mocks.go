@@ -57,7 +57,7 @@ func (m *MockPatientRepo) UpdateProfile(ctx context.Context, id string, input mo
 type MockVisitRepo struct {
 	CreateFunc        func(ctx context.Context, v *model.VisitSession) error
 	FindByIDFunc      func(ctx context.Context, id string) (*model.VisitSession, error)
-	ListByPatientFunc func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	ListByPatientFunc func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
 	UpdateStatusFunc  func(ctx context.Context, id, status, machineState string) error
 	UpdateFunc        func(ctx context.Context, v *model.VisitSession) error
 }
@@ -74,9 +74,9 @@ func (m *MockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSe
 	}
 	return nil, ErrNotImplemented
 }
-func (m *MockVisitRepo) ListByPatient(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+func (m *MockVisitRepo) ListByPatient(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 	if m.ListByPatientFunc != nil {
-		return m.ListByPatientFunc(ctx, patientID, cursor, pageSize)
+		return m.ListByPatientFunc(ctx, patientID, status, cursor, pageSize)
 	}
 	return nil, nil, false, ErrNotImplemented
 }

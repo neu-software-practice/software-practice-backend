@@ -13,7 +13,7 @@ import (
 type mockVisitRepo struct {
 	createFunc        func(ctx context.Context, v *model.VisitSession) error
 	findByIDFunc      func(ctx context.Context, id string) (*model.VisitSession, error)
-	listByPatientFunc func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
 	updateStatusFunc  func(ctx context.Context, id string, status string, machineState string) error
 	updateFunc        func(ctx context.Context, v *model.VisitSession) error
 }
@@ -24,8 +24,8 @@ func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error
 func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
 	return m.findByIDFunc(ctx, id)
 }
-func (m *mockVisitRepo) ListByPatient(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
-	return m.listByPatientFunc(ctx, patientID, cursor, pageSize)
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+	return m.listByPatientFunc(ctx, patientID, status, cursor, pageSize)
 }
 func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id string, status string, machineState string) error {
 	return m.updateStatusFunc(ctx, id, status, machineState)
@@ -329,7 +329,7 @@ func TestListSessions(t *testing.T) {
 	ctx := context.Background()
 
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "v001", PatientID: patientID},
 			}, nil, false, nil
@@ -339,7 +339,7 @@ func TestListSessions(t *testing.T) {
 
 	svc := visit.NewService(visitRepo, timelineRepo)
 
-	items, _, hasMore, err := svc.ListSessions(ctx, "p001", nil, 20)
+	items, _, hasMore, err := svc.ListSessions(ctx, "p001", "", nil, 20)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestListSessions_WithCursor(t *testing.T) {
 	cursor := "next_cursor"
 
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			items := []model.VisitSessionSummary{
 				{ID: "v002", PatientID: pid},
 				{ID: "v003", PatientID: pid},
@@ -369,7 +369,7 @@ func TestListSessions_WithCursor(t *testing.T) {
 
 	svc := visit.NewService(visitRepo, timelineRepo)
 
-	items, nextCursor, hasMore, err := svc.ListSessions(ctx, "p001", &cursor, 2)
+	items, nextCursor, hasMore, err := svc.ListSessions(ctx, "p001", "", &cursor, 2)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}
@@ -584,7 +584,7 @@ func TestListSessions_Empty(t *testing.T) {
 	ctx := context.Background()
 
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -592,7 +592,7 @@ func TestListSessions_Empty(t *testing.T) {
 
 	svc := visit.NewService(visitRepo, timelineRepo)
 
-	items, _, hasMore, err := svc.ListSessions(ctx, "p001", nil, 20)
+	items, _, hasMore, err := svc.ListSessions(ctx, "p001", "", nil, 20)
 	if err != nil {
 		t.Fatalf("ListSessions: %v", err)
 	}

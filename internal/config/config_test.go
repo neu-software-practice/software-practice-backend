@@ -12,6 +12,7 @@ func clearEnv(t *testing.T) {
 	t.Helper()
 	_ = os.Unsetenv("DATABASE_DSN")
 	_ = os.Unsetenv("JWT_SECRET")
+	_ = os.Unsetenv("ADMIN_JWT_SECRET")
 	_ = os.Unsetenv("SERVER_MODE")
 	_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
 	_ = os.Unsetenv("SERVER_ADDR")
@@ -26,6 +27,7 @@ func clearEnv(t *testing.T) {
 func TestLoadValidConfig(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
 	t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+	t.Setenv("ADMIN_JWT_SECRET", "this-is-32-byte-admin-secret-key-!!")
 	t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
@@ -38,6 +40,25 @@ func TestLoadValidConfig(t *testing.T) {
 	}
 	if cfg.JWTSecret != "this-is-a-32-byte-secret-key-here!!" {
 		t.Errorf("unexpected JWTSecret: got %q, want %q", cfg.JWTSecret, "this-is-a-32-byte-secret-key-here!!")
+	}
+	if cfg.AdminJWTSecret != "this-is-32-byte-admin-secret-key-!!" {
+		t.Errorf("unexpected AdminJWTSecret: got %q, want %q", cfg.AdminJWTSecret, "this-is-32-byte-admin-secret-key-!!")
+	}
+}
+
+func TestLoadValidConfig_AdminJWTFallback(t *testing.T) {
+	t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+	t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+	t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
+	// ADMIN_JWT_SECRET not set — should fall back to JWT_SECRET
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if cfg.AdminJWTSecret != cfg.JWTSecret {
+		t.Errorf("AdminJWTSecret should fall back to JWTSecret, got %q, want %q", cfg.AdminJWTSecret, cfg.JWTSecret)
 	}
 }
 
@@ -103,6 +124,36 @@ func TestLoadErrors(t *testing.T) {
 				t.Setenv("JWT_SECRET", "extra-secret-secret-secret-secret-sec")
 			},
 			wantErr: "JWT_SECRET is too weak (matches blacklisted pattern)",
+		},
+		{
+			name: "AdminJWTTooShort",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("ADMIN_JWT_SECRET", "short")
+				t.Setenv("MEDAGENT_API_KEY", "sk-test-key-for-validation")
+			},
+			wantErr: "ADMIN_JWT_SECRET must be at least 32 bytes, got 5 bytes",
+		},
+		{
+			name: "AdminJWTTooShort31Bytes",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				// 31 bytes — one short of the 32-byte minimum
+				t.Setenv("ADMIN_JWT_SECRET", "abcdefghijklmnopqrstuvwxyz12345")
+				t.Setenv("MEDAGENT_API_KEY", "sk-test-key-for-validation")
+			},
+			wantErr: "ADMIN_JWT_SECRET must be at least 32 bytes, got 31 bytes",
+		},
+		{
+			name: "AdminJWTWeakPassword",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("ADMIN_JWT_SECRET", "12345678901234567890123456789012")
+			},
+			wantErr: "ADMIN_JWT_SECRET is too weak (matches blacklisted pattern)",
 		},
 		{
 			name: "ProductionWildcardCORS",

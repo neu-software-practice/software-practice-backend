@@ -44,7 +44,7 @@ func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input mo
 type mockVisitRepo struct {
 	createFunc        func(ctx context.Context, v *model.VisitSession) error
 	findByIDFunc      func(ctx context.Context, id string) (*model.VisitSession, error)
-	listByPatientFunc func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error)
 	updateStatusFunc  func(ctx context.Context, id, status, ms string) error
 	updateFunc        func(ctx context.Context, v *model.VisitSession) error
 }
@@ -55,8 +55,8 @@ func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error
 func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
 	return m.findByIDFunc(ctx, id)
 }
-func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
-	return m.listByPatientFunc(ctx, pid, c, ps)
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, status string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+	return m.listByPatientFunc(ctx, pid, status, c, ps)
 }
 func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id, status, ms string) error {
 	return m.updateStatusFunc(ctx, id, status, ms)

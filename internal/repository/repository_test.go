@@ -370,7 +370,7 @@ func TestVisitRepo_CRUD(t *testing.T) {
 		}
 
 		// First page
-		summaries, nextCursor, hasMore, err := vRepo.ListByPatient(ctx, patient.ID, nil, 2)
+		summaries, nextCursor, hasMore, err := vRepo.ListByPatient(ctx, patient.ID, "", nil, 2)
 		if err != nil {
 			t.Fatalf("ListByPatient failed: %v", err)
 		}
@@ -385,7 +385,7 @@ func TestVisitRepo_CRUD(t *testing.T) {
 		}
 
 		// Second page
-		page2, _, hasMore2, err := vRepo.ListByPatient(ctx, patient.ID, nextCursor, 2)
+		page2, _, hasMore2, err := vRepo.ListByPatient(ctx, patient.ID, "", nextCursor, 2)
 		if err != nil {
 			t.Fatalf("ListByPatient page 2 failed: %v", err)
 		}
@@ -2331,7 +2331,7 @@ func TestVisitRepo_EdgeCases(t *testing.T) {
 		// pageSize=0 should trigger the default assignment (pageSize = 20).
 		patient := createPatient(ctx, t, pRepo)
 		visit := createVisit(ctx, t, vRepo, patient.ID)
-		summaries, _, _, err := vRepo.ListByPatient(ctx, patient.ID, nil, 0)
+		summaries, _, _, err := vRepo.ListByPatient(ctx, patient.ID, "", nil, 0)
 		if err != nil {
 			t.Fatalf("ListByPatient with zero pageSize: %v", err)
 		}
@@ -2348,7 +2348,7 @@ func TestVisitRepo_EdgeCases(t *testing.T) {
 		createVisit(ctx, t, vRepo, patient.ID)
 		// With only 1 visit and pageSize=1, there are no more items,
 		// so cursor should be nil and hasMore false.
-		summaries, cursor, hasMore, err := vRepo.ListByPatient(ctx, patient.ID, nil, 1)
+		summaries, cursor, hasMore, err := vRepo.ListByPatient(ctx, patient.ID, "", nil, 1)
 		if err != nil {
 			t.Fatalf("ListByPatient: %v", err)
 		}
@@ -2397,7 +2397,7 @@ func TestVisitRepo_EdgeCases(t *testing.T) {
 		if err == nil {
 			t.Error("Create: expected error")
 		}
-		_, _, _, err = vRepo.ListByPatient(ctx, "any", nil, 10)
+		_, _, _, err = vRepo.ListByPatient(ctx, "any", "", nil, 10)
 		if err == nil {
 			t.Error("ListByPatient: expected error")
 		}

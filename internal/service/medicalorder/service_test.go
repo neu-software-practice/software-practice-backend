@@ -15,15 +15,15 @@ var _ repository.VisitRepository = (*mockVisitRepo)(nil)
 var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
 
 type mockVisitRepo struct {
-	listByPatientFunc func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error)
 }
 
 func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error { return nil }
 func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
 	return nil, nil
 }
-func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
-	return m.listByPatientFunc(ctx, pid, c, ps)
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, status string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+	return m.listByPatientFunc(ctx, pid, status, c, ps)
 }
 func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id, status, ms string) error { return nil }
 func (m *mockVisitRepo) Update(ctx context.Context, v *model.VisitSession) error       { return nil }
@@ -44,7 +44,7 @@ func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) err
 
 func TestListMedicalOrders_Empty(t *testing.T) {
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -63,7 +63,7 @@ func TestListMedicalOrders_Empty(t *testing.T) {
 func TestListMedicalOrders_NoMatchingCards(t *testing.T) {
 	cc := "头痛"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -91,7 +91,7 @@ func TestListMedicalOrders_AdviceCompleted(t *testing.T) {
 	cc := "头痛"
 	now := time.Date(2026, 6, 15, 10, 0, 0, 0, time.UTC)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -144,7 +144,7 @@ func TestListMedicalOrders_MedicationCompleted(t *testing.T) {
 	cc := "发热"
 	now := time.Date(2026, 6, 16, 14, 0, 0, 0, time.UTC)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -197,7 +197,7 @@ func TestListMedicalOrders_MedicationConfirmed(t *testing.T) {
 	cc := "发热"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -228,7 +228,7 @@ func TestListMedicalOrders_MedicationConfirmed(t *testing.T) {
 func TestListMedicalOrders_SkipsAdviceNotCompleted(t *testing.T) {
 	cc := "头痛"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -255,7 +255,7 @@ func TestListMedicalOrders_SkipsAdviceNotCompleted(t *testing.T) {
 func TestListMedicalOrders_SkipsMedicationPending(t *testing.T) {
 	cc := "头痛"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -286,7 +286,7 @@ func TestListMedicalOrders_MixedKinds(t *testing.T) {
 	cc := "头痛"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -322,7 +322,7 @@ func TestListMedicalOrders_SessionTitle_ChiefComplaint(t *testing.T) {
 	cc := "头痛三天"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -347,7 +347,7 @@ func TestListMedicalOrders_SessionTitle_Diagnosis(t *testing.T) {
 	diagnosis := "上呼吸道感染"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{Diagnosis: &diagnosis}},
 			}, nil, false, nil
@@ -372,7 +372,7 @@ func TestListMedicalOrders_SessionTitle_Title(t *testing.T) {
 	title := "就诊标题"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{Title: &title}},
 			}, nil, false, nil
@@ -396,7 +396,7 @@ func TestListMedicalOrders_SessionTitle_Title(t *testing.T) {
 func TestListMedicalOrders_SessionTitle_Unknown(t *testing.T) {
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{}},
 			}, nil, false, nil
@@ -422,7 +422,7 @@ func TestListMedicalOrders_SortedByHandledAtDesc(t *testing.T) {
 	earlier := time.Date(2026, 6, 10, 10, 0, 0, 0, time.UTC)
 	later := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -455,7 +455,7 @@ func TestListMedicalOrders_HandledAtNilFallback(t *testing.T) {
 	earlier := time.Date(2026, 6, 10, 10, 0, 0, 0, time.UTC)
 	later := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -488,7 +488,7 @@ func TestListMedicalOrders_MultipleSessions(t *testing.T) {
 	cc2 := "发热"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc1}},
 				{ID: "s2", Summary: model.VisitSummary{ChiefComplaint: &cc2}},
@@ -520,7 +520,7 @@ func TestListMedicalOrders_MultipleSessions(t *testing.T) {
 
 func TestListMedicalOrders_ListByPatientError(t *testing.T) {
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, errors.New("db error")
 		},
 	}
@@ -535,7 +535,7 @@ func TestListMedicalOrders_ListByPatientError(t *testing.T) {
 func TestListMedicalOrders_ListBySessionError(t *testing.T) {
 	cc := "头痛"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -558,7 +558,7 @@ func TestListMedicalOrders_NullSlicesPreserved(t *testing.T) {
 	cc := "头痛"
 	now := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil

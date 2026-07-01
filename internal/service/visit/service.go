@@ -145,9 +145,9 @@ func (s *Service) GetSession(ctx context.Context, sessionID string) (*model.Visi
 	return s.visitRepo.FindByID(ctx, sessionID)
 }
 
-// ListSessions lists visit sessions for a patient with cursor pagination.
-func (s *Service) ListSessions(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
-	return s.visitRepo.ListByPatient(ctx, patientID, cursor, pageSize)
+// ListSessions lists visit sessions for a patient with cursor pagination, optionally filtered by status.
+func (s *Service) ListSessions(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+	return s.visitRepo.ListByPatient(ctx, patientID, status, cursor, pageSize)
 }
 
 // GetSnapshot returns a read-only snapshot of a visit including its full timeline.

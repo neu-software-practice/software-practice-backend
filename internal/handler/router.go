@@ -134,7 +134,7 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 
 		// Admin authenticated routes
 		adminProtected := adminGroup.Group("")
-		adminProtected.Use(middleware.AdminAuthMiddleware(cfg.JWTSecret))
+		adminProtected.Use(middleware.AdminAuthMiddleware(cfg.AdminJWTSecret))
 		{
 			adminProtected.GET("/dashboard/stats", router.Admin.GetDashboardStats)
 			adminProtected.GET("/patients", router.Admin.ListPatients)

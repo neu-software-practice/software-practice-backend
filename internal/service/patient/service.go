@@ -78,7 +78,7 @@ func (s *Service) GetContext(ctx context.Context, patientID string) (*model.Pati
 	}
 
 	// Get last completed visit for prior visit summary
-	summaries, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, nil, 1)
+	summaries, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, "", nil, 1)
 	if err == nil && len(summaries) > 0 {
 		last := summaries[0]
 		completedAt := last.UpdatedAt

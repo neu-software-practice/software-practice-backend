@@ -33,15 +33,15 @@ func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input mo
 
 // mockVisitRepo implements repository.VisitRepository for testing.
 type mockVisitRepo struct {
-	listByPatientFunc func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, patientID string, _ string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
 }
 
 func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error { return nil }
 func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
 	return nil, nil
 }
-func (m *mockVisitRepo) ListByPatient(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
-	return m.listByPatientFunc(ctx, patientID, cursor, pageSize)
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+	return m.listByPatientFunc(ctx, patientID, status, cursor, pageSize)
 }
 func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id string, status string, machineState string) error {
 	return nil
@@ -328,7 +328,7 @@ func TestGetContext(t *testing.T) {
 		},
 	}
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, patientID string, _ string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -372,7 +372,7 @@ func TestGetContext_WithPriorVisit_NilSummaryFields(t *testing.T) {
 		},
 	}
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, patientID string, _ string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{
 					ID:        "v002",
@@ -423,7 +423,7 @@ func TestGetContext_WithPriorVisit(t *testing.T) {
 		},
 	}
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, patientID string, _ string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{
 					ID:        "v001",
@@ -497,7 +497,7 @@ func TestGetContext_ListError(t *testing.T) {
 	}
 	listErr := errors.New("list failed")
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, patientID string, _ string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, listErr
 		},
 	}

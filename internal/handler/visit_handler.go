@@ -73,6 +73,7 @@ func (h *VisitHandler) CreateFollowUp(c *gin.Context) {
 // ListSessions handles GET /visits
 func (h *VisitHandler) ListSessions(c *gin.Context) {
 	patientID := c.Query("patientId")
+	status := c.Query("status")
 	cursor := api.CursorFromQuery(c.Query("cursor"))
 	pageSize := ParseQueryInt(c, "pageSize", 20)
 
@@ -85,7 +86,12 @@ func (h *VisitHandler) ListSessions(c *gin.Context) {
 		return
 	}
 
-	items, nextCursor, hasMore, err := h.svc.ListSessions(c.Request.Context(), patientID, cursor, pageSize)
+	if status != "" && !model.IsValidVisitStatus(status) {
+		apperrors.WriteValidationError(c, "invalid status value")
+		return
+	}
+
+	items, nextCursor, hasMore, err := h.svc.ListSessions(c.Request.Context(), patientID, status, cursor, pageSize)
 	if err != nil {
 		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
 		return

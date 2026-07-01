@@ -27,7 +27,7 @@ func NewService(visitRepo repository.VisitRepository, flowCardRepo repository.Fl
 // from paid payment flow cards across all their visit sessions.
 func (s *Service) ListBillingRecords(ctx context.Context, patientID string) (*model.BillingRecordsResponse, error) {
 	// List all sessions for the patient (use a large page size to get everything)
-	sessions, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, nil, 1000)
+	sessions, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, "", nil, 1000)
 	if err != nil {
 		return nil, fmt.Errorf("list visits: %w", err)
 	}

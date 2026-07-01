@@ -594,7 +594,6 @@ go test -short ./...
 | `SESSION_NOT_FOUND` | 404 | 会话不存在 | 检查 sessionId |
 | `CARD_NOT_FOUND` | 404 | 流程卡已失效 | 刷新重试 |
 | `RATE_LIMITED` | 429 | 请求过于频繁 | 稍后重试 |
-| `LLM_UNAVAILABLE` | 503 | 大模型不可用 | 降级或稍后重试 |
 
 ### Docker Compose 服务无法启动
 

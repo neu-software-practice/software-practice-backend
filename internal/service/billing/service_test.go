@@ -17,15 +17,15 @@ func pf(v float64) *float64 { return &v }
 var _ repository.FlowCardRepository = (*mockFlowCardRepo)(nil)
 
 type mockVisitRepo struct {
-	listByPatientFunc func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error)
 }
 
 func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error { return nil }
 func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSession, error) {
 	return nil, nil
 }
-func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
-	return m.listByPatientFunc(ctx, pid, c, ps)
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, status string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+	return m.listByPatientFunc(ctx, pid, status, c, ps)
 }
 func (m *mockVisitRepo) UpdateStatus(ctx context.Context, id, status, ms string) error { return nil }
 func (m *mockVisitRepo) Update(ctx context.Context, v *model.VisitSession) error       { return nil }
@@ -46,7 +46,7 @@ func (m *mockFlowCardRepo) Update(ctx context.Context, card *model.FlowCard) err
 
 func TestListBillingRecords_Empty(t *testing.T) {
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -69,7 +69,7 @@ func TestListBillingRecords_Empty(t *testing.T) {
 func TestListBillingRecords_NoPaymentCards(t *testing.T) {
 	chiefComplaint := "头痛"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &chiefComplaint}},
 			}, nil, false, nil
@@ -98,7 +98,7 @@ func TestListBillingRecords_WithPaymentCards(t *testing.T) {
 	chiefComplaint := "头痛"
 	handledAt := time.Date(2026, 6, 15, 10, 0, 0, 0, time.UTC)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &chiefComplaint}},
 			}, nil, false, nil
@@ -154,7 +154,7 @@ func TestListBillingRecords_SessionTitleFallback(t *testing.T) {
 	diagnosis := "上呼吸道感染"
 	title := "就诊标题"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			// ChiefComplaint is nil, should fall back to diagnosis
 			return []model.VisitSessionSummary{
 				{
@@ -200,7 +200,7 @@ func TestListBillingRecords_SessionTitleFallback(t *testing.T) {
 
 func TestListBillingRecords_UnknownTitle(t *testing.T) {
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{}},
 			}, nil, false, nil
@@ -235,7 +235,7 @@ func TestListBillingRecords_MultipleSessions(t *testing.T) {
 	handledAt1 := time.Date(2026, 6, 10, 10, 0, 0, 0, time.UTC)
 	handledAt2 := time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc1}},
 				{ID: "s2", Summary: model.VisitSummary{ChiefComplaint: &cc2}},
@@ -277,7 +277,7 @@ func TestListBillingRecords_SkipsUnpaid(t *testing.T) {
 	cc := "头痛"
 	handledAt := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -305,7 +305,7 @@ func TestListBillingRecords_SkipsUnpaid(t *testing.T) {
 func TestListBillingRecords_TitleFromTitleField(t *testing.T) {
 	sessionTitle := "会话标题"
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{Title: &sessionTitle}},
 			}, nil, false, nil
@@ -336,7 +336,7 @@ func TestListBillingRecords_WithQuantity(t *testing.T) {
 	qty := 3
 	handledAt := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil

@@ -1,0 +1,247 @@
+{
+  "file": "docs/rest-api-patch-v9.md",
+  "baseUrl": "/api",
+  "auth": {
+    "mechanism": "Token-based (patient identity established via POST /patients/verify, subsequent requests carry patientId/sessionId as identifiers; token bearer mechanism determined by backend auth gateway, transparently passed by frontend transport layer)",
+    "headerName": "Authorization (via RequestOptions.headers, transparently passed by transport layer)",
+    "tokenTypes": ["bearer"],
+    "refreshEndpoint": "Not specified (frontend contract does not define auth refresh)"
+  },
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/suspend",
+      "summary": "Suspend a visit session when idle timeout triggers (lastActivityAt exceeds idle threshold). Non-terminal state — does not write endedAt or terminalReason, only sets status to 'suspended' and clears activeCardId.",
+      "pathParams": [
+        {
+          "name": "sessionId",
+          "type": "SessionId (z.string().trim().min(1))",
+          "description": "Session ID of the visit to suspend"
+        }
+      ],
+      "requestBody": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "SessionId (z.string().trim().min(1))",
+            "required": true,
+            "description": "The session ID to suspend"
+          }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "VisitSession",
+            "required": true,
+            "description": "Updated visit session with status=suspended"
+          },
+          "timelineItem": {
+            "type": "TimelineItem",
+            "required": true,
+            "description": "System_event type TimelineItem with eventType=session_suspended"
+          }
+        }
+      },
+      "statusCodes": [200, 404, 422],
+      "errorCodes": ["SESSION_NOT_FOUND", "INVALID_STATE"],
+      "queryParams": [],
+      "headers": [],
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v9"
+    }
+  ],
+  "enums": [
+    {
+      "name": "VisitStatus",
+      "values": [
+        "loading_context",
+        "chatting",
+        "analyzing",
+        "blocked",
+        "diagnosis",
+        "treatment",
+        "completed",
+        "suspended",
+        "transferred",
+        "emergency_terminated",
+        "exited"
+      ]
+    },
+    {
+      "name": "VisitMachineState",
+      "values": [
+        "loadingContext",
+        "chatting",
+        "analyzing",
+        "labDecision",
+        "labPayment",
+        "labExecution",
+        "diagnosis",
+        "treatmentDecision",
+        "medicationPayment",
+        "medicationFulfillment",
+        "treatmentExecution",
+        "adviceOnly",
+        "completed",
+        "suspended",
+        "emergencyPending",
+        "terminated",
+        "exitSettlement",
+        "exited"
+      ]
+    },
+    {
+      "name": "MessageTimelineItem.interruptedBy",
+      "values": [
+        "emergency",
+        "timeout",
+        "exit",
+        "idle"
+      ]
+    },
+    {
+      "name": "SystemEventTimelineItem.eventType",
+      "values": [
+        "context_loaded",
+        "agent_thinking",
+        "lab_result_received",
+        "payment_succeeded",
+        "drug_purchased",
+        "follow_up_started",
+        "emergency_dismissed",
+        "exit_settled",
+        "session_suspended"
+      ]
+    },
+    {
+      "name": "AssistantStreamEvent.type (SSE event types)",
+      "values": [
+        "delta",
+        "message_final",
+        "card",
+        "state",
+        "emergency",
+        "done",
+        "error"
+      ]
+    },
+    {
+      "name": "EmergencyEvent.severity",
+      "values": [
+        "suspected",
+        "critical"
+      ]
+    },
+    {
+      "name": "VisitEntryType",
+      "values": [
+        "new",
+        "follow_up"
+      ]
+    },
+    {
+      "name": "FlowCardKind",
+      "values": [
+        "lab_decision",
+        "payment",
+        "lab_execution",
+        "diagnosis",
+        "treatment_plan",
+        "medication_fulfillment",
+        "treatment_execution",
+        "advice_only",
+        "completed_visit"
+      ]
+    },
+    {
+      "name": "FlowCardStatus",
+      "values": [
+        "pending",
+        "accepted",
+        "skipped",
+        "vetoed",
+        "paid",
+        "processing",
+        "completed",
+        "failed",
+        "invalidated"
+      ]
+    },
+    {
+      "name": "TimelineItem.kind (discriminant)",
+      "values": [
+        "message",
+        "flow_card",
+        "system_event",
+        "terminal"
+      ]
+    },
+    {
+      "name": "TimelineItemStatus",
+      "values": [
+        "pending",
+        "streaming",
+        "done",
+        "failed",
+        "invalidated"
+      ]
+    },
+    {
+      "name": "TerminalReason",
+      "values": [
+        "emergency",
+        "timeout",
+        "ask_limit_reached",
+        "lab_limit_reached",
+        "referral",
+        "capability_insufficient",
+        "exited"
+      ]
+    },
+    {
+      "name": "PaymentStatus",
+      "values": [
+        "unpaid",
+        "pending",
+        "paid",
+        "failed",
+        "refunded"
+      ]
+    }
+  ],
+  "globalErrorFormat": {
+    "type": "object (apiErrorSchema)",
+    "description": "Common ApiError model for all endpoints",
+    "properties": {
+      "code": {
+        "type": "string(min 1)",
+        "required": true,
+        "description": "Error code string (e.g. SESSION_NOT_FOUND, VALIDATION_ERROR)"
+      },
+      "message": {
+        "type": "string(min 1)",
+        "required": true,
+        "description": "Developer-readable error description (not shown to patients directly)"
+      },
+      "status": {
+        "type": "number (int > 0)",
+        "required": false,
+        "description": "HTTP status code"
+      },
+      "details": {
+        "type": "unknown",
+        "required": false,
+        "description": "Additional details (Zod validation issues when applicable)"
+      },
+      "retriable": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether the request can be retried; UI fallback rules apply when absent"
+      }
+    }
+  },
+  "totalEndpoints": 1
+}

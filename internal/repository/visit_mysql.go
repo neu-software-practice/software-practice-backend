@@ -98,7 +98,7 @@ func scanVisitSummary(scanner rowScanner) (*model.VisitSessionSummary, error) {
 	return &s, nil
 }
 
-func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
+func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 	if pageSize <= 0 || pageSize > 50 {
 		pageSize = 20
 	}
@@ -107,19 +107,37 @@ func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, cu
 	var err error
 
 	if cursor != nil && *cursor != "" {
-		rows, err = r.db.QueryContext(ctx,
-			`SELECT id, patient_id, entry_type, status,
-			started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
-			FROM visits WHERE patient_id = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?`,
-			patientID, *cursor, pageSize+1,
-		)
+		if status != "" {
+			rows, err = r.db.QueryContext(ctx,
+				`SELECT id, patient_id, entry_type, status,
+				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
+				FROM visits WHERE patient_id = ? AND status = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?`,
+				patientID, status, *cursor, pageSize+1,
+			)
+		} else {
+			rows, err = r.db.QueryContext(ctx,
+				`SELECT id, patient_id, entry_type, status,
+				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
+				FROM visits WHERE patient_id = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?`,
+				patientID, *cursor, pageSize+1,
+			)
+		}
 	} else {
-		rows, err = r.db.QueryContext(ctx,
-			`SELECT id, patient_id, entry_type, status,
-			started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
-			FROM visits WHERE patient_id = ? ORDER BY started_at DESC LIMIT ?`,
-			patientID, pageSize+1,
-		)
+		if status != "" {
+			rows, err = r.db.QueryContext(ctx,
+				`SELECT id, patient_id, entry_type, status,
+				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
+				FROM visits WHERE patient_id = ? AND status = ? ORDER BY started_at DESC LIMIT ?`,
+				patientID, status, pageSize+1,
+			)
+		} else {
+			rows, err = r.db.QueryContext(ctx,
+				`SELECT id, patient_id, entry_type, status,
+				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
+				FROM visits WHERE patient_id = ? ORDER BY started_at DESC LIMIT ?`,
+				patientID, pageSize+1,
+			)
+		}
 	}
 	if err != nil {
 		return nil, nil, false, fmt.Errorf("list visits: %w", err)

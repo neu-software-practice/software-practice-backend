@@ -582,7 +582,7 @@ func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input mo
 
 type mockVisitRepo struct {
 	findByIDFunc      func(ctx context.Context, id string) (*model.VisitSession, error)
-	listByPatientFunc func(ctx context.Context, patientID string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
 	createFunc        func(ctx context.Context, v *model.VisitSession) error
 	updateFunc        func(ctx context.Context, v *model.VisitSession) error
 }
@@ -599,9 +599,9 @@ func (m *mockVisitRepo) FindByID(ctx context.Context, id string) (*model.VisitSe
 	}
 	return nil, nil
 }
-func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+func (m *mockVisitRepo) ListByPatient(ctx context.Context, pid string, status string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 	if m.listByPatientFunc != nil {
-		return m.listByPatientFunc(ctx, pid, cursor, ps)
+		return m.listByPatientFunc(ctx, pid, status, cursor, ps)
 	}
 	return nil, nil, false, nil
 }
@@ -1058,7 +1058,7 @@ func TestPatientHandler_GetContext(t *testing.T) {
 		},
 	}
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, nil
 		},
 	}
@@ -1170,7 +1170,7 @@ func TestVisitHandler_ListSessions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -1882,7 +1882,7 @@ func TestBillingHandler_ListBillingRecords(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c2 *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c2 *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -1930,7 +1930,7 @@ func TestBillingHandler_ListBillingRecords_WithData(t *testing.T) {
 	cc := "头痛"
 	handledAt := time.Now()
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, c2 *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, c2 *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{
 				{ID: "s1", Summary: model.VisitSummary{ChiefComplaint: &cc}},
 			}, nil, false, nil
@@ -2018,7 +2018,7 @@ func TestPatientHandler_GetContext_Valid(t *testing.T) {
 	patientRepo := &mockPatientRepo{findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
 		return &model.PatientProfile{ID: id, Name: "Test", Gender: "male", Age: 30}, nil
 	}}
-	visitRepo := &mockVisitRepo{listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+	visitRepo := &mockVisitRepo{listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 		return nil, nil, false, nil
 	}}
 	svc := patientsvc.NewService(patientRepo, visitRepo)
@@ -2036,7 +2036,7 @@ func TestPatientHandler_GetContext_Valid(t *testing.T) {
 
 func TestMedicalOrderHandler_ListMedicalOrders_RepoError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	visitRepo := &mockVisitRepo{listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+	visitRepo := &mockVisitRepo{listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 		return nil, nil, false, errors.New("db error")
 	}}
 	svc := medicalordersvc.NewService(visitRepo, &mockFlowCardRepo{})
@@ -2694,7 +2694,7 @@ func TestSSEWriter_StreamEvents_Multiple(t *testing.T) {
 func TestBillingHandler_ListBillingRecords_Valid(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, nil
 		},
 	}
@@ -3065,7 +3065,7 @@ func TestSSEWriter_Heartbeat_ContextDone(t *testing.T) {
 func TestVisitHandler_ListSessions_Valid(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
@@ -3115,7 +3115,7 @@ func TestPatientHandler_GetContext_ValidFull(t *testing.T) {
 		},
 	}
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, nil
 		},
 	}
@@ -4374,7 +4374,7 @@ func TestPatientHandler_UpdateProfile_PatientNotFound(t *testing.T) {
 func TestBillingHandler_ListBillingRecords_RepoError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, errors.New("db error")
 		},
 	}
@@ -4790,7 +4790,7 @@ func TestAddressHandler_UpdateAddress_RepoError(t *testing.T) {
 func TestVisitHandler_ListSessions_RepoError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 			return nil, nil, false, errors.New("db error")
 		},
 	}

@@ -18,6 +18,18 @@ const (
 	VisitStatusExited              VisitStatus = "exited"
 )
 
+// IsValidVisitStatus returns true if the given status string is a valid VisitStatus value.
+func IsValidVisitStatus(status string) bool {
+	switch VisitStatus(status) {
+	case VisitStatusLoadingContext, VisitStatusChatting, VisitStatusAnalyzing,
+		VisitStatusBlocked, VisitStatusDiagnosis, VisitStatusTreatment,
+		VisitStatusCompleted, VisitStatusSuspended, VisitStatusTransferred,
+		VisitStatusEmergencyTerminated, VisitStatusExited:
+		return true
+	}
+	return false
+}
+
 // VisitMachineState represents the internal state machine state of a visit.
 type VisitMachineState string
 

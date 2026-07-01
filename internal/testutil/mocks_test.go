@@ -64,7 +64,7 @@ func TestMockVisitRepo_AllMethods(t *testing.T) {
 		if _, err := r.FindByID(context.Background(), "x"); err != testutil.ErrNotImplemented {
 			t.Errorf("FindByID: %v", err)
 		}
-		if _, _, _, err := r.ListByPatient(context.Background(), "x", nil, 20); err != testutil.ErrNotImplemented {
+		if _, _, _, err := r.ListByPatient(context.Background(), "x", "", nil, 20); err != testutil.ErrNotImplemented {
 			t.Errorf("ListByPatient: %v", err)
 		}
 		if err := r.UpdateStatus(context.Background(), "x", "s", "ms"); err != testutil.ErrNotImplemented {
@@ -80,7 +80,7 @@ func TestMockVisitRepo_AllMethods(t *testing.T) {
 			FindByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
 				return &model.VisitSession{ID: id}, nil
 			},
-			ListByPatientFunc: func(ctx context.Context, pid string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			ListByPatientFunc: func(ctx context.Context, pid string, _ string, c *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
 				return nil, nil, false, nil
 			},
 			UpdateStatusFunc: func(ctx context.Context, id, s, ms string) error { return nil },
@@ -92,7 +92,7 @@ func TestMockVisitRepo_AllMethods(t *testing.T) {
 		if v, _ := r.FindByID(context.Background(), "v1"); v.ID != "v1" {
 			t.Error("FindByID")
 		}
-		if _, _, _, err := r.ListByPatient(context.Background(), "x", nil, 20); err != nil {
+		if _, _, _, err := r.ListByPatient(context.Background(), "x", "", nil, 20); err != nil {
 			t.Error("ListByPatient")
 		}
 		if err := r.UpdateStatus(context.Background(), "x", "s", "ms"); err != nil {
