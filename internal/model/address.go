@@ -41,7 +41,7 @@ type UpdateAddressInput struct {
 	District  *string `json:"district,omitempty"`
 	Detail    *string `json:"detail,omitempty"`
 	IsDefault *bool   `json:"isDefault,omitempty"`
-	Tag       *string `json:"tag,omitempty"`
+	Tag       *string `json:"tag,omitempty" binding:"omitempty,max=20"`
 }
 
 // AddressListResponse is the response for GET /patients/:patientId/addresses.
