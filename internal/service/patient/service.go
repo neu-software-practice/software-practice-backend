@@ -71,7 +71,10 @@ func (s *Service) GetContext(ctx context.Context, patientID string) (*model.Pati
 	}
 
 	ctx2 := &model.PatientContext{
-		Patient: *patient,
+		Patient:             *patient,
+		Allergies:           normalizeStringSlice(patient.Allergies),
+		MedicalHistory:      normalizeStringSlice(patient.MedicalHistory),
+		LongTermMedications: normalizeStringSlice(patient.LongTermMedications),
 	}
 
 	// Get last completed visit for prior visit summary
@@ -103,4 +106,11 @@ func stringDeref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func normalizeStringSlice(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
