@@ -35,7 +35,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	switch input.Action {
 	case "schedule":
-		card.ExecutionStatus = string(model.ExecutionStatusScheduled)
+		card.ExecutionStatus = string(model.TreatmentExecutionStatusScheduled)
 		card.Status = string(model.FlowCardStatusProcessing)
 		future := now.Add(30 * time.Minute)
 		card.AppointmentAt = &future
@@ -46,7 +46,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		result.Message = "治疗已预约"
 
 	case "confirm_arrival":
-		card.ExecutionStatus = string(model.ExecutionStatusArrived)
+		card.ExecutionStatus = string(model.TreatmentExecutionStatusArrived)
 		_ = s.flowCardRepo.Update(ctx, card)
 
 		result.Status = session.Status
@@ -54,7 +54,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		result.Message = "已确认到达"
 
 	case "start":
-		card.ExecutionStatus = string(model.ExecutionStatusInProgress)
+		card.ExecutionStatus = string(model.TreatmentExecutionStatusInProgress)
 		_ = s.flowCardRepo.Update(ctx, card)
 
 		result.Status = session.Status
@@ -62,7 +62,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		result.Message = "治疗开始"
 
 	case "complete":
-		card.ExecutionStatus = string(model.ExecutionStatusCompleted)
+		card.ExecutionStatus = string(model.TreatmentExecutionStatusCompleted)
 		card.Status = string(model.FlowCardStatusCompleted)
 		card.HandledAt = &now
 		_ = s.flowCardRepo.Update(ctx, card)
@@ -107,7 +107,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		result.TimelineItems = []model.TimelineItem{termTL}
 
 	case "cancel":
-		card.ExecutionStatus = string(model.ExecutionStatusCanceled)
+		card.ExecutionStatus = string(model.TreatmentExecutionStatusCanceled)
 		card.Status = string(model.FlowCardStatusInvalidated)
 		card.HandledAt = &now
 		_ = s.flowCardRepo.Update(ctx, card)

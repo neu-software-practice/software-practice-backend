@@ -240,13 +240,13 @@ const (
 	TreatmentActionCancel         TreatmentAction = "cancel"
 )
 
-// ConsultationIntent classifies the intent behind a completed-visit user input.
-type ConsultationIntent string
+// IntentType classifies the intent behind a completed-visit user input.
+type IntentType string
 
 const (
-	ConsultationIntentConsultation ConsultationIntent = "consultation"
-	ConsultationIntentFollowUp     ConsultationIntent = "follow_up"
-	ConsultationIntentUncertain    ConsultationIntent = "uncertain"
+	IntentTypeConsultation IntentType = "consultation"
+	IntentTypeFollowUp     IntentType = "follow_up"
+	IntentTypeUncertain    IntentType = "uncertain"
 )
 
 // EmergencySeverity represents the severity level of an emergency event.
@@ -295,35 +295,35 @@ const (
 	DiagnosisConfidenceHigh   DiagnosisConfidence = "high"
 )
 
-// TreatmentPlan categorises the recommended treatment path.
-type TreatmentPlan string
+// TreatmentPlanType categorises the recommended treatment path.
+type TreatmentPlanType string
 
 const (
-	TreatmentPlanMedication TreatmentPlan = "medication"
-	TreatmentPlanTreatment  TreatmentPlan = "treatment"
-	TreatmentPlanAdviceOnly TreatmentPlan = "advice_only"
-	TreatmentPlanReferral   TreatmentPlan = "referral"
+	TreatmentPlanTypeMedication TreatmentPlanType = "medication"
+	TreatmentPlanTypeTreatment  TreatmentPlanType = "treatment"
+	TreatmentPlanTypeAdviceOnly TreatmentPlanType = "advice_only"
+	TreatmentPlanTypeReferral   TreatmentPlanType = "referral"
 )
 
-// TreatmentCapability describes whether the facility can provide a treatment.
-type TreatmentCapability string
+// Capability describes whether the facility can provide a treatment.
+type Capability string
 
 const (
-	TreatmentCapabilityAvailable   TreatmentCapability = "available"
-	TreatmentCapabilityLimited     TreatmentCapability = "limited"
-	TreatmentCapabilityUnavailable TreatmentCapability = "unavailable"
+	CapabilityAvailable   Capability = "available"
+	CapabilityLimited     Capability = "limited"
+	CapabilityUnavailable Capability = "unavailable"
 )
 
-// ExecutionStatus tracks the lifecycle of a treatment execution.
-type ExecutionStatus string
+// TreatmentExecutionStatus tracks the lifecycle of a treatment execution.
+type TreatmentExecutionStatus string
 
 const (
-	ExecutionStatusPending    ExecutionStatus = "pending"
-	ExecutionStatusScheduled  ExecutionStatus = "scheduled"
-	ExecutionStatusArrived    ExecutionStatus = "arrived"
-	ExecutionStatusInProgress ExecutionStatus = "in_progress"
-	ExecutionStatusCompleted  ExecutionStatus = "completed"
-	ExecutionStatusCanceled   ExecutionStatus = "canceled"
+	TreatmentExecutionStatusPending    TreatmentExecutionStatus = "pending"
+	TreatmentExecutionStatusScheduled  TreatmentExecutionStatus = "scheduled"
+	TreatmentExecutionStatusArrived    TreatmentExecutionStatus = "arrived"
+	TreatmentExecutionStatusInProgress TreatmentExecutionStatus = "in_progress"
+	TreatmentExecutionStatusCompleted  TreatmentExecutionStatus = "completed"
+	TreatmentExecutionStatusCanceled   TreatmentExecutionStatus = "canceled"
 )
 
 // LabExecutionStatus tracks the lifecycle of a lab order execution.

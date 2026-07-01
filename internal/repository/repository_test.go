@@ -689,7 +689,7 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 			Blocking:   false,
 			Title:      "治疗方案",
 			Plan:       "口服抗生素",
-			Capability: string(model.TreatmentCapabilityAvailable),
+			Capability: string(model.CapabilityAvailable),
 		}
 		if err := fRepo.Create(ctx, card1); err != nil {
 			t.Fatalf("setup: Create card1: %v", err)

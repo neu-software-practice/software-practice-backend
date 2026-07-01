@@ -317,13 +317,13 @@ func TestEnumConstants(t *testing.T) {
 		{name: "ExitConsequenceRefundable", value: string(model.ExitConsequenceRefundable), expected: "refundable"},
 		{name: "ExitConsequenceExecutedNoRefund", value: string(model.ExitConsequenceExecutedNoRefund), expected: "executed_no_refund"},
 		{name: "ExitConsequenceMedicationDispensed", value: string(model.ExitConsequenceMedicationDispensed), expected: "medication_dispensed"},
-		{name: "ConsultationIntentConsultation", value: string(model.ConsultationIntentConsultation), expected: "consultation"},
-		{name: "ConsultationIntentFollowUp", value: string(model.ConsultationIntentFollowUp), expected: "follow_up"},
-		{name: "ConsultationIntentUncertain", value: string(model.ConsultationIntentUncertain), expected: "uncertain"},
-		{name: "TreatmentPlanMedication", value: string(model.TreatmentPlanMedication), expected: "medication"},
-		{name: "TreatmentPlanTreatment", value: string(model.TreatmentPlanTreatment), expected: "treatment"},
-		{name: "TreatmentPlanAdviceOnly", value: string(model.TreatmentPlanAdviceOnly), expected: "advice_only"},
-		{name: "TreatmentPlanReferral", value: string(model.TreatmentPlanReferral), expected: "referral"},
+		{name: "IntentTypeConsultation", value: string(model.IntentTypeConsultation), expected: "consultation"},
+		{name: "IntentTypeFollowUp", value: string(model.IntentTypeFollowUp), expected: "follow_up"},
+		{name: "IntentTypeUncertain", value: string(model.IntentTypeUncertain), expected: "uncertain"},
+		{name: "TreatmentPlanTypeMedication", value: string(model.TreatmentPlanTypeMedication), expected: "medication"},
+		{name: "TreatmentPlanTypeTreatment", value: string(model.TreatmentPlanTypeTreatment), expected: "treatment"},
+		{name: "TreatmentPlanTypeAdviceOnly", value: string(model.TreatmentPlanTypeAdviceOnly), expected: "advice_only"},
+		{name: "TreatmentPlanTypeReferral", value: string(model.TreatmentPlanTypeReferral), expected: "referral"},
 	}
 
 	for _, tt := range tests {
