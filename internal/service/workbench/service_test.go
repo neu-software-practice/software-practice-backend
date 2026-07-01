@@ -1065,12 +1065,14 @@ func TestReportVitals_Normal(t *testing.T) {
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
+	hr := 72
+	spo2 := 98.0
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
 		SessionID: "s1",
 		Source:    "patient_report",
-		Vitals: map[string]interface{}{
-			"heartRate": 72.0,
-			"spo2":      98.0,
+		Vitals: &model.VitalsData{
+			HeartRate: &hr,
+			SpO2:      &spo2,
 		},
 	})
 	if err != nil {
@@ -1086,12 +1088,14 @@ func TestReportVitals_Critical(t *testing.T) {
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
+	hr := 150
+	spo2 := 85.0
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
 		SessionID: "s1",
 		Source:    "device",
-		Vitals: map[string]interface{}{
-			"heartRate": 150.0,
-			"spo2":      85.0,
+		Vitals: &model.VitalsData{
+			HeartRate: &hr,
+			SpO2:      &spo2,
 		},
 	})
 	if err != nil {
@@ -1115,11 +1119,12 @@ func TestReportVitals_HighTemp(t *testing.T) {
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
+	temp := 42.0
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
 		SessionID: "s1",
 		Source:    "device",
-		Vitals: map[string]interface{}{
-			"temperature": 42.0,
+		Vitals: &model.VitalsData{
+			Temperature: &temp,
 		},
 	})
 	if err != nil {
@@ -1141,11 +1146,12 @@ func TestReportVitals_LowTemp(t *testing.T) {
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
+	temp := 34.5
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
 		SessionID: "s1",
 		Source:    "device",
-		Vitals: map[string]interface{}{
-			"temperature": 34.5,
+		Vitals: &model.VitalsData{
+			Temperature: &temp,
 		},
 	})
 	if err != nil {
@@ -1165,11 +1171,12 @@ func TestReportVitals_LowSPO2_NonCritical(t *testing.T) {
 	ctx := context.Background()
 
 	// spo2 91 is < 90 = false, so no emergency; exercises the spo2 code path.
+	spo2 := 91.0
 	result, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
 		SessionID: "s1",
 		Source:    "device",
-		Vitals: map[string]interface{}{
-			"spo2": 91.0,
+		Vitals: &model.VitalsData{
+			SpO2: &spo2,
 		},
 	})
 	if err != nil {

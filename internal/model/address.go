@@ -28,7 +28,7 @@ type CreateAddressInput struct {
 	District  string `json:"district"`
 	Detail    string `json:"detail"`
 	IsDefault bool   `json:"isDefault"`
-	Tag       string `json:"tag"`
+	Tag       string `json:"tag" binding:"max=20"`
 }
 
 // UpdateAddressInput is the request body for PATCH /patients/:patientId/addresses/:addressId.

@@ -66,7 +66,7 @@ type VisitSnapshot struct {
 type CreateSessionInput struct {
 	PatientID      string `json:"patientId"`
 	EntryType      string `json:"entryType"`
-	ChiefComplaint string `json:"chiefComplaint,omitempty"`
+	ChiefComplaint string `json:"chiefComplaint,omitempty" binding:"max=2000"`
 }
 
 // Validate checks that CreateSessionInput has valid fields.
@@ -83,7 +83,7 @@ func (c CreateSessionInput) Validate() error {
 type CreateFollowUpInput struct {
 	PatientID       string `json:"patientId"`
 	ParentSessionID string `json:"parentSessionId"`
-	ChiefComplaint  string `json:"chiefComplaint,omitempty"`
+	ChiefComplaint  string `json:"chiefComplaint,omitempty" binding:"max=2000"`
 }
 
 // CreateSessionResult is the response for session creation (both new and follow-up).

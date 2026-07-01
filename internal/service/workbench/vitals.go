@@ -18,7 +18,7 @@ var emergencySymptomKeywords = []string{
 type ReportVitalsInput struct {
 	SessionID string
 	Source    string
-	Vitals    map[string]interface{}
+	Vitals    *model.VitalsData
 	Symptoms  []string
 }
 
@@ -35,22 +35,27 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 	emergency := false
 	severity := ""
 
-	if hr, ok := input.Vitals["heartRate"].(float64); ok {
-		if hr > 120 || hr < 40 {
-			emergency = true
-			severity = string(model.EmergencySeverityCritical)
+	if input.Vitals != nil {
+		if input.Vitals.HeartRate != nil {
+			hr := *input.Vitals.HeartRate
+			if hr > 120 || hr < 40 {
+				emergency = true
+				severity = string(model.EmergencySeverityCritical)
+			}
 		}
-	}
-	if spo2, ok := input.Vitals["spo2"].(float64); ok {
-		if spo2 < 90 {
-			emergency = true
-			severity = string(model.EmergencySeverityCritical)
+		if input.Vitals.SpO2 != nil {
+			spo2 := *input.Vitals.SpO2
+			if spo2 < 90 {
+				emergency = true
+				severity = string(model.EmergencySeverityCritical)
+			}
 		}
-	}
-	if temp, ok := input.Vitals["temperature"].(float64); ok {
-		if temp > 41 || temp < 35 {
-			emergency = true
-			severity = string(model.EmergencySeveritySuspected)
+		if input.Vitals.Temperature != nil {
+			temp := *input.Vitals.Temperature
+			if temp > 41 || temp < 35 {
+				emergency = true
+				severity = string(model.EmergencySeveritySuspected)
+			}
 		}
 	}
 

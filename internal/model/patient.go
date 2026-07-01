@@ -58,7 +58,7 @@ type ProfileUpdateInput struct {
 // Credential holds the credential value, and Name is the optional patient name.
 type VerifyIdentityInput struct {
 	CredentialType string `json:"credentialType"`
-	Credential     string `json:"credential"`
+	Credential     string `json:"credential" binding:"required,min=4"`
 	Name           string `json:"name,omitempty"`
 }
 

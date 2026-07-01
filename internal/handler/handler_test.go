@@ -1485,7 +1485,7 @@ func TestWorkbenchHandler_SendMessage(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
-		body := `{"content":"hello"}`
+		body := `{"content":"hello","clientMessageId":"m1"}`
 		c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
 		c.Request.Header.Set("Content-Type", "application/json")
 		c.Set("patientId", "p001")
@@ -1501,7 +1501,7 @@ func TestWorkbenchHandler_SendMessage(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
-		body := `{"content":"hello"}`
+		body := `{"content":"hello","clientMessageId":"m1"}`
 		c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(body))
 		c.Request.Header.Set("Content-Type", "application/json")
 		// Intentionally not setting patientId
@@ -2126,7 +2126,7 @@ func TestWorkbenchHandler_SendMessage_RepoError(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
-	c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(`{"sessionId":"s001","content":"hello"}`))
+	c.Request = httptest.NewRequest("POST", "/visits/s001/messages", strings.NewReader(`{"sessionId":"s001","content":"hello","clientMessageId":"m1"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("patientId", "p001")
 	h.SendMessage(c)
@@ -4642,7 +4642,7 @@ func TestWorkbenchHandler_SendMessage_SessionNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Params = gin.Params{{Key: "sessionId", Value: "s999"}}
-	c.Request = httptest.NewRequest("POST", "/visits/s999/message", strings.NewReader(`{"content":"hello"}`))
+	c.Request = httptest.NewRequest("POST", "/visits/s999/message", strings.NewReader(`{"content":"hello","clientMessageId":"m1"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("patientId", "p001")
 	h.SendMessage(c)
@@ -4679,7 +4679,7 @@ func TestWorkbenchHandler_ClassifyIntent_SessionNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Params = gin.Params{{Key: "sessionId", Value: "s999"}}
-	c.Request = httptest.NewRequest("POST", "/visits/s999/classify-intent", strings.NewReader(`{"message":"test"}`))
+	c.Request = httptest.NewRequest("POST", "/visits/s999/classify-intent", strings.NewReader(`{"content":"test"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("patientId", "p001")
 	h.ClassifyIntent(c)
@@ -4872,7 +4872,7 @@ func TestWorkbenchHandler_StreamAssistantMessage_SessionNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Params = gin.Params{{Key: "sessionId", Value: "s999"}}
-	c.Request = httptest.NewRequest("POST", "/visits/s999/stream-assistant", strings.NewReader(`{}`))
+	c.Request = httptest.NewRequest("POST", "/visits/s999/stream-assistant", strings.NewReader(`{"requestId":"r1"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("patientId", "p001")
 	h.StreamAssistantMessage(c)
@@ -5212,7 +5212,7 @@ func TestWorkbenchHandler_SendMessage_InternalError(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
-	c.Request = httptest.NewRequest("POST", "/visits/s001/message", strings.NewReader(`{"content":"hello"}`))
+	c.Request = httptest.NewRequest("POST", "/visits/s001/message", strings.NewReader(`{"content":"hello","clientMessageId":"m1"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("patientId", "p001")
 	h.SendMessage(c)
