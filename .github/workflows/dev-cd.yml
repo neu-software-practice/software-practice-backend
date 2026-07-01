@@ -10,7 +10,7 @@ jobs:
     runs-on: [self-hosted, cd]
     env:
       COMPOSE_PROJECT_NAME: neuhis-dev
-      COMPOSE_FILE: docker-compose.yml:docker-compose.dev.yml
+      COMPOSE_FILE: docker-compose.dev.yml
 
     steps:
       - name: Set deploy directory
@@ -109,7 +109,7 @@ jobs:
           echo "Running migrations on neuhis_dev..."
           for f in db/migrations/*.up.sql; do
             echo "  Applying: $(basename $f)"
-            docker compose exec -T mysql mysql -u root -ppassword \
+            docker compose exec -T mysql-dev mysql -u root -ppassword \
               neuhis_dev < "$f" 2>/dev/null || echo "  (already applied, skipping)"
           done
           echo "✅ Migrations complete"
@@ -136,9 +136,9 @@ jobs:
           echo "=== Dev App logs (last 50 lines) ==="
           docker compose logs --tail=50 app || true
           echo "=== Dev MySQL logs (last 20 lines) ==="
-          docker compose logs --tail=20 mysql || true
+          docker compose logs --tail=20 mysql-dev || true
           echo "=== Dev MedAgent logs (last 20 lines) ==="
-          docker compose logs --tail=20 medagent || true
+          docker compose logs --tail=20 medagent-dev || true
 
       - name: Cleanup old images
         working-directory: ${{ env.DEV_DIR }}
