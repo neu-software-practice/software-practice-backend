@@ -17,8 +17,11 @@ jobs:
         run: echo "DEV_DIR=$HOME/software-practice-backend-dev" >> $GITHUB_ENV
 
       - name: Clone or pull latest code
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
           if [ -d "${DEV_DIR}/.git" ]; then
             echo "Existing repo found, pulling latest dev..."
             cd "${DEV_DIR}"
