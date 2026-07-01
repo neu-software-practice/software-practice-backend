@@ -24,8 +24,9 @@ jobs:
             git reset --hard origin/dev
             git submodule update --init --recursive
           else
-            echo "First deployment, cloning repository..."
-            mkdir -p "${DEV_DIR}"
+            echo "First deployment, setting up directory..."
+            sudo mkdir -p "${DEV_DIR}"
+            sudo chown -R "$(whoami):$(whoami)" "${DEV_DIR}"
             git clone --branch dev --depth 1 \
               https://github.com/neuhis/software-practice-backend.git \
               "${DEV_DIR}"
