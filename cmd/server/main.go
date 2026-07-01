@@ -112,8 +112,9 @@ func main() {
 	// Start server with graceful shutdown
 	addr := cfg.ServerAddr
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: engine,
+		Addr:              addr,
+		Handler:           engine,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
