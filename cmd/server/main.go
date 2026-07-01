@@ -17,6 +17,7 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/handler"
 	"github.com/neuhis/software-practice-backend/internal/llm"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
+	"github.com/neuhis/software-practice-backend/internal/migrator"
 	"github.com/neuhis/software-practice-backend/internal/repository"
 	addresssvc "github.com/neuhis/software-practice-backend/internal/service/address"
 	adminsvc "github.com/neuhis/software-practice-backend/internal/service/admin"
@@ -57,6 +58,11 @@ func main() {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 	log.Println("Database connected")
+
+	// Run database migrations
+	if err := migrator.Run(db, "db/migrations"); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
 	// Initialize repositories
 	patientRepo := repository.NewPatientRepository(db)
