@@ -100,7 +100,7 @@ func BuildMedicationFulfillmentCard(sessionID string, step *medagent.Step) *mode
 		})
 	}
 	card.AvailableModes = []string{"pickup", "delivery"}
-	card.FulfillmentStatus = "pending"
+	card.FulfillmentStatus = model.MedicationFulfillmentStatusPending
 
 	return card
 }

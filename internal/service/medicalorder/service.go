@@ -97,13 +97,13 @@ func (s *Service) buildRecordFromCard(session model.VisitSessionSummary, card mo
 		return &base
 
 	case string(model.FlowCardKindMedicationFulfillment):
-		if card.FulfillmentStatus != string(model.FlowCardStatusCompleted) &&
-			card.FulfillmentStatus != "confirmed" {
+		if card.FulfillmentStatus != model.MedicationFulfillmentStatusCompleted &&
+			card.FulfillmentStatus != model.MedicationFulfillmentStatusConfirmed {
 			return nil
 		}
 		base.Kind = string(model.MedicalOrderKindMedication)
 		base.Medications = copyMedications(card.Medications)
-		base.FulfillmentStatus = card.FulfillmentStatus
+		base.FulfillmentStatus = model.FulfillmentStatus(card.FulfillmentStatus)
 		base.DeliveryAddress = card.DeliveryAddress
 		return &base
 	}

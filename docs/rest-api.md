@@ -73,6 +73,9 @@ NEUHIS Agent（产品名「东软云脑智能医疗」）是面向患者的「AI
 | `SESSION_NOT_FOUND` | 业务 | false | 找不到该就诊会话 |
 | `PATIENT_NOT_FOUND` | 业务 | false | 找不到患者信息 |
 | `CARD_NOT_FOUND` | 业务 | true | 流程卡已更新/失效，提示刷新 |
+| `FORBIDDEN` | 业务 | false | 权限不足（管理员角色守卫、患者 ID 不匹配） |
+| `NOT_FOUND` | 业务 | false | 端点未找到（全局 NoRoute 处理器） |
+| `INTERNAL_ERROR` | 业务 | true | 内部服务器错误（未知异常兜底） |
 
 UI 文案命中的 HTTP 状态（`MESSAGE_BY_HTTP_STATUS`）：`401`（登录失效，不可重试）、`403`（无法访问该记录，不可重试）、`404`（找不到内容，不可重试）、`408`（请求超时，可重试）。其余 HTTP 错误按 `status >= 500` 可重试、`4xx` 不可重试兜底。
 

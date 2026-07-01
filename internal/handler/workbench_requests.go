@@ -45,8 +45,8 @@ type VitalsRequest struct {
 
 // TimerRequest represents the request body for timer operations.
 type TimerRequest struct {
-	SessionID string `json:"sessionId"`
-	Action    string `json:"action"`
+	SessionID string            `json:"sessionId"`
+	Action    model.TimerAction `json:"action"`
 }
 
 // LockQuestionRequest represents the request body for asking a locked question.

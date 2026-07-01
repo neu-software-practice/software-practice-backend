@@ -84,11 +84,11 @@ type FlowCard struct {
 	Actions    []string `json:"actions,omitempty"`
 
 	// --- medication_fulfillment ---
-	Medications       []MedicationItem `json:"medications,omitempty"`
-	AvailableModes    []string         `json:"availableModes,omitempty"`
-	SelectedMode      *string          `json:"selectedMode,omitempty"`
-	FulfillmentStatus string           `json:"fulfillmentStatus,omitempty"`
-	DeliveryAddress   *DeliveryAddress `json:"deliveryAddress,omitempty"`
+	Medications       []MedicationItem            `json:"medications,omitempty"`
+	AvailableModes    []string                    `json:"availableModes,omitempty"`
+	SelectedMode      *string                     `json:"selectedMode,omitempty"`
+	FulfillmentStatus MedicationFulfillmentStatus `json:"fulfillmentStatus,omitempty"`
+	DeliveryAddress   *DeliveryAddress            `json:"deliveryAddress,omitempty"`
 
 	// --- treatment_execution ---
 	TreatmentName    string     `json:"treatmentName,omitempty"`

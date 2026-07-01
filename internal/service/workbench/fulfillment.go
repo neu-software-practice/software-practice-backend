@@ -51,7 +51,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 
 	now := time.Now()
 	card.SelectedMode = &input.Mode
-	card.FulfillmentStatus = "confirmed"
+	card.FulfillmentStatus = model.MedicationFulfillmentStatusConfirmed
 	card.Status = string(model.FlowCardStatusCompleted)
 	card.HandledAt = &now
 	_ = s.flowCardRepo.Update(ctx, card)

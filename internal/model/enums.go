@@ -52,7 +52,9 @@ const (
 	VisitMachineStateTerminated            VisitMachineState = "terminated"
 	VisitMachineStateExitSettlement        VisitMachineState = "exitSettlement"
 	VisitMachineStateExited                VisitMachineState = "exited"
-	VisitMachineStateTransferred           VisitMachineState = "transferred"
+	// VisitMachineStateTransferred is used in internal/service/visit/state_machine.go and
+	// internal/service/workbench/chat.go for transfer-to-hospital scenarios.
+	VisitMachineStateTransferred VisitMachineState = "transferred"
 )
 
 // TerminalReason describes why a visit was terminated.
@@ -361,4 +363,40 @@ const (
 	InterruptedByEmergency InterruptedBy = "emergency"
 	InterruptedByTimeout   InterruptedBy = "timeout"
 	InterruptedByExit      InterruptedBy = "exit"
+)
+
+// MedicationFulfillmentStatus represents the status of a medication fulfillment on a flow card.
+type MedicationFulfillmentStatus string
+
+const (
+	MedicationFulfillmentStatusPending   MedicationFulfillmentStatus = "pending"
+	MedicationFulfillmentStatusConfirmed MedicationFulfillmentStatus = "confirmed"
+	MedicationFulfillmentStatusCompleted MedicationFulfillmentStatus = "completed"
+)
+
+// FulfillmentStatus represents the status of a fulfillment on a medical order record.
+type FulfillmentStatus string
+
+const (
+	FulfillmentStatusPending   FulfillmentStatus = "pending"
+	FulfillmentStatusConfirmed FulfillmentStatus = "confirmed"
+	FulfillmentStatusCompleted FulfillmentStatus = "completed"
+)
+
+// TimerAction represents the action for a timer operation.
+type TimerAction string
+
+const (
+	TimerActionPause  TimerAction = "pause"
+	TimerActionResume TimerAction = "resume"
+)
+
+// AddressTag represents a tag/label for a delivery address.
+type AddressTag string
+
+const (
+	AddressTagHome     AddressTag = "家"
+	AddressTagCompany  AddressTag = "公司"
+	AddressTagHospital AddressTag = "医院"
+	AddressTagOther    AddressTag = "其他"
 )

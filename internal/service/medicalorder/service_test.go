@@ -156,7 +156,7 @@ func TestListMedicalOrders_MedicationCompleted(t *testing.T) {
 			return []model.FlowCard{
 				{
 					ID: "c2", SessionID: "s1", Kind: "medication_fulfillment",
-					FulfillmentStatus: "completed",
+					FulfillmentStatus: model.MedicationFulfillmentStatusCompleted,
 					Medications: []model.MedicationItem{
 						{Name: "阿莫西林", Spec: "0.25g", Quantity: 2, Dosage: "每日三次", Days: 7, Price: 35.0},
 					},
@@ -182,7 +182,7 @@ func TestListMedicalOrders_MedicationCompleted(t *testing.T) {
 	if len(r.Medications) != 1 || r.Medications[0].Name != "阿莫西林" {
 		t.Errorf("medications = %v", r.Medications)
 	}
-	if r.FulfillmentStatus != "completed" {
+	if r.FulfillmentStatus != model.FulfillmentStatusCompleted {
 		t.Errorf("fulfillmentStatus = %s, want completed", r.FulfillmentStatus)
 	}
 	if r.DeliveryAddress == nil || r.DeliveryAddress.Name != "张三" {
@@ -208,7 +208,7 @@ func TestListMedicalOrders_MedicationConfirmed(t *testing.T) {
 			return []model.FlowCard{
 				{
 					ID: "c1", SessionID: "s1", Kind: "medication_fulfillment",
-					FulfillmentStatus: "confirmed",
+					FulfillmentStatus: model.MedicationFulfillmentStatusConfirmed,
 					HandledAt:         &now,
 				},
 			}, nil
@@ -266,7 +266,7 @@ func TestListMedicalOrders_SkipsMedicationPending(t *testing.T) {
 			return []model.FlowCard{
 				{
 					ID: "c1", SessionID: "s1", Kind: "medication_fulfillment",
-					FulfillmentStatus: "pending",
+					FulfillmentStatus: model.MedicationFulfillmentStatusPending,
 				},
 			}, nil
 		},
@@ -296,7 +296,7 @@ func TestListMedicalOrders_MixedKinds(t *testing.T) {
 		listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) {
 			return []model.FlowCard{
 				{ID: "c1", SessionID: "s1", Kind: "advice_only", Status: "completed", HandledAt: &now},
-				{ID: "c2", SessionID: "s1", Kind: "medication_fulfillment", FulfillmentStatus: "completed", HandledAt: &now},
+				{ID: "c2", SessionID: "s1", Kind: "medication_fulfillment", FulfillmentStatus: model.MedicationFulfillmentStatusCompleted, HandledAt: &now},
 			}, nil
 		},
 	}
@@ -569,7 +569,7 @@ func TestListMedicalOrders_NullSlicesPreserved(t *testing.T) {
 			return []model.FlowCard{
 				{
 					ID: "c1", SessionID: "s1", Kind: "medication_fulfillment",
-					FulfillmentStatus: "completed",
+					FulfillmentStatus: model.MedicationFulfillmentStatusCompleted,
 					Medications:       nil, // nil medications
 					HandledAt:         &now,
 				},

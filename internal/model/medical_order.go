@@ -23,9 +23,9 @@ type MedicalOrderRecord struct {
 	FollowUpRecommendation string   `json:"followUpRecommendation,omitempty"`
 
 	// --- medication-only fields ---
-	Medications       []MedicationItem `json:"medications,omitempty"`
-	FulfillmentStatus string           `json:"fulfillmentStatus,omitempty"`
-	DeliveryAddress   *DeliveryAddress `json:"deliveryAddress,omitempty"`
+	Medications       []MedicationItem  `json:"medications,omitempty"`
+	FulfillmentStatus FulfillmentStatus `json:"fulfillmentStatus,omitempty"`
+	DeliveryAddress   *DeliveryAddress  `json:"deliveryAddress,omitempty"`
 
 	// --- common ---
 	HandledAt string `json:"handledAt"`

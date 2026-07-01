@@ -59,7 +59,7 @@ func makeTestAddress(patientID string) *model.Address {
 		District:  "浑南区",
 		Detail:    "创新路195号",
 		IsDefault: false,
-		Tag:       "公司",
+		Tag:       model.AddressTagCompany,
 	}
 }
 
@@ -112,7 +112,7 @@ func TestCreateAddress_Success(t *testing.T) {
 	addr, err := svc.CreateAddress(context.Background(), "p001", model.CreateAddressInput{
 		Name: "李明", Phone: "13800002468",
 		Province: "辽宁省", City: "沈阳市", District: "浑南区", Detail: "创新路195号",
-		Tag: "公司",
+		Tag: model.AddressTagCompany,
 	})
 	if err != nil {
 		t.Fatalf("CreateAddress: %v", err)
@@ -355,7 +355,7 @@ func TestUpdateAddress_AllFields(t *testing.T) {
 	newCity := "北京市"
 	newDistrict := "朝阳区"
 	newDetail := "建国路100号"
-	newTag := "家"
+	newTag := model.AddressTagHome
 	isDefault := true
 	updated, err := svc.UpdateAddress(context.Background(), "p001", addr.ID, model.UpdateAddressInput{
 		Name: &newName, Phone: &newPhone,

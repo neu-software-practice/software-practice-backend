@@ -212,7 +212,7 @@ func validateCreateAddressInput(input model.CreateAddressInput) error {
 		return fmt.Errorf("%w: province, city, and district are required", model.ErrValidation)
 	}
 	if input.Tag != "" {
-		trimmed := strings.TrimSpace(input.Tag)
+		trimmed := strings.TrimSpace(string(input.Tag))
 		if len(trimmed) < 1 || len(trimmed) > 20 {
 			return fmt.Errorf("%w: tag must be 1-20 characters when provided", model.ErrValidation)
 		}
@@ -231,7 +231,7 @@ func validateUpdateAddressInput(input model.UpdateAddressInput) error {
 		return fmt.Errorf("%w: detail must be 1-200 characters", model.ErrValidation)
 	}
 	if input.Tag != nil {
-		trimmed := strings.TrimSpace(*input.Tag)
+		trimmed := strings.TrimSpace(string(*input.Tag))
 		if len(trimmed) < 1 || len(trimmed) > 20 {
 			return fmt.Errorf("%w: tag must be 1-20 characters when provided", model.ErrValidation)
 		}

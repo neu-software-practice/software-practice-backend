@@ -1046,7 +1046,7 @@ func TestAddressRepo_CRUD(t *testing.T) {
 		District:  "浑南区",
 		Detail:    "创新路195号",
 		IsDefault: true,
-		Tag:       "公司",
+		Tag:       model.AddressTagCompany,
 	}
 	if err := addrRepo.Create(ctx, addr); err != nil {
 		t.Fatalf("Create: %v", err)
@@ -1915,7 +1915,7 @@ func TestAddressRepo_EdgeCases(t *testing.T) {
 			District:  "朝阳区",
 			Detail:    "测试地址",
 			IsDefault: false,
-			Tag:       "家",
+			Tag:       model.AddressTagHome,
 		}
 		if err := addrRepo.Create(ctx, addr); err != nil {
 			t.Fatalf("first Create: %v", err)
@@ -1953,7 +1953,7 @@ func TestAddressRepo_EdgeCases(t *testing.T) {
 			District:  "朝阳区",
 			Detail:    "test",
 			IsDefault: false,
-			Tag:       "家",
+			Tag:       model.AddressTagHome,
 		}
 		err = addrRepo.Create(ctx, addr)
 		if err == nil {

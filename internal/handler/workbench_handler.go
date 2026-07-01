@@ -376,9 +376,9 @@ func (h *WorkbenchHandler) ToggleTimer(c *gin.Context) {
 	var result *model.VisitSession
 
 	switch input.Action {
-	case "pause":
+	case model.TimerActionPause:
 		result, err = h.svc.PauseTimer(c.Request.Context(), input.SessionID)
-	case "resume":
+	case model.TimerActionResume:
 		result, err = h.svc.ResumeTimer(c.Request.Context(), input.SessionID)
 	default:
 		apperrors.WriteValidationError(c, "action must be 'pause' or 'resume'")
