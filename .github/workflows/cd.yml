@@ -20,7 +20,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # 清理旧的 token 配置，避免累积
+          git config --global --unset-all url."https://x-access-token:".insteadOf "https://github.com/" 2>/dev/null || true
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          # 中国访问 GitHub HTTP/2 不稳定，强制 HTTP/1.1
+          git config --global http.version HTTP/1.1
+          git config --global http.postBuffer 524288000
           if [ -d "${APP_DIR}/.git" ]; then
             echo "Existing repo found, pulling latest main..."
             cd "${APP_DIR}"
