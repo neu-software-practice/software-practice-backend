@@ -2,10 +2,14 @@
 # 与 docker-compose.yml 合并使用: COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
 # 容器名加 -dev 后缀，避免与生产容器冲突
 # 端口: app=8081, medagent=8082, mysql=3307
+# 国内网络适配: GOPROXY=https://goproxy.cn
 
 services:
   app:
     container_name: neuhis-backend-dev
+    build:
+      args:
+        - GOPROXY=https://goproxy.cn,direct
     ports:
       - "8081:8080"
     environment:
@@ -24,8 +28,12 @@ services:
 
   medagent:
     container_name: neuhis-medagent-dev
+    image: golang:1.25-alpine
     ports:
       - "8082:8080"
+    environment:
+      - GOPROXY=https://goproxy.cn,direct
+      - GOSUMDB=off
 
 volumes:
   mysql-data-dev:
