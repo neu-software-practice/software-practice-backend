@@ -1,0 +1,31 @@
+# Dev 环境覆盖配置
+# 与 docker-compose.yml 合并使用: COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+# 容器名加 -dev 后缀，避免与生产容器冲突
+# 端口: app=8081, medagent=8082, mysql=3307
+
+services:
+  app:
+    container_name: neuhis-backend-dev
+    ports:
+      - "8081:8080"
+    environment:
+      - DATABASE_DSN=root:password@tcp(mysql:3306)/neuhis_dev?charset=utf8mb4&parseTime=True&loc=Local
+      - SERVER_MODE=debug
+      - LOG_LEVEL=debug
+
+  mysql:
+    container_name: neuhis-mysql-dev
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: neuhis_dev
+    volumes:
+      - mysql-data-dev:/var/lib/mysql
+
+  medagent:
+    container_name: neuhis-medagent-dev
+    ports:
+      - "8082:8080"
+
+volumes:
+  mysql-data-dev:

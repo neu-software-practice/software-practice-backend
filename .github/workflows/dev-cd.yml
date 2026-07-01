@@ -1,0 +1,120 @@
+name: CD - Deploy to Dev
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    name: Deploy Dev
+    runs-on: [self-hosted, cd]
+    env:
+      DEV_DIR: /root/software-practice-backend-dev
+      COMPOSE_PROJECT_NAME: neuhis-dev
+      COMPOSE_FILE: docker-compose.yml:docker-compose.dev.yml
+
+    steps:
+      - name: Clone or pull latest code
+        run: |
+          set -euo pipefail
+          if [ -d "${DEV_DIR}/.git" ]; then
+            echo "Existing repo found, pulling latest dev..."
+            cd "${DEV_DIR}"
+            git fetch origin dev
+            git reset --hard origin/dev
+            git submodule update --init --recursive
+          else
+            echo "First deployment, cloning repository..."
+            mkdir -p "${DEV_DIR}"
+            git clone --branch dev --depth 1 \
+              https://github.com/neuhis/software-practice-backend.git \
+              "${DEV_DIR}"
+            cd "${DEV_DIR}"
+            git submodule update --init --recursive
+          fi
+          echo "Deploying commit: $(git -C "${DEV_DIR}" rev-parse --short HEAD)"
+
+      - name: Create .env from template
+        working-directory: ${{ env.DEV_DIR }}
+        run: |
+          set -euo pipefail
+          cp .env.dev .env
+          # 用 GitHub Secrets 替换占位符
+          sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${{ secrets.JWT_SECRET }}|" .env
+          sed -i "s|^MEDAGENT_API_KEY=.*|MEDAGENT_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}|" .env
+          # 验证占位符已被替换
+          if grep -q "JWT_SECRET=change-me-to" .env; then
+            echo "ERROR: JWT_SECRET still has placeholder value"
+            exit 1
+          fi
+          if grep -q "MEDAGENT_API_KEY=sk-placeholder" .env; then
+            echo "ERROR: MEDAGENT_API_KEY still has placeholder value"
+            exit 1
+          fi
+          echo ".env created successfully (secrets masked)"
+
+      - name: Rebuild and restart dev app
+        id: docker-up
+        working-directory: ${{ env.DEV_DIR }}
+        run: |
+          set -euo pipefail
+          DOCKER_BUILDKIT=1 docker compose up -d --build app
+          echo "Waiting for app health on port 8081..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8081/api/health > /dev/null 2>&1; then
+              echo "✅ Service is ready (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "❌ Service failed to start within 60 seconds"
+              docker compose logs --tail=30 app
+              exit 1
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          echo "📋 Health check response:"
+          curl -s http://localhost:8081/api/health | python3 -m json.tool || true
+
+      - name: Run database migrations
+        working-directory: ${{ env.DEV_DIR }}
+        run: |
+          set -euo pipefail
+          echo "Running migrations on neuhis_dev..."
+          for f in db/migrations/*.up.sql; do
+            echo "  Applying: $(basename $f)"
+            docker compose exec -T mysql mysql -u root -ppassword \
+              neuhis_dev < "$f" 2>/dev/null || echo "  (already applied, skipping)"
+          done
+          echo "✅ Migrations complete"
+
+      - name: Verify deployment
+        id: verify
+        working-directory: ${{ env.DEV_DIR }}
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -sf http://localhost:8081/api/health | \
+            python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+          echo "Health check status: $STATUS"
+          docker compose ps
+          if [ "$STATUS" != "ok" ]; then
+            echo "❌ Health check returned non-ok status"
+            exit 1
+          fi
+          echo "✅ Deployment to dev verified successfully"
+
+      - name: Collect logs on failure
+        if: failure() && steps.docker-up.outcome == 'success'
+        working-directory: ${{ env.DEV_DIR }}
+        run: |
+          echo "=== Dev App logs (last 50 lines) ==="
+          docker compose logs --tail=50 app || true
+          echo "=== Dev MySQL logs (last 20 lines) ==="
+          docker compose logs --tail=20 mysql || true
+          echo "=== Dev MedAgent logs (last 20 lines) ==="
+          docker compose logs --tail=20 medagent || true
+
+      - name: Cleanup old images
+        working-directory: ${{ env.DEV_DIR }}
+        run: |
+          docker image prune -f
