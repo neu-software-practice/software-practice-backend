@@ -1504,6 +1504,7 @@ func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path stri
 	}
 	mf := &mockFlowCardRepo{
 		createFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
+		listFunc:   func(ctx context.Context, sid string) ([]model.FlowCard, error) { return nil, nil },
 	}
 	ma := &mockAddressRepo{
 		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
@@ -1603,21 +1604,64 @@ func TestStreamAssistantMessage_NeedTests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StreamAssistantMessage: %v", err)
 	}
-	hasCard := false
+	cardCount := 0
 	hasState := false
 	for _, e := range ec.events {
 		if e.Type == "card" {
-			hasCard = true
+			cardCount++
 		}
 		if e.Type == "state" && e.Status == "blocked" {
 			hasState = true
 		}
 	}
-	if !hasCard {
+	if cardCount == 0 {
 		t.Error("expected card event for NEED_TESTS")
+	}
+	if cardCount > 1 {
+		t.Errorf("expected exactly 1 card event, got %d — duplicate card event bug", cardCount)
 	}
 	if !hasState {
 		t.Error("expected blocked state event")
+	}
+}
+
+func TestStreamAssistantMessage_NeedTests_Idempotent(t *testing.T) {
+	// When a pending lab_decision card already exists, a second NEED_TESTS step
+	// must NOT create a duplicate card.
+	cardCreated := false
+	svc, _, _, _, mf, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		switch {
+		case path == "/sessions":
+			return 200, `{"session_id":"ma-001"}`
+		case containsStr(path, "/patient-say"):
+			return 200, `{"kind":"NEED_TESTS","doctor_say":"需要检查血常规","test_items":["血常规"]}`
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+	// Override: ListBySession returns an existing pending lab_decision card
+	mf.listFunc = func(ctx context.Context, sid string) ([]model.FlowCard, error) {
+		return []model.FlowCard{{
+			ID:        "existing-card",
+			SessionID: sid,
+			Kind:      "lab_decision",
+			Status:    "pending",
+		}}, nil
+	}
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		cardCreated = true
+		return nil
+	}
+
+	ec := &eventCollector{}
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: "s1", RequestID: "r1",
+	}, ec.callback)
+	if err != nil {
+		t.Fatalf("StreamAssistantMessage: %v", err)
+	}
+	if cardCreated {
+		t.Error("duplicate lab_decision card was created — idempotency guard failed")
 	}
 }
 

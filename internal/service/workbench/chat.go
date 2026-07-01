@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -252,20 +253,20 @@ func (s *Service) handleAsk(ctx context.Context, sessionID, requestID string, se
 }
 
 func (s *Service) handleNeedTests(ctx context.Context, sessionID, requestID string, session *model.VisitSession, step *medagent.Step, callback StreamAssistantEventCallback) error {
+	// Idempotency guard: check for existing pending lab_decision card to prevent duplicates.
+	if existingCards, err := s.flowCardRepo.ListBySession(ctx, sessionID); err == nil {
+		for _, c := range existingCards {
+			if c.Kind == string(model.FlowCardKindLabDecision) && c.Status == string(model.FlowCardStatusPending) {
+				slog.Warn("duplicate lab_decision card suppressed", "session_id", sessionID)
+				return nil
+			}
+		}
+	}
+
 	// Build lab_decision card
 	card := adapter.BuildLabDecisionCard(sessionID, step)
 	if err := s.flowCardRepo.Create(ctx, card); err != nil {
 		return fmt.Errorf("create lab decision card: %w", err)
-	}
-
-	// Send card event
-	if err := callback(model.AssistantStreamEvent{
-		Type:      "card",
-		SessionID: sessionID,
-		RequestID: requestID,
-		Card:      card,
-	}); err != nil {
-		return err
 	}
 
 	// Create timeline item for the card
@@ -274,6 +275,7 @@ func (s *Service) handleNeedTests(ctx context.Context, sessionID, requestID stri
 		return fmt.Errorf("append card timeline: %w", err)
 	}
 
+	// Send card event (once, with timeline item) — avoids duplicate card rendering on the frontend.
 	if err := callback(model.AssistantStreamEvent{
 		Type:             "card",
 		SessionID:        sessionID,
