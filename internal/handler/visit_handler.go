@@ -93,9 +93,13 @@ func (h *VisitHandler) ListSessions(c *gin.Context) {
 	cursor := api.CursorFromQuery(c.Query("cursor"))
 	pageSize := ParseQueryInt(c, "pageSize", 20)
 
+	// patientId is optional per API spec; when not provided, default to the authenticated patient
 	if patientID == "" {
-		apperrors.WriteValidationError(c, "patientId query parameter is required")
-		return
+		patientID = GetPatientIDFromContext(c)
+		if patientID == "" {
+			apperrors.WriteUnauthorized(c, "authentication required")
+			return
+		}
 	}
 
 	if !RequirePatientID(c, patientID) {

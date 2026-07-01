@@ -4159,12 +4159,33 @@ func TestVisitHandler_ListSessions_MissingPatientID(t *testing.T) {
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	// No patientId query param set
+	// No patientId query param, no auth context → unauthorized
 	c.Request = httptest.NewRequest("GET", "/visits", nil)
 	h.ListSessions(c)
-	// Handler returns 422 when patientId query parameter is missing
-	if w.Code != http.StatusUnprocessableEntity {
-		t.Errorf("status = %d, want 422, body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestVisitHandler_ListSessions_NoQueryParamUseAuth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, _ string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			if pid != "p001" {
+				t.Errorf("expected patientID from auth context, got %s", pid)
+			}
+			return []model.VisitSessionSummary{}, nil, false, nil
+		},
+	}
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/visits", nil)
+	c.Set("patientId", "p001") // authenticated patient
+	h.ListSessions(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
 	}
 }
 
