@@ -1041,6 +1041,10 @@
                   "        pm.expect(item.status).to.be.a('string');",
                   "        pm.expect(item.startedAt).to.be.a('string');",
                   "        pm.expect(item.entryType).to.be.a('string');",
+                  "        if (item.lastActivityAt) {",
+                  "            pm.expect(item.lastActivityAt).to.be.a('string');",
+                  "            pm.expect(item.lastActivityAt).to.match(/^\\d{4}-\\d{2}-\\d{2}T/);",
+                  "        }",
                   "    }",
                   "});"
                 ],
@@ -1098,6 +1102,8 @@
                   "    pm.expect(jsonData.data.status).to.be.a('string');",
                   "    pm.expect(jsonData.data.startedAt).to.be.a('string');",
                   "    pm.expect(jsonData.data.updatedAt).to.be.a('string');",
+                  "    pm.expect(jsonData.data.lastActivityAt).to.be.a('string');",
+                  "    pm.expect(jsonData.data.lastActivityAt).to.match(/^\\d{4}-\\d{2}-\\d{2}T/);",
                   "    pm.expect(jsonData.data.timerPaused).to.be.a('boolean');",
                   "    pm.expect(jsonData.data.summary).to.be.an('object');",
                   "});"
@@ -2139,7 +2145,7 @@
     },
     {
       "name": "10. Workbench - Visit Control",
-      "description": "会话控制端点: title, vitals, timer, exit, dismiss-emergency, lock-question",
+      "description": "会话控制端点: title, vitals, timer, suspend, exit, dismiss-emergency, lock-question",
       "item": [
         {
           "name": "✅ POST Generate Title",
@@ -2388,6 +2394,153 @@
           }
         },
         {
+          "name": "✅ POST Suspend Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "// Step 1: Create new session for suspend test",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: 'suspend测试' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed: ' + err1); return; }",
+                  "    pm.test('Step 1 - Create Session: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "    var sid = res1.json().data.session.id;",
+                  "    var initialLastActivity = res1.json().data.session.lastActivityAt;",
+                  "",
+                  "    // Step 2: Send a message to transition to chatting",
+                  "    var msgId = 'suspend-msg-' + Date.now();",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/messages',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, content: '测试消息', clientMessageId: msgId }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Send message failed: ' + err2); return; }",
+                  "        pm.test('Step 2 - Send Message: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "",
+                  "        // Step 3: Suspend the session",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/visits/' + sid + '/suspend',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid }) }",
+                  "        }, function(err3, res3) {",
+                  "            if (err3) { pm.expect.fail('Suspend failed: ' + err3); return; }",
+                  "            pm.test('Step 3 - Suspend: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "            var data = res3.json().data;",
+                  "            pm.test('Session status is suspended', function() {",
+                  "                pm.expect(data.session.id).to.eql(sid);",
+                  "                pm.expect(data.session.status).to.eql('suspended');",
+                  "            });",
+                  "            pm.test('lastActivityAt preserved (not refreshed on suspend)', function() {",
+                  "                pm.expect(data.session.lastActivityAt).to.be.a('string');",
+                  "                pm.expect(data.session.lastActivityAt).to.match(/^\\d{4}-\\d{2}-\\d{2}T/);",
+                  "            });",
+                  "            pm.test('Active card cleared', function() {",
+                  "                pm.expect(data.session.activeCardId).to.be.null;",
+                  "            });",
+                  "            pm.test('Returns session_suspended timeline item', function() {",
+                  "                pm.expect(data.timelineItem.kind).to.eql('system_event');",
+                  "                pm.expect(data.timelineItem.eventType).to.eql('session_suspended');",
+                  "                pm.expect(data.timelineItem.title).to.be.a('string').and.not.empty;",
+                  "                pm.expect(data.timelineItem.description).to.be.a('string').and.not.empty;",
+                  "                pm.expect(data.timelineItem.createdAt).to.be.a('string');",
+                  "            });",
+                  "",
+                  "            // Step 4: Verify via GET Session Detail",
+                  "            pm.sendRequest({",
+                  "                url: baseUrl + '/api/visits/' + sid,",
+                  "                method: 'GET',",
+                  "                header: { 'Authorization': 'Bearer ' + token }",
+                  "            }, function(err4, res4) {",
+                  "                if (err4) { pm.expect.fail('Get session detail failed: ' + err4); return; }",
+                  "                pm.test('Step 4 - Session Detail: 200', function() { pm.expect(res4.code).to.eql(200); });",
+                  "                pm.test('Session detail shows suspended', function() {",
+                  "                    pm.expect(res4.json().data.status).to.eql('suspended');",
+                  "                    pm.expect(res4.json().data.lastActivityAt).to.be.a('string');",
+                  "                });",
+                  "",
+                  "                // Step 5: Verify via GET Timeline",
+                  "                pm.sendRequest({",
+                  "                    url: baseUrl + '/api/visits/' + sid + '/timeline?pageSize=50',",
+                  "                    method: 'GET',",
+                  "                    header: { 'Authorization': 'Bearer ' + token }",
+                  "                }, function(err5, res5) {",
+                  "                    if (err5) { pm.expect.fail('Get timeline failed: ' + err5); return; }",
+                  "                    pm.test('Step 5 - Timeline: 200', function() { pm.expect(res5.code).to.eql(200); });",
+                  "                    var items = res5.json().data.items;",
+                  "                    var found = false;",
+                  "                    for (var i = 0; i < items.length; i++) {",
+                  "                        if (items[i].kind === 'system_event' && items[i].eventType === 'session_suspended') {",
+                  "                            found = true;",
+                  "                            break;",
+                  "                        }",
+                  "                    }",
+                  "                    pm.test('Timeline contains session_suspended event', function() {",
+                  "                        pm.expect(found).to.be.true;",
+                  "                    });",
+                  "                });",
+                  "            });",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Suspend Session - Self-contained: creates session, sends message, suspends, verifies detail + timeline"
+          }
+        },
+        {
+          "name": "❌ POST Suspend - Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', function() { pm.response.to.have.status(404); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('SESSION_NOT_FOUND error', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('SESSION_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/non-existent-session/suspend",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sessionId\":\"non-existent-session\"}"
+            }
+          }
+        },
+        {
           "name": "✅ POST Exit Visit",
           "event": [
             {
@@ -2500,6 +2653,42 @@
               "raw": "{\"sessionId\":\"{{sessionId}}\",\"cardId\":\"{{cardId}}\",\"content\":\"这个检查必须做吗？\",\"requestId\":\"lock-req-{{$timestamp}}\"}"
             }
           }
+        },
+        {
+          "name": "❌ POST Suspend - Invalid State (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('INVALID_STATE error', function() {",
+                  "    pm.expect(jsonData.error.code).to.eql('INVALID_STATE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/visits/{{sessionId}}/suspend",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sessionId\":\"{{sessionId}}\"}"
+            }
+          }
         }
       ]
     },
@@ -2550,6 +2739,82 @@
             "body": {
               "mode": "raw",
               "raw": "{\"patientId\":\"{{patientId}}\",\"name\":\"李明\",\"phone\":\"13800002468\",\"province\":\"辽宁省\",\"city\":\"沈阳市\",\"district\":\"浑南区\",\"detail\":\"创新路195号\",\"tag\":\"公司\"}"
+            }
+          }
+        },
+        {
+          "name": "❌ POST Create Address - Empty Tag (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR for empty tag', function() {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.message.toLowerCase()).to.include('tag');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"patientId\":\"{{patientId}}\",\"name\":\"测试\",\"phone\":\"13800002468\",\"province\":\"辽宁省\",\"city\":\"沈阳市\",\"district\":\"浑南区\",\"detail\":\"测试地址100号\",\"tag\":\"\"}"
+            }
+          }
+        },
+        {
+          "name": "❌ POST Create Address - Tag Too Long (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR for long tag', function() {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.message.toLowerCase()).to.include('tag');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"patientId\":\"{{patientId}}\",\"name\":\"测试\",\"phone\":\"13800002468\",\"province\":\"辽宁省\",\"city\":\"沈阳市\",\"district\":\"浑南区\",\"detail\":\"测试地址100号\",\"tag\":\"abcdefghijklmnopqrstu\"}"
             }
           }
         },
@@ -2616,6 +2881,82 @@
                 "value": "Bearer {{accessToken}}"
               }
             ]
+          }
+        },
+        {
+          "name": "❌ PATCH Update Address - Empty Tag (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR for empty tag update', function() {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.message.toLowerCase()).to.include('tag');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/{{addressId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"tag\":\"\"}"
+            }
+          }
+        },
+        {
+          "name": "❌ PATCH Update Address - Tag Too Long (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', function() { pm.response.to.have.status(422); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('VALIDATION_ERROR for long tag update', function() {",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(jsonData.error.message.toLowerCase()).to.include('tag');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/addresses/{{addressId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"tag\":\"abcdefghijklmnopqrstu\"}"
+            }
           }
         },
         {
@@ -3358,6 +3699,101 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/health",
             "description": "Flow 8: Patient Context - Verify identity → Get context → Update profile"
+          }
+        },
+        {
+          "name": "🔄 Flow 9: Suspend Flow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var baseUrl = pm.environment.get('baseUrl');",
+                  "var token = pm.environment.get('accessToken');",
+                  "var pid = pm.environment.get('patientId');",
+                  "",
+                  "// Step 1: Create new session",
+                  "pm.sendRequest({",
+                  "    url: baseUrl + '/api/visits',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ patientId: pid, entryType: 'new', chiefComplaint: 'suspend流程测试' }) }",
+                  "}, function(err1, res1) {",
+                  "    if (err1) { pm.expect.fail('Create session failed: ' + err1); return; }",
+                  "    pm.test('Step 1 - Create Session: 200', function() { pm.expect(res1.code).to.eql(200); });",
+                  "    var sid = res1.json().data.session.id;",
+                  "",
+                  "    // Step 2: Send a message",
+                  "    var msgId = 'flow-suspend-' + Date.now();",
+                  "    pm.sendRequest({",
+                  "        url: baseUrl + '/api/visits/' + sid + '/messages',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid, content: '测试消息内容', clientMessageId: msgId }) }",
+                  "    }, function(err2, res2) {",
+                  "        if (err2) { pm.expect.fail('Send message failed: ' + err2); return; }",
+                  "        pm.test('Step 2 - Send Message: 200', function() { pm.expect(res2.code).to.eql(200); });",
+                  "",
+                  "        // Step 3: Suspend",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/visits/' + sid + '/suspend',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({ sessionId: sid }) }",
+                  "        }, function(err3, res3) {",
+                  "            if (err3) { pm.expect.fail('Suspend failed: ' + err3); return; }",
+                  "            pm.test('Step 3 - Suspend: 200', function() { pm.expect(res3.code).to.eql(200); });",
+                  "            var data = res3.json().data;",
+                  "            pm.test('Session suspended, timeline event created', function() {",
+                  "                pm.expect(data.session.status).to.eql('suspended');",
+                  "                pm.expect(data.session.lastActivityAt).to.be.a('string');",
+                  "                pm.expect(data.timelineItem.kind).to.eql('system_event');",
+                  "                pm.expect(data.timelineItem.eventType).to.eql('session_suspended');",
+                  "            });",
+                  "",
+                  "            // Step 4: Verify detail",
+                  "            pm.sendRequest({",
+                  "                url: baseUrl + '/api/visits/' + sid,",
+                  "                method: 'GET',",
+                  "                header: { 'Authorization': 'Bearer ' + token }",
+                  "            }, function(err4, res4) {",
+                  "                if (err4) { pm.expect.fail('Get detail failed: ' + err4); return; }",
+                  "                pm.test('Step 4 - Detail: 200 + suspended', function() {",
+                  "                    pm.expect(res4.code).to.eql(200);",
+                  "                    pm.expect(res4.json().data.status).to.eql('suspended');",
+                  "                });",
+                  "",
+                  "                // Step 5: Verify timeline",
+                  "                pm.sendRequest({",
+                  "                    url: baseUrl + '/api/visits/' + sid + '/timeline?pageSize=50',",
+                  "                    method: 'GET',",
+                  "                    header: { 'Authorization': 'Bearer ' + token }",
+                  "                }, function(err5, res5) {",
+                  "                    if (err5) { pm.expect.fail('Get timeline failed: ' + err5); return; }",
+                  "                    pm.test('Step 5 - Timeline: 200', function() { pm.expect(res5.code).to.eql(200); });",
+                  "                    var items = res5.json().data.items;",
+                  "                    var found = false;",
+                  "                    for (var i = 0; i < items.length; i++) {",
+                  "                        if (items[i].kind === 'system_event' && items[i].eventType === 'session_suspended') {",
+                  "                            found = true;",
+                  "                            break;",
+                  "                        }",
+                  "                    }",
+                  "                    pm.test('Timeline has session_suspended', function() { pm.expect(found).to.be.true; });",
+                  "                });",
+                  "            });",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health",
+            "description": "Flow 9: Suspend Flow - Create session → Send message → Suspend → Verify detail + timeline"
           }
         }
       ]
