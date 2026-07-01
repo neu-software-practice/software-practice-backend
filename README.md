@@ -61,7 +61,8 @@ software-practice-backend/
 │   ├── STRUCTURE.md            # 项目架构设计文档
 │   ├── PLAN.md                 # 分阶段实现计划
 │   ├── SPEC.md                 # 项目目标与要求
-│   └── front-api.md            # 前端 REST/SSE API 合约 (权威基线)
+│   └── rest-api.md             # 前端 REST/SSE API 合约 (权威基线)
+│   └── rest-api-patch-v*.md     # 版本化 API 变更补丁
 ├── scripts/precommit-check.sh  # Pre-commit 覆盖率检查脚本
 ├── Makefile                    # 常用命令速查
 ├── Dockerfile                  # 多阶段构建
@@ -179,7 +180,7 @@ go run ./cmd/server
 
 ## API 端点概览
 
-所有端点位于 `/api` 前缀下。完整字段级合约见 [`docs/front-api.md`](./docs/front-api.md)。
+所有端点位于 `/api` 前缀下。完整字段级合约见 [`docs/rest-api.md`](./docs/rest-api.md)（及版本化补丁 `rest-api-patch-v*.md`）。
 
 ### 鉴权说明
 
@@ -531,7 +532,7 @@ Gin Backend                    medAgent (独立进程)
 
 ## 前端接口合约
 
-[`docs/front-api.md`](./docs/front-api.md) 是前后端交互的**权威基线**，由前端 TypeScript Zod schema 自动梳理而成。包含:
+[`docs/rest-api.md`](./docs/rest-api.md) 是前后端交互的**权威基线**，由前端 TypeScript Zod schema 自动梳理而成。版本化补丁（`rest-api-patch-v*.md`）记录各版本增量变更。包含:
 
 - 全部端点请求/响应字段、枚举取值
 - SSE 事件结构与示例序列
@@ -617,6 +618,6 @@ docker compose up -d
 |------|------|
 | [`docs/STRUCTURE.md`](./docs/STRUCTURE.md) | 项目架构设计、技术栈、分层详情 |
 | [`docs/PLAN.md`](./docs/PLAN.md) | 分阶段实现计划与进度 |
-| [`docs/front-api.md`](./docs/front-api.md) | 前端 REST/SSE API 合约 (权威基线) |
+| [`docs/rest-api.md`](./docs/rest-api.md) | 前端 REST/SSE API 合约 (权威基线) |
 | [`medAgent/docs/后端接入指南.md`](./medAgent/docs/后端接入指南.md) | medAgent 接入指南 |
 | [`CLAUDE.md`](./CLAUDE.md) | Claude Code AI 助手指令 |

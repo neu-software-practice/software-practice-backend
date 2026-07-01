@@ -5,7 +5,7 @@
 > **基线文档**：
 > - [SPEC.md](./SPEC.md) — 项目目标与质量要求
 > - [STRUCTURE.md](./STRUCTURE.md) — 软件架构、分层设计与包结构
-> - [front-api.md](./front-api.md) — 前端 REST/SSE API 合约（权威基线）
+> - [rest-api.md](./rest-api.md) — 前端 REST/SSE API 合约（权威基线）
 
 ---
 
@@ -113,10 +113,10 @@ pre-commit run --all-files # 通过（初期无 .go 文件，空运行）
 | --- | --- |
 | `internal/model/enums.go` | 全部状态枚举常量：`VisitStatus`(10值)、`VisitMachineState`(17值)、`TerminalReason`(7值)、`PaymentStatus`(5值)、`VisitEntryType`、`FlowCardKind`(9值)、`FlowCardStatus`(9值)、`TimelineItemKind`(4值)、`TimelineItemStatus`(5值)、`SystemEventType`(8值)、`SSEEventType`(7值) |
 | `internal/model/patient.go` | `PatientProfile`、`PatientContext`、`PatientPriorVisit`、`ProfileUpdateInput`、`CredentialType`、`ReadableScope` |
-| `internal/model/visit.go` | `VisitSession`(含全部字段，对齐 front-api.md §5.2 `visitSessionSchema`)、`VisitSessionSummary`、`VisitSummary`、`VisitSnapshot`、`CreateSessionInput`、`CreateFollowUpInput` |
+| `internal/model/visit.go` | `VisitSession`(含全部字段，对齐 rest-api.md §5.2 `visitSessionSchema`)、`VisitSessionSummary`、`VisitSummary`、`VisitSnapshot`、`CreateSessionInput`、`CreateFollowUpInput` |
 | `internal/model/timeline.go` | `TimelineItem` 判别联合（message/flow_card/system_event/terminal），`TimelineItemBase`、各 kind 专属字段 |
-| `internal/model/flow_card.go` | `FlowCard` 判别联合（9 种类型），`FlowCardBase`、各 kind 专属字段，对齐 front-api.md §6.3 |
-| `internal/model/sse.go` | `AssistantStreamEvent` 判别联合（7 种 type），对齐 front-api.md §6.2 |
+| `internal/model/flow_card.go` | `FlowCard` 判别联合（9 种类型），`FlowCardBase`、各 kind 专属字段，对齐 rest-api.md §6.3 |
+| `internal/model/sse.go` | `AssistantStreamEvent` 判别联合（7 种 type），对齐 rest-api.md §6.2 |
 | `internal/model/payment.go` | `PaymentStatus`、`PaymentItem`、`PaymentInfo` |
 | `internal/model/errors.go` | 业务错误 sentinel：`ErrSessionNotFound`、`ErrPatientNotFound`、`ErrCardNotFound`、`ErrValidation` 等 |
 
@@ -129,7 +129,7 @@ go build ./internal/model/...
 # 2. 序列化/反序列化测试
 go test -v ./internal/model/...
 
-# 3. JSON tag 对齐 front-api.md
+# 3. JSON tag 对齐 rest-api.md
 # 手动核对关键结构体的 JSON 输出与文档一致
 
 # 4. 枚举常量与文档一致
@@ -438,7 +438,7 @@ go test -v ./internal/adapter/... -cover
 go test -v ./internal/handler/... -cover
 # 覆盖率 ≥90%
 
-# 2. Endpoint 对比（front-api.md §4 清单）
+# 2. Endpoint 对比（rest-api.md §4 清单）
 # 全部 22 个 endpoint 逐一验证：
 curl -X POST /api/patients/verify -H "Content-Type: application/json" -d '{...}'
 curl -X GET  /api/patients/:id/context
@@ -476,7 +476,7 @@ curl -X GET  /api/patients/:id/context
 
 | 文件 | 说明 |
 | --- | --- |
-| `tests/newman/neuhis-agent.postman_collection.json` | Newman 冒烟测试集：覆盖 front-api.md §7.1–§7.5 核心时序（新建会话→聊天→检验→缴费→诊断→用药→取药→完成、急症、超时退出、完成态咨询/复诊） |
+| `tests/newman/neuhis-agent.postman_collection.json` | Newman 冒烟测试集：覆盖 rest-api.md §7.1–§7.5 核心时序（新建会话→聊天→检验→缴费→诊断→用药→取药→完成、急症、超时退出、完成态咨询/复诊） |
 | `tests/newman/neuhis-agent.postman_environment.json` | 环境变量：Docker Compose 服务地址 |
 | `tests/seed/testdata.sql` | 测试种子数据更新：预置患者、历史会话 |
 | `docker-compose.yml` | **更新**：确保 Gin 服务可连接 MySQL + medAgent，Newman 作为一次性服务运行 |
@@ -618,7 +618,7 @@ Phase 0 ────────────────────────
 | testcontainers 需 Docker 环境 | CI 使用 `ubuntu-latest` + Docker；本地开发需 Docker Desktop/Docker Engine |
 | 状态机复杂度（17 种内部态） | Phase 1 先定义完整状态转移表；Phase 5b 用表驱动测试覆盖全部转移 |
 | SSE 流式传输调试困难 | Phase 7 先实现 `SSEWriter` 工具，用 `httptest` 的 `ResponseRecorder` 验证事件序列 |
-| front-api.md 与 medAgent 的边界差异 | 严格按照 STRUCTURE.md §6.5 边界表处理：治疗执行映射为 REFERRAL、急症恢复需后端显式支持、总计时由前端发起 |
+| rest-api.md 与 medAgent 的边界差异 | 严格按照 STRUCTURE.md §6.5 边界表处理：治疗执行映射为 REFERRAL、急症恢复需后端显式支持、总计时由前端发起 |
 
 ---
 
