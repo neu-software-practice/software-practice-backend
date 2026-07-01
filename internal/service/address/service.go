@@ -74,7 +74,7 @@ func (s *Service) CreateAddress(ctx context.Context, patientID string, input mod
 		District:  input.District,
 		Detail:    input.Detail,
 		IsDefault: input.IsDefault,
-		Tag:       input.Tag,
+		Tag:       &input.Tag,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -123,7 +123,7 @@ func (s *Service) UpdateAddress(ctx context.Context, patientID, addressID string
 		updatedAddr.Detail = *input.Detail
 	}
 	if input.Tag != nil {
-		updatedAddr.Tag = *input.Tag
+		updatedAddr.Tag = input.Tag
 	}
 
 	// Handle IsDefault

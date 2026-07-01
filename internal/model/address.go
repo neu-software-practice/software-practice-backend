@@ -4,18 +4,18 @@ import "time"
 
 // Address represents a patient's delivery address.
 type Address struct {
-	ID        string     `json:"id"`
-	PatientID string     `json:"patientId"`
-	Name      string     `json:"name"`
-	Phone     string     `json:"phone"`
-	Province  string     `json:"province"`
-	City      string     `json:"city"`
-	District  string     `json:"district"`
-	Detail    string     `json:"detail"`
-	IsDefault bool       `json:"isDefault"`
-	Tag       AddressTag `json:"tag"`
-	CreatedAt time.Time  `json:"createdAt"`
-	UpdatedAt time.Time  `json:"updatedAt"`
+	ID        string      `json:"id"`
+	PatientID string      `json:"patientId"`
+	Name      string      `json:"name"`
+	Phone     string      `json:"phone"`
+	Province  string      `json:"province"`
+	City      string      `json:"city"`
+	District  string      `json:"district"`
+	Detail    string      `json:"detail"`
+	IsDefault bool        `json:"isDefault,omitempty"`
+	Tag       *AddressTag `json:"tag,omitempty"`
+	CreatedAt time.Time   `json:"createdAt"`
+	UpdatedAt time.Time   `json:"updatedAt"`
 }
 
 // CreateAddressInput is the request body for POST /patients/:patientId/addresses.

@@ -60,7 +60,7 @@ type VisitSessionSummary struct {
 type VisitSnapshot struct {
 	Session        VisitSession   `json:"session"`
 	Timeline       []TimelineItem `json:"timeline"`
-	Readonly       bool           `json:"readonly,omitempty"`
+	Readonly       bool           `json:"readonly"`
 	TerminalReason *string        `json:"terminalReason,omitempty"`
 }
 

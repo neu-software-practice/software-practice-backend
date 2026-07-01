@@ -34,6 +34,9 @@ func setupDB(t *testing.T) (*sql.DB, func()) {
 // strPtr is a small helper that returns a pointer to its argument.
 func strPtr(s string) *string { return &s }
 
+// addrTagPtr is a small helper that returns a pointer to an AddressTag.
+func addrTagPtr(t model.AddressTag) *model.AddressTag { return &t }
+
 // createPatient is a test helper that creates and returns a minimal patient.
 func createPatient(ctx context.Context, t *testing.T, repo repository.PatientRepository) *model.PatientProfile {
 	t.Helper()
@@ -1047,7 +1050,7 @@ func TestAddressRepo_CRUD(t *testing.T) {
 		District:  "浑南区",
 		Detail:    "创新路195号",
 		IsDefault: true,
-		Tag:       model.AddressTagCompany,
+		Tag:       addrTagPtr(model.AddressTagCompany),
 	}
 	if err := addrRepo.Create(ctx, addr); err != nil {
 		t.Fatalf("Create: %v", err)
@@ -1916,7 +1919,7 @@ func TestAddressRepo_EdgeCases(t *testing.T) {
 			District:  "朝阳区",
 			Detail:    "测试地址",
 			IsDefault: false,
-			Tag:       model.AddressTagHome,
+			Tag:       addrTagPtr(model.AddressTagHome),
 		}
 		if err := addrRepo.Create(ctx, addr); err != nil {
 			t.Fatalf("first Create: %v", err)
@@ -1954,7 +1957,7 @@ func TestAddressRepo_EdgeCases(t *testing.T) {
 			District:  "朝阳区",
 			Detail:    "test",
 			IsDefault: false,
-			Tag:       model.AddressTagHome,
+			Tag:       addrTagPtr(model.AddressTagHome),
 		}
 		err = addrRepo.Create(ctx, addr)
 		if err == nil {

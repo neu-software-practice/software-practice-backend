@@ -12,6 +12,8 @@ import (
 
 var _ repository.AddressRepository = (*mockAddressRepo)(nil)
 
+func addrTagPtr(t model.AddressTag) *model.AddressTag { return &t }
+
 type mockAddressRepo struct {
 	createFunc                func(ctx context.Context, addr *model.Address) error
 	findByIDFunc              func(ctx context.Context, id string) (*model.Address, error)
@@ -59,7 +61,7 @@ func makeTestAddress(patientID string) *model.Address {
 		District:  "浑南区",
 		Detail:    "创新路195号",
 		IsDefault: false,
-		Tag:       model.AddressTagCompany,
+		Tag:       addrTagPtr(model.AddressTagCompany),
 	}
 }
 
