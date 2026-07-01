@@ -1,0 +1,1 @@
+ALTER TABLE visits ADD COLUMN patient_name VARCHAR(100) NOT NULL DEFAULT '' AFTER patient_id;

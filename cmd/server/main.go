@@ -81,7 +81,7 @@ func main() {
 
 	// Initialize services
 	patientSvc := patientsvc.NewService(patientRepo, visitRepo)
-	visitSvc := visitsvc.NewService(visitRepo, timelineRepo)
+	visitSvc := visitsvc.NewService(visitRepo, timelineRepo, patientRepo)
 	workbenchSvc := wbsvc.NewService(
 		patientRepo, visitRepo, timelineRepo, flowCardRepo, addressRepo,
 		visitSvc, medAgentClient, cfg.MedAgentMode, llmClient,

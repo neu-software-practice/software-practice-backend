@@ -9,6 +9,7 @@ import (
 type VisitSession struct {
 	ID                string       `json:"id"`
 	PatientID         string       `json:"patientId"`
+	PatientName       string       `json:"patientName"`
 	EntryType         string       `json:"entryType"`
 	Status            string       `json:"status"`
 	MachineState      string       `json:"-"`
@@ -43,6 +44,7 @@ type VisitSummary struct {
 type VisitSessionSummary struct {
 	ID              string       `json:"id"`
 	PatientID       string       `json:"patientId"`
+	PatientName     string       `json:"patientName"`
 	EntryType       string       `json:"entryType"`
 	Status          string       `json:"status"`
 	StartedAt       time.Time    `json:"startedAt"`

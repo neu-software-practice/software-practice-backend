@@ -35,6 +35,14 @@ func (h *VisitHandler) CreateSession(c *gin.Context) {
 
 	result, err := h.svc.CreateSession(c.Request.Context(), input)
 	if err != nil {
+		if errors.Is(err, model.ErrPatientNotFound) {
+			apperrors.WriteError(c, apperrors.NewApiError(
+				apperrors.CodePatientNotFound,
+				"patient not found",
+				http.StatusNotFound,
+			))
+			return
+		}
 		apperrors.WriteError(c, apperrors.NewValidationError(err.Error()))
 		return
 	}
@@ -59,6 +67,14 @@ func (h *VisitHandler) CreateFollowUp(c *gin.Context) {
 
 	result, err := h.svc.CreateFollowUp(c.Request.Context(), input)
 	if err != nil {
+		if errors.Is(err, model.ErrPatientNotFound) {
+			apperrors.WriteError(c, apperrors.NewApiError(
+				apperrors.CodePatientNotFound,
+				"patient not found",
+				http.StatusNotFound,
+			))
+			return
+		}
 		apperrors.WriteError(c, apperrors.NewApiError(
 			apperrors.CodeSessionNotFound,
 			err.Error(),

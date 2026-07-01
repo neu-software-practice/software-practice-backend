@@ -61,6 +61,7 @@ func createVisit(ctx context.Context, t *testing.T, repo repository.VisitReposit
 	v := &model.VisitSession{
 		ID:            uuid.New().String(),
 		PatientID:     patientID,
+		PatientName:   "",
 		EntryType:     string(model.VisitEntryTypeNew),
 		Status:        string(model.VisitStatusLoadingContext),
 		AskRound:      0,

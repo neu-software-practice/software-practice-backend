@@ -15,13 +15,15 @@ import (
 type Service struct {
 	visitRepo    repository.VisitRepository
 	timelineRepo repository.TimelineRepository
+	patientRepo  repository.PatientRepository
 }
 
 // NewService creates a new VisitService.
-func NewService(visitRepo repository.VisitRepository, timelineRepo repository.TimelineRepository) *Service {
+func NewService(visitRepo repository.VisitRepository, timelineRepo repository.TimelineRepository, patientRepo repository.PatientRepository) *Service {
 	return &Service{
 		visitRepo:    visitRepo,
 		timelineRepo: timelineRepo,
+		patientRepo:  patientRepo,
 	}
 }
 
@@ -43,12 +45,18 @@ type createSessionParams struct {
 // createSession is the shared session-creation helper used by CreateSession and CreateFollowUp.
 // It creates the session in DB, appends the initial timeline, and transitions to chatting.
 func (s *Service) createSession(ctx context.Context, params createSessionParams) (*model.CreateSessionResult, error) {
+	patient, err := s.patientRepo.FindByID(ctx, params.PatientID)
+	if err != nil {
+		return nil, err
+	}
+
 	sessionID := uuid.New().String()
 	now := time.Now()
 
 	session := &model.VisitSession{
 		ID:              sessionID,
 		PatientID:       params.PatientID,
+		PatientName:     patient.Name,
 		EntryType:       params.EntryType,
 		Status:          string(model.VisitStatusLoadingContext),
 		MachineState:    string(model.VisitMachineStateLoadingContext),
