@@ -77,19 +77,27 @@ func (s *Service) GetContext(ctx context.Context, patientID string) (*model.Pati
 		LongTermMedications: normalizeStringSlice(patient.LongTermMedications),
 	}
 
-	// Get last completed visit for prior visit summary
-	summaries, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, nil, 1)
-	if err == nil && len(summaries) > 0 {
-		last := summaries[0]
-		completedAt := last.UpdatedAt
-		if last.EndedAt != nil {
-			completedAt = *last.EndedAt
-		}
-		ctx2.PriorVisit = &model.PatientPriorVisit{
-			SessionID:        last.ID,
-			CompletedAt:      completedAt,
-			Diagnosis:        stringDeref(last.Summary.Diagnosis),
-			TreatmentSummary: stringDeref(last.Summary.TreatmentSummary),
+	// Get last completed visit for prior visit summary.
+	// Fetch a reasonable batch and stop at the first completed visit so that
+	// in-progress visits (which may not have a diagnosis/treatment-summary yet)
+	// are skipped.
+	summaries, _, _, err := s.visitRepo.ListByPatient(ctx, patientID, nil, 10)
+	if err == nil {
+		for i := range summaries {
+			if summaries[i].Status == string(model.VisitStatusCompleted) {
+				last := summaries[i]
+				completedAt := last.UpdatedAt
+				if last.EndedAt != nil {
+					completedAt = *last.EndedAt
+				}
+				ctx2.PriorVisit = &model.PatientPriorVisit{
+					SessionID:        last.ID,
+					CompletedAt:      completedAt,
+					Diagnosis:        stringDeref(last.Summary.Diagnosis),
+					TreatmentSummary: stringDeref(last.Summary.TreatmentSummary),
+				}
+				break
+			}
 		}
 	}
 
