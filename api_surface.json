@@ -1,0 +1,715 @@
+{
+  "baseUrl": "/api",
+  "routes": [
+    {"method":"GET","path":"/api/health","handler":"inline (gin.HandlerFunc)","middleware":[],"authRequired":false},
+    {"method":"POST","path":"/api/auth/register","handler":"AuthHandler.Register","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"POST","path":"/api/auth/login","handler":"AuthHandler.Login","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"POST","path":"/api/auth/refresh","handler":"AuthHandler.Refresh","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"POST","path":"/api/auth/logout","handler":"AuthHandler.Logout","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"POST","path":"/api/patients/verify","handler":"PatientHandler.VerifyIdentity","middleware":[],"authRequired":false},
+    {"method":"GET","path":"/api/patients/:patientId/context","handler":"PatientHandler.GetContext","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"PATCH","path":"/api/patients/:patientId/profile","handler":"PatientHandler.UpdateProfile","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits","handler":"VisitHandler.CreateSession","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/follow-up","handler":"VisitHandler.CreateFollowUp","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/visits","handler":"VisitHandler.ListSessions","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/visits/:sessionId","handler":"VisitHandler.GetSession","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/visits/:sessionId/snapshot","handler":"VisitHandler.GetSnapshot","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/suspend","handler":"VisitHandler.SuspendVisit","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/visits/:sessionId/timeline","handler":"WorkbenchHandler.ListTimeline","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/messages","handler":"WorkbenchHandler.SendMessage","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/assistant-stream","handler":"WorkbenchHandler.StreamAssistantMessage","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/lab-decision","handler":"WorkbenchHandler.SubmitLabDecision","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/payments","handler":"WorkbenchHandler.SubmitPayment","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/fulfillment","handler":"WorkbenchHandler.SubmitFulfillment","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/treatment-execution","handler":"WorkbenchHandler.SubmitTreatmentExecution","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/advice-ack","handler":"WorkbenchHandler.AckAdvice","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/lock-question","handler":"WorkbenchHandler.AskLockedQuestion","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/classify-intent","handler":"WorkbenchHandler.ClassifyIntent","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/consult","handler":"WorkbenchHandler.StreamConsultationReply","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/vitals","handler":"WorkbenchHandler.ReportVitals","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/exit","handler":"WorkbenchHandler.ExitVisit","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/timer","handler":"WorkbenchHandler.ToggleTimer","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/dismiss-emergency","handler":"WorkbenchHandler.DismissEmergency","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/visits/:sessionId/generate-title","handler":"WorkbenchHandler.GenerateTitle","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/patients/:patientId/addresses","handler":"AddressHandler.ListAddresses","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/api/patients/:patientId/addresses","handler":"AddressHandler.CreateAddress","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"PATCH","path":"/api/patients/:patientId/addresses/:addressId","handler":"AddressHandler.UpdateAddress","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"DELETE","path":"/api/patients/:patientId/addresses/:addressId","handler":"AddressHandler.DeleteAddress","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"PUT","path":"/api/patients/:patientId/addresses/:addressId/default","handler":"AddressHandler.SetDefaultAddress","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/billing/records","handler":"BillingHandler.ListBillingRecords","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/api/medical-orders","handler":"MedicalOrderHandler.ListMedicalOrders","middleware":["AuthMiddleware"],"authRequired":true},
+    {"method":"POST","path":"/admin/auth/login","handler":"AdminHandler.Login","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"POST","path":"/admin/auth/logout","handler":"AdminHandler.Logout","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"POST","path":"/admin/auth/refresh","handler":"AdminHandler.Refresh","middleware":["RateLimitMiddleware(5.0/60.0,5)"],"authRequired":false},
+    {"method":"GET","path":"/admin/dashboard/stats","handler":"AdminHandler.GetDashboardStats","middleware":["AdminAuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/admin/patients","handler":"AdminHandler.ListPatients","middleware":["AdminAuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/admin/patients/:id","handler":"AdminHandler.GetPatientDetail","middleware":["AdminAuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/admin/sessions","handler":"AdminHandler.ListSessions","middleware":["AdminAuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/admin/sessions/:id","handler":"AdminHandler.GetSessionDetail","middleware":["AdminAuthMiddleware"],"authRequired":true},
+    {"method":"GET","path":"/admin/settings","handler":"AdminHandler.GetSettings","middleware":["AdminAuthMiddleware"],"authRequired":true},
+    {"method":"PUT","path":"/admin/settings","handler":"AdminHandler.UpdateSettings","middleware":["AdminAuthMiddleware"],"authRequired":true}
+  ],
+  "requestStructs": [
+    {
+      "name": "model.RegisterInput",
+      "usedBy": ["POST /api/auth/register"],
+      "fields": [
+        {"name":"phone","type":"string","json":"phone", "binding":""},
+        {"name":"password","type":"string","json":"password", "binding":""},
+        {"name":"realName","type":"string","json":"realName,omitempty", "binding":"optional"}
+      ]
+    },
+    {
+      "name": "model.LoginInput",
+      "usedBy": ["POST /api/auth/login"],
+      "fields": [
+        {"name":"phone","type":"string","json":"phone"},
+        {"name":"password","type":"string","json":"password"}
+      ]
+    },
+    {
+      "name": "model.RefreshInput",
+      "usedBy": ["POST /api/auth/refresh"],
+      "fields": [
+        {"name":"refreshToken","type":"string","json":"refreshToken"}
+      ]
+    },
+    {
+      "name": "model.LogoutInput",
+      "usedBy": ["POST /api/auth/logout"],
+      "fields": [
+        {"name":"refreshToken","type":"string","json":"refreshToken"}
+      ]
+    },
+    {
+      "name": "model.VerifyIdentityInput",
+      "usedBy": ["POST /api/patients/verify"],
+      "fields": [
+        {"name":"credentialType","type":"string","json":"credentialType","enum":"phone|id_card"},
+        {"name":"credential","type":"string","json":"credential"},
+        {"name":"name","type":"string","json":"name,omitempty","optional":true}
+      ]
+    },
+    {
+      "name": "model.ProfileUpdateInput",
+      "usedBy": ["PATCH /api/patients/:patientId/profile"],
+      "fields": [
+        {"name":"patientId","type":"string","json":"patientId"},
+        {"name":"allergies","type":"[]string","json":"allergies,omitempty","optional":true},
+        {"name":"chronicDiseases","type":"[]string","json":"chronicDiseases,omitempty","optional":true},
+        {"name":"longTermMedications","type":"[]string","json":"longTermMedications,omitempty","optional":true},
+        {"name":"medicalHistory","type":"[]string","json":"medicalHistory,omitempty","optional":true}
+      ]
+    },
+    {
+      "name": "model.CreateSessionInput",
+      "usedBy": ["POST /api/visits"],
+      "fields": [
+        {"name":"patientId","type":"string","json":"patientId"},
+        {"name":"entryType","type":"string","json":"entryType","enum":"new"},
+        {"name":"chiefComplaint","type":"string","json":"chiefComplaint,omitempty"}
+      ]
+    },
+    {
+      "name": "model.CreateFollowUpInput",
+      "usedBy": ["POST /api/visits/:sessionId/follow-up"],
+      "fields": [
+        {"name":"patientId","type":"string","json":"patientId"},
+        {"name":"parentSessionId","type":"string","json":"parentSessionId"},
+        {"name":"chiefComplaint","type":"string","json":"chiefComplaint,omitempty"}
+      ]
+    },
+    {
+      "name": "handler.SendMessageRequest",
+      "usedBy": ["POST /api/visits/:sessionId/messages"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"content","type":"string","json":"content"},
+        {"name":"clientMessageId","type":"string","json":"clientMessageId"}
+      ]
+    },
+    {
+      "name": "handler.StreamAssistantRequest",
+      "usedBy": ["POST /api/visits/:sessionId/assistant-stream"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"requestId","type":"string","json":"requestId"},
+        {"name":"clientMessageId","type":"string","json":"clientMessageId,omitempty"}
+      ]
+    },
+    {
+      "name": "handler.LabDecisionRequest",
+      "usedBy": ["POST /api/visits/:sessionId/lab-decision"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"cardId","type":"string","json":"cardId"},
+        {"name":"decision","type":"string","json":"decision","enum":"accepted|skipped|vetoed"}
+      ]
+    },
+    {
+      "name": "model.SubmitPaymentInput",
+      "usedBy": ["POST /api/visits/:sessionId/payments"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"cardId","type":"string","json":"cardId"},
+        {"name":"purpose","type":"string","json":"purpose","enum":"lab|medication"},
+        {"name":"paymentMethodId","type":"string","json":"paymentMethodId,omitempty","optional":true},
+        {"name":"simulateStatus","type":"string","json":"simulateStatus,omitempty","optional":true},
+        {"name":"defer","type":"bool","json":"defer,omitempty","optional":true}
+      ]
+    },
+    {
+      "name": "workbench.SubmitFulfillmentInput",
+      "usedBy": ["POST /api/visits/:sessionId/fulfillment"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"cardId","type":"string","json":"cardId"},
+        {"name":"mode","type":"string","json":"mode","enum":"pickup|delivery"},
+        {"name":"addressId","type":"string","json":"addressId,omitempty","optional":true}
+      ]
+    },
+    {
+      "name": "workbench.SubmitTreatmentExecutionInput",
+      "usedBy": ["POST /api/visits/:sessionId/treatment-execution"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"cardId","type":"string","json":"cardId"},
+        {"name":"action","type":"string","json":"action","enum":"schedule|confirm_arrival|start|complete|cancel"}
+      ]
+    },
+    {
+      "name": "handler.AckAdviceRequest",
+      "usedBy": ["POST /api/visits/:sessionId/advice-ack"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"cardId","type":"string","json":"cardId"}
+      ]
+    },
+    {
+      "name": "handler.LockQuestionRequest",
+      "usedBy": ["POST /api/visits/:sessionId/lock-question"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"cardId","type":"string","json":"cardId"},
+        {"name":"content","type":"string","json":"content"},
+        {"name":"requestId","type":"string","json":"requestId"}
+      ]
+    },
+    {
+      "name": "handler.ClassifyIntentRequest",
+      "usedBy": ["POST /api/visits/:sessionId/classify-intent"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"content","type":"string","json":"content"}
+      ]
+    },
+    {
+      "name": "handler.ConsultRequest",
+      "usedBy": ["POST /api/visits/:sessionId/consult"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"content","type":"string","json":"content"},
+        {"name":"requestId","type":"string","json":"requestId"}
+      ]
+    },
+    {
+      "name": "handler.VitalsRequest",
+      "usedBy": ["POST /api/visits/:sessionId/vitals"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"source","type":"string","json":"source","enum":"patient_report|device|manual"},
+        {"name":"vitals","type":"map[string]interface{}","json":"vitals,omitempty","optional":true},
+        {"name":"symptoms","type":"[]string","json":"symptoms"}
+      ]
+    },
+    {
+      "name": "model.ExitVisitInput",
+      "usedBy": ["POST /api/visits/:sessionId/exit"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"reason","type":"string","json":"reason","enum":"patient_request|timeout|emergency|other"}
+      ]
+    },
+    {
+      "name": "handler.TimerRequest",
+      "usedBy": ["POST /api/visits/:sessionId/timer"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"action","type":"string","json":"action","enum":"pause|resume"}
+      ]
+    },
+    {
+      "name": "handler.GenerateTitleRequest",
+      "usedBy": ["POST /api/visits/:sessionId/generate-title"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"}
+      ]
+    },
+    {
+      "name": "model.CreateAddressInput",
+      "usedBy": ["POST /api/patients/:patientId/addresses"],
+      "fields": [
+        {"name":"patientId","type":"string","json":"patientId"},
+        {"name":"name","type":"string","json":"name"},
+        {"name":"phone","type":"string","json":"phone"},
+        {"name":"province","type":"string","json":"province"},
+        {"name":"city","type":"string","json":"city"},
+        {"name":"district","type":"string","json":"district"},
+        {"name":"detail","type":"string","json":"detail"},
+        {"name":"isDefault","type":"bool","json":"isDefault"},
+        {"name":"tag","type":"string","json":"tag"}
+      ]
+    },
+    {
+      "name": "model.UpdateAddressInput",
+      "usedBy": ["PATCH /api/patients/:patientId/addresses/:addressId"],
+      "fields": [
+        {"name":"name","type":"*string","json":"name,omitempty","optional":true},
+        {"name":"phone","type":"*string","json":"phone,omitempty","optional":true},
+        {"name":"province","type":"*string","json":"province,omitempty","optional":true},
+        {"name":"city","type":"*string","json":"city,omitempty","optional":true},
+        {"name":"district","type":"*string","json":"district,omitempty","optional":true},
+        {"name":"detail","type":"*string","json":"detail,omitempty","optional":true},
+        {"name":"isDefault","type":"*bool","json":"isDefault,omitempty","optional":true},
+        {"name":"tag","type":"*string","json":"tag,omitempty","optional":true}
+      ]
+    },
+    {
+      "name": "model.AdminLoginInput",
+      "usedBy": ["POST /admin/auth/login"],
+      "fields": [
+        {"name":"username","type":"string","json":"username"},
+        {"name":"password","type":"string","json":"password"}
+      ]
+    },
+    {
+      "name": "model.AdminLogoutInput",
+      "usedBy": ["POST /admin/auth/logout"],
+      "fields": [
+        {"name":"refreshToken","type":"string","json":"refreshToken"}
+      ]
+    },
+    {
+      "name": "model.AdminRefreshInput",
+      "usedBy": ["POST /admin/auth/refresh"],
+      "fields": [
+        {"name":"refreshToken","type":"string","json":"refreshToken"}
+      ]
+    },
+    {
+      "name": "model.UpdateSystemSettingsInput",
+      "usedBy": ["PUT /admin/settings"],
+      "fields": [
+        {"name":"siteName","type":"*string","json":"siteName","optional":true},
+        {"name":"maxConcurrentSessions","type":"*int","json":"maxConcurrentSessions","optional":true},
+        {"name":"sessionTimeoutMinutes","type":"*int","json":"sessionTimeoutMinutes","optional":true},
+        {"name":"enableRegistration","type":"*bool","json":"enableRegistration","optional":true}
+      ]
+    }
+  ],
+  "responseStructs": [
+    {
+      "name": "model.AuthResponse",
+      "usedBy": ["POST /api/auth/register","POST /api/auth/login","POST /api/auth/refresh"],
+      "fields": [
+        {"name":"accessToken","type":"string","json":"accessToken"},
+        {"name":"refreshToken","type":"string","json":"refreshToken"},
+        {"name":"expiresIn","type":"int","json":"expiresIn"},
+        {"name":"user","type":"*UserInfo","json":"user,omitempty"}
+      ]
+    },
+    {
+      "name": "model.UserInfo",
+      "usedBy": ["POST /api/auth/register","POST /api/auth/login"],
+      "fields": [
+        {"name":"userId","type":"string","json":"userId"},
+        {"name":"patientId","type":"string","json":"patientId"},
+        {"name":"phone","type":"string","json":"phone"},
+        {"name":"realName","type":"string","json":"realName"}
+      ]
+    },
+    {
+      "name": "model.VerifyIdentityResult",
+      "usedBy": ["POST /api/patients/verify"],
+      "fields": [
+        {"name":"patient","type":"PatientProfile","json":"patient"},
+        {"name":"readableScopes","type":"[]string","json":"readableScopes"},
+        {"name":"verifiedAt","type":"time.Time","json":"verifiedAt"}
+      ]
+    },
+    {
+      "name": "model.PatientProfile",
+      "usedBy": ["POST /api/patients/verify","GET /api/patients/:patientId/context"],
+      "fields": [
+        {"name":"id","type":"string","json":"id"},
+        {"name":"name","type":"string","json":"name"},
+        {"name":"gender","type":"string","json":"gender","enum":"male|female|other|unknown"},
+        {"name":"age","type":"int","json":"age"},
+        {"name":"phoneMasked","type":"string","json":"phoneMasked,omitempty"},
+        {"name":"idCardMasked","type":"string","json":"idCardMasked,omitempty"},
+        {"name":"allergies","type":"[]string","json":"allergies"},
+        {"name":"chronicDiseases","type":"[]string","json":"chronicDiseases"},
+        {"name":"longTermMedications","type":"[]string","json":"longTermMedications"},
+        {"name":"updatedAt","type":"time.Time","json":"updatedAt,omitempty"}
+      ]
+    },
+    {
+      "name": "model.PatientContext",
+      "usedBy": ["GET /api/patients/:patientId/context"],
+      "fields": [
+        {"name":"patient","type":"PatientProfile","json":"patient"},
+        {"name":"chiefComplaint","type":"string","json":"chiefComplaint,omitempty"},
+        {"name":"allergies","type":"[]string","json":"allergies"},
+        {"name":"medicalHistory","type":"[]string","json":"medicalHistory"},
+        {"name":"longTermMedications","type":"[]string","json":"longTermMedications"},
+        {"name":"priorVisit","type":"*PatientPriorVisit","json":"priorVisit,omitempty"}
+      ]
+    },
+    {
+      "name": "model.VisitSession",
+      "usedBy": ["GET /api/visits/:sessionId"],
+      "fields": [
+        {"name":"id","type":"string","json":"id"},
+        {"name":"patientId","type":"string","json":"patientId"},
+        {"name":"entryType","type":"string","json":"entryType","enum":"new|follow_up"},
+        {"name":"status","type":"string","json":"status"},
+        {"name":"startedAt","type":"time.Time","json":"startedAt"},
+        {"name":"updatedAt","type":"time.Time","json":"updatedAt"},
+        {"name":"endedAt","type":"*time.Time","json":"endedAt,omitempty"},
+        {"name":"timeoutAt","type":"*time.Time","json":"timeoutAt,omitempty"},
+        {"name":"pausedAt","type":"*time.Time","json":"pausedAt,omitempty"},
+        {"name":"lastActivityAt","type":"*time.Time","json":"lastActivityAt,omitempty"},
+        {"name":"askRound","type":"int","json":"askRound"},
+        {"name":"askRoundLimit","type":"int","json":"askRoundLimit"},
+        {"name":"labRound","type":"int","json":"labRound"},
+        {"name":"labRoundLimit","type":"int","json":"labRoundLimit"},
+        {"name":"parentSessionId","type":"*string","json":"parentSessionId,omitempty"},
+        {"name":"terminalReason","type":"*string","json":"terminalReason,omitempty"},
+        {"name":"activeCardId","type":"*string","json":"activeCardId,omitempty"},
+        {"name":"timerPaused","type":"bool","json":"timerPaused"},
+        {"name":"summary","type":"VisitSummary","json":"summary"}
+      ]
+    },
+    {
+      "name": "model.VisitSnapshot",
+      "usedBy": ["GET /api/visits/:sessionId/snapshot"],
+      "fields": [
+        {"name":"session","type":"VisitSession","json":"session"},
+        {"name":"timeline","type":"[]TimelineItem","json":"timeline"},
+        {"name":"readonly","type":"bool","json":"readonly,omitempty"},
+        {"name":"terminalReason","type":"*string","json":"terminalReason,omitempty"}
+      ]
+    },
+    {
+      "name": "model.CreateSessionResult",
+      "usedBy": ["POST /api/visits","POST /api/visits/:sessionId/follow-up"],
+      "fields": [
+        {"name":"session","type":"VisitSession","json":"session"},
+        {"name":"initialTimeline","type":"[]TimelineItem","json":"initialTimeline"}
+      ]
+    },
+    {
+      "name": "model.FlowActionResult",
+      "usedBy": ["POST /api/visits/:sessionId/lab-decision","POST /api/visits/:sessionId/payments","POST /api/visits/:sessionId/fulfillment","POST /api/visits/:sessionId/treatment-execution","POST /api/visits/:sessionId/advice-ack"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"status","type":"string","json":"status"},
+        {"name":"activeCardId","type":"*string","json":"activeCardId,omitempty"},
+        {"name":"card","type":"*FlowCard","json":"card,omitempty"},
+        {"name":"timelineItems","type":"[]TimelineItem","json":"timelineItems"},
+        {"name":"message","type":"string","json":"message,omitempty"}
+      ]
+    },
+    {
+      "name": "workbench.SendMessageResult",
+      "usedBy": ["POST /api/visits/:sessionId/messages"],
+      "fields": [
+        {"name":"session","type":"VisitSession","json":"session"},
+        {"name":"patientMessage","type":"TimelineItem","json":"patientMessage"},
+        {"name":"assistantPlaceholder","type":"*TimelineItem","json":"assistantPlaceholder"}
+      ]
+    },
+    {
+      "name": "workbench.EmergencyRecheckResult",
+      "usedBy": ["POST /api/visits/:sessionId/vitals"],
+      "fields": [
+        {"name":"emergency","type":"bool","json":"emergency"},
+        {"name":"severity","type":"string","json":"severity,omitempty"},
+        {"name":"message","type":"string","json":"message,omitempty"}
+      ]
+    },
+    {
+      "name": "workbench.ClassifyIntentResult",
+      "usedBy": ["POST /api/visits/:sessionId/classify-intent"],
+      "fields": [
+        {"name":"intent","type":"string","json":"intent","enum":"consultation|follow_up|uncertain"},
+        {"name":"confidence","type":"float64","json":"confidence"},
+        {"name":"reason","type":"string","json":"reason,omitempty"}
+      ]
+    },
+    {
+      "name": "model.ExitSettlementResult",
+      "usedBy": ["POST /api/visits/:sessionId/exit"],
+      "fields": [
+        {"name":"sessionId","type":"string","json":"sessionId"},
+        {"name":"terminalReason","type":"string","json":"terminalReason"},
+        {"name":"refundAmount","type":"float64","json":"refundAmount"},
+        {"name":"payableAmount","type":"float64","json":"payableAmount"},
+        {"name":"timelineItem","type":"TimelineItem","json":"timelineItem"},
+        {"name":"consequence","type":"*ExitConsequence","json":"consequence,omitempty"}
+      ]
+    },
+    {
+      "name": "model.AddressListResponse",
+      "usedBy": ["GET /api/patients/:patientId/addresses"],
+      "fields": [
+        {"name":"addresses","type":"[]Address","json":"addresses"}
+      ]
+    },
+    {
+      "name": "model.DeleteAddressResponse",
+      "usedBy": ["DELETE /api/patients/:patientId/addresses/:addressId"],
+      "fields": [
+        {"name":"success","type":"bool","json":"success"}
+      ]
+    },
+    {
+      "name": "model.BillingRecordsResponse",
+      "usedBy": ["GET /api/billing/records"],
+      "fields": [
+        {"name":"items","type":"[]BillingRecord","json":"items"}
+      ]
+    },
+    {
+      "name": "model.MedicalOrdersResponse",
+      "usedBy": ["GET /api/medical-orders"],
+      "fields": [
+        {"name":"items","type":"[]MedicalOrderRecord","json":"items"}
+      ]
+    },
+    {
+      "name": "model.DashboardStats",
+      "usedBy": ["GET /admin/dashboard/stats"],
+      "fields": [
+        {"name":"totalPatients","type":"int","json":"totalPatients"},
+        {"name":"totalSessions","type":"int","json":"totalSessions"},
+        {"name":"activeSessions","type":"int","json":"activeSessions"},
+        {"name":"todayNewPatients","type":"int","json":"todayNewPatients"},
+        {"name":"todayNewSessions","type":"int","json":"todayNewSessions"}
+      ]
+    },
+    {
+      "name": "model.AdminLoginResult",
+      "usedBy": ["POST /admin/auth/login"],
+      "fields": [
+        {"name":"tokens","type":"AdminTokens","json":"tokens"},
+        {"name":"user","type":"AdminUser","json":"user"}
+      ]
+    },
+    {
+      "name": "model.AdminTokens",
+      "usedBy": ["POST /admin/auth/login","POST /admin/auth/refresh"],
+      "fields": [
+        {"name":"accessToken","type":"string","json":"accessToken"},
+        {"name":"refreshToken","type":"string","json":"refreshToken"},
+        {"name":"expiresIn","type":"int","json":"expiresIn"}
+      ]
+    },
+    {
+      "name": "model.AdminRefreshResult",
+      "usedBy": ["POST /admin/auth/refresh"],
+      "fields": [
+        {"name":"tokens","type":"AdminTokens","json":"tokens"}
+      ]
+    },
+    {
+      "name": "model.AdminLogoutResult",
+      "usedBy": ["POST /admin/auth/logout"],
+      "fields": [
+        {"name":"success","type":"bool","json":"success"}
+      ]
+    },
+    {
+      "name": "model.AdminPatientListResult",
+      "usedBy": ["GET /admin/patients"],
+      "fields": [
+        {"name":"items","type":"[]AdminPatientItem","json":"items"},
+        {"name":"total","type":"int","json":"total"},
+        {"name":"page","type":"int","json":"page"},
+        {"name":"pageSize","type":"int","json":"pageSize"}
+      ]
+    },
+    {
+      "name": "model.AdminSessionListResult",
+      "usedBy": ["GET /admin/sessions"],
+      "fields": [
+        {"name":"items","type":"[]AdminSessionItem","json":"items"},
+        {"name":"total","type":"int","json":"total"},
+        {"name":"page","type":"int","json":"page"},
+        {"name":"pageSize","type":"int","json":"pageSize"}
+      ]
+    },
+    {
+      "name": "model.SystemSettings",
+      "usedBy": ["GET /admin/settings","PUT /admin/settings"],
+      "fields": [
+        {"name":"siteName","type":"string","json":"siteName"},
+        {"name":"maxConcurrentSessions","type":"int","json":"maxConcurrentSessions"},
+        {"name":"sessionTimeoutMinutes","type":"int","json":"sessionTimeoutMinutes"},
+        {"name":"enableRegistration","type":"bool","json":"enableRegistration"}
+      ]
+    }
+  ],
+  "errorCodes": [
+    {"code":"SESSION_NOT_FOUND","httpStatus":404,"message":"session not found"},
+    {"code":"PATIENT_NOT_FOUND","httpStatus":404,"message":"patient not found"},
+    {"code":"CARD_NOT_FOUND","httpStatus":404,"message":"flow card not found"},
+    {"code":"VALIDATION_ERROR","httpStatus":422,"message":"invalid request body / validation error"},
+    {"code":"UNKNOWN_ERROR","httpStatus":500,"message":"unknown error"},
+    {"code":"NETWORK_ERROR","httpStatus":500,"message":"network error"},
+    {"code":"UNAUTHORIZED","httpStatus":401,"message":"unauthorized"},
+    {"code":"FORBIDDEN","httpStatus":403,"message":"forbidden"},
+    {"code":"NOT_FOUND","httpStatus":404,"message":"endpoint not found"},
+    {"code":"TIMEOUT","httpStatus":408,"message":"timeout"},
+    {"code":"INTERNAL_ERROR","httpStatus":500,"message":"internal server error"},
+    {"code":"AUTH_PHONE_EXISTS","httpStatus":409,"message":"phone already registered"},
+    {"code":"AUTH_INVALID_CREDENTIALS","httpStatus":401,"message":"invalid phone or password"},
+    {"code":"AUTH_TOKEN_EXPIRED","httpStatus":401,"message":"access token expired"},
+    {"code":"AUTH_REFRESH_INVALID","httpStatus":401,"message":"refresh token invalid"},
+    {"code":"AUTH_REFRESH_EXPIRED","httpStatus":401,"message":"refresh token expired"},
+    {"code":"RATE_LIMITED","httpStatus":429,"message":"too many requests, please try again later"},
+    {"code":"TITLE_ALREADY_EXISTS","httpStatus":409,"message":"title already exists"},
+    {"code":"LLM_UNAVAILABLE","httpStatus":503,"message":"LLM unavailable"},
+    {"code":"INVALID_STATE","httpStatus":422,"message":"invalid state"},
+    {"code":"ADDRESS_NOT_FOUND","httpStatus":404,"message":"address not found"},
+    {"code":"ADDRESS_LIMIT_EXCEEDED","httpStatus":400,"message":"address limit exceeded (max 10)"},
+    {"code":"ADDRESS_REQUIRED","httpStatus":400,"message":"addressId is required for delivery mode"},
+    {"code":"INVALID_CREDENTIALS","httpStatus":401,"message":"invalid username or password"},
+    {"code":"INVALID_REFRESH_TOKEN","httpStatus":401,"message":"refresh token invalid or expired"},
+    {"code":"INVALID_SETTINGS","httpStatus":400,"message":"invalid settings"}
+  ],
+  "enums": [
+    {
+      "name": "VisitStatus",
+      "values": ["loading_context","chatting","analyzing","blocked","diagnosis","treatment","completed","suspended","transferred","emergency_terminated","exited"]
+    },
+    {
+      "name": "VisitMachineState",
+      "values": ["loadingContext","chatting","analyzing","labDecision","labPayment","labExecution","diagnosis","treatmentDecision","medicationPayment","medicationFulfillment","treatmentExecution","adviceOnly","completed","suspended","emergencyPending","terminated","exitSettlement","exited","transferred"]
+    },
+    {
+      "name": "TerminalReason",
+      "values": ["emergency","timeout","ask_limit_reached","lab_limit_reached","referral","capability_insufficient","exited"]
+    },
+    {
+      "name": "PaymentStatus",
+      "values": ["unpaid","pending","paid","failed","refunded"]
+    },
+    {
+      "name": "VisitEntryType",
+      "values": ["new","follow_up"]
+    },
+    {
+      "name": "FlowCardKind",
+      "values": ["lab_decision","payment","lab_execution","diagnosis","treatment_plan","medication_fulfillment","treatment_execution","advice_only","completed_visit"]
+    },
+    {
+      "name": "FlowCardStatus",
+      "values": ["pending","accepted","skipped","vetoed","paid","processing","completed","failed","invalidated"]
+    },
+    {
+      "name": "TimelineItemKind",
+      "values": ["message","flow_card","system_event","terminal"]
+    },
+    {
+      "name": "TimelineItemStatus",
+      "values": ["pending","streaming","done","failed","invalidated"]
+    },
+    {
+      "name": "SystemEventType",
+      "values": ["context_loaded","agent_thinking","lab_result_received","payment_succeeded","drug_purchased","follow_up_started","emergency_dismissed","exit_settled","session_suspended"]
+    },
+    {
+      "name": "SSEEventType",
+      "values": ["delta","message_final","card","state","emergency","done","error"]
+    },
+    {
+      "name": "CredentialType",
+      "values": ["id_card","phone"]
+    },
+    {
+      "name": "ReadableScope",
+      "values": ["profile","history","allergies","medications"]
+    },
+    {
+      "name": "Gender",
+      "values": ["male","female","other","unknown"]
+    },
+    {
+      "name": "MessageRole",
+      "values": ["patient","assistant"]
+    },
+    {
+      "name": "LabDecision",
+      "values": ["accepted","skipped","vetoed"]
+    },
+    {
+      "name": "PaymentPurpose",
+      "values": ["lab","medication"]
+    },
+    {
+      "name": "FulfillmentMode",
+      "values": ["pickup","delivery"]
+    },
+    {
+      "name": "TreatmentAction",
+      "values": ["schedule","confirm_arrival","start","complete","cancel"]
+    },
+    {
+      "name": "ConsultationIntent",
+      "values": ["consultation","follow_up","uncertain"]
+    },
+    {
+      "name": "EmergencySeverity",
+      "values": ["suspected","critical"]
+    },
+    {
+      "name": "ExitReason",
+      "values": ["patient_request","timeout","emergency","other"]
+    },
+    {
+      "name": "ExitConsequenceKind",
+      "values": ["no_fee","refundable","executed_no_refund","medication_dispensed"]
+    },
+    {
+      "name": "VitalsSource",
+      "values": ["patient_report","device","manual"]
+    },
+    {
+      "name": "DiagnosisConfidence",
+      "values": ["low","medium","high"]
+    },
+    {
+      "name": "TreatmentPlan",
+      "values": ["medication","treatment","advice_only","referral"]
+    },
+    {
+      "name": "AdminRole",
+      "values": ["super_admin","admin","operator"]
+    },
+    {
+      "name": "InterruptedBy",
+      "values": ["idle","emergency","timeout","exit"]
+    },
+    {
+      "name": "FinalOutcome",
+      "values": ["ADVICE","REFERRAL"]
+    }
+  ],
+  "middlewareChain": [
+    "RateLimitMiddleware(rate, capacity) - Token-bucket rate limiter applied to auth endpoints (5 req/min/IP)",
+    "AuthMiddleware(jwtSecret) - Patient JWT auth (Bearer token, extracts patientId/userId/phone)",
+    "AdminAuthMiddleware(jwtSecret) - Admin JWT auth (Bearer token, extracts adminId/adminRole)"
+  ],
+  "totalEndpoints": 47
+}
