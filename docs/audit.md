@@ -1,370 +1,385 @@
-# NEUHIS Agent 后端审计报告
+# AUDIT.md — 项目全面扫描审计报告
 
-> 审计日期：2026-06-30 | 审计方式：7 Agent 并行 Workflow
-> 审计范围：123 Go 源文件 + 20 测试文件（排除 medAgent 子模块）
-> 审计维度：代码简化 / STRUCTURE 一致性 / API 合约一致性 / 测试质量 / 数据流与依赖
-
----
-
-## A. 总体评估
-
-项目基础扎实：testcontainers 集成测试基础设施完善、分层架构清晰、核心诊疗流程功能完整。但存在明显的**架构漂移**——16 个未记录的包/文件偏离了 STRUCTURE.md 设计文档，2 处**层级违规**（依赖方向反转），API 合约有 3 个高危泄露（内部状态暴露给前端），测试覆盖率严重不均匀（handler 仅 37.8%，远低于 90% 要求）。
-
-关键指标：
-- 总文件数：123（非 medAgent Go 源文件）+ 20（测试文件）
-- 未记录在 STRUCTURE.md 的包/文件：16 个
-- 架构层级违规：2 处
-- API 合约违反：3 处高危
-- 测试覆盖率未达标包：5 个
+> 生成日期：2026-07-01  
+> 审计方法：五组独立审计 + 对抗性交叉验证（11 agent，736K tokens，369 次工具调用）  
+> 扫描范围：`internal/`、`pkg/`、`cmd/`、`tests/` 全部 Go 源文件（~90 文件）
 
 ---
 
-## B. 关键问题（必须修复）
+## 一、概述
 
-### B.1 VisitSession 泄露内部机器状态到 API 响应 — `json` tag 违规
+### 发现问题总数
 
-- **文件**：`internal/model/visit.go:14,27`
-- **严重度**：🔴 Critical
-- **规范参考**：`front-api.md §5.2` — VisitSession 有 18 个已声明字段；`machineState` 和 `medagentSessionId` 不在其中
-- **现状**：`MachineState`（第 14 行）带 `json:"machineState"` tag，`MedAgentSessionID`（第 27 行）带 `json:"medagentSessionId,omitempty"` tag，每次序列化 VisitSession 都会暴露内部状态机值和 medAgent 会话 ID
-- **修复**：将两个字段的 JSON tag 改为 `json:"-"`，或为 API 响应创建独立的 DTO 结构体
+| 严重程度 | 数量 |
+|---------|------|
+| **HIGH** | 1 |
+| **MEDIUM** | 27 |
+| **LOW** | 33 |
+| **INFO** | 4 |
+| **总计** | **65** |
 
-### B.2 PatientProfile 暴露非规范字段
+### 按类别分布
 
-- **文件**：`internal/model/patient.go:18-19`
-- **严重度**：🔴 Critical
-- **规范参考**：`front-api.md §5.1` — PatientProfile 有 10 个已定义字段；`medicalHistory` 和 `createdAt` 不在其中
-- **现状**：结构体包含 `MedicalHistory []string json:"medicalHistory"`（第 18 行）和 `CreatedAt time.Time json:"createdAt,omitempty"`（第 19 行），两者在所有 PatientProfile 响应中序列化。`medicalHistory` 仅应存在于 PatientContext/PriorVisit
-- **修复**：从 PatientProfile 结构体移除 MedicalHistory 和 CreatedAt，或使用单独的响应 DTO
-
-### B.3 SSE 错误事件违反 API 合约格式
-
-- **文件**：`internal/handler/sse_handler.go:54-62`
-- **严重度**：🔴 Critical
-- **规范参考**：`front-api.md §6.2` — error 类型 SSE 事件必须包含 `error: ApiError` 对象（code/message/status/details/retriable）
-- **现状**：`SSEWriter.WriteError` 将错误文本放入 `message` 字符串字段。`AssistantStreamEvent.Error *SSEEventError` 字段从未填充。事件产出 `{"type":"error","message":"some error"}` 而非规范的 `{"type":"error","error":{"code":"...","message":"...","status":...}}`
-- **修复**：让 `WriteError` 接受 `*errors.ApiError` 并设置 `event.Error = &SSEEventError{...}`
-
-### B.4 Handler 包覆盖率 37.8%（要求 ≥90%）
-
-- **文件**：`internal/handler/handler_test.go`
-- **严重度**：🔴 Critical
-- **规范参考**：`SPEC.md` + `STRUCTURE.md §7.1`
-- **现状**：AuthHandler、AdminHandler、MedicalOrderHandler 零 HTTP 层测试。WorkbenchHandler 大部分端点缺少测试（SubmitFulfillment、SubmitTreatmentExecution、ReportVitals、DismissEmergency、ToggleTimer、AskLockedQuestion、StreamConsultationReply、GenerateTitle、ClassifyIntent、ExitVisit、SubmitPayment、StreamAssistantMessage、SubmitLabDecision、SubmitLabResults）
-- **修复**：按 `TestVisitHandler_CreateSession` / `TestPatientHandler_VerifyIdentity` 模式添加 `httptest` 测试
-
-### B.5 Service 层导入 Middleware（层级违规——依赖方向反转）
-
-- **文件**：`internal/service/admin/service.go:17`
-- **严重度**：🔴 Critical
-- **规范参考**：`STRUCTURE.md §3.1` — "Middleware → Config"；`§5.2` — Service 依赖 Repository/medAgent/Model
-- **现状**：`admin` service 导入 `internal/middleware` 调用 `middleware.GenerateAdminAccessToken`，反转了文档化的依赖方向
-- **修复**：将 `GenerateAdminAccessToken` 提取到 `internal/auth` 或 `pkg/auth` 共享包
-
-### B.6 `transferred` 状态的状态机不一致
-
-- **文件**：`internal/model/enums.go:15`、`state_machine.go:10-14,112-130`、`internal/service/workbench/chat.go:482`
-- **严重度**：🟠 High
-- **规范参考**：`STRUCTURE.md §6.4` — 4 种终端状态包括 "transferred"
-- **现状**：`VisitStatusTransferred` 在 enums 中已定义，但在 `MachineStateToStatus` 中无映射条目，`TerminalStates` 中也缺失。chat.go 处理转诊时设置 `session.Status = VisitStatusTransferred`，但机器状态为 `completed`，造成不一致：`GetStatusForState("completed")` 返回 `"completed"` 而非 `"transferred"`
-- **修复**：添加 `VisitMachineStateTransferred`、补全映射、添加到 TerminalStates
-
-### B.7 Workbench Service 使用具体 medAgent Client 类型（不可 Mock）
-
-- **文件**：`internal/service/workbench/service.go:23`
-- **严重度**：🟠 High
-- **规范参考**：Go 最佳实践 "接受接口，返回结构体"
-- **现状**：workbench `Service` 持有具体类型 `*medagent.Client` 而非接口，导致无法在无真实 medAgent 服务器的情况下进行单元测试。同文件中的 `LLMClient` 字段已正确抽象为接口
-- **修复**：在 workbench 包定义 `medAgentClient` 接口，将接口存入 Service 结构体
-
----
-
-## C. 简化机会
-
-### C.1 高影响
-
-| # | 文件 | 类别 | 发现 | 建议 |
-|---|------|------|------|------|
-| 1 | `internal/middleware/auth.go` | 死代码 | 5 个导出函数零生产调用者（IsAuthenticated、SetPatientID、CurrentPatient、RespondWithJSON、WriteJSONError） | 从生产代码移除 4 个；将 SetPatientID 移至 testutil |
-| 2 | `internal/middleware/auth.go` + `admin_auth.go` | 代码重复 | ~55 行几乎相同的 JWT 提取/解析/签名验证/错误处理代码 | 提取共享 `parseJWT(c, jwtSecret) (*jwt.MapClaims, error)` 函数 |
-| 3 | `internal/repository/visit_mysql.go:101-151` + `timeline_mysql.go:84-138` | 代码重复 | 完全相同的游标分页实现（if/else 分支、pageSize+1 技巧、hasMore 裁剪、ISO 格式光标字符串） | 提取 `PaginateCursor[T]` 到 `internal/repository/pagination.go` |
-| 4 | `internal/handler/workbench_handler.go` | 代码重复 | 10 个 handler 方法定义几乎相同的行内输入结构体，手动逐字段复制到 service 类型 | 在 model 或 request 包定义共享输入类型；使用 `BindAndSetSessionID` 辅助函数 |
-
-### C.2 中影响
-
-| # | 文件 | 类别 | 发现 | 建议 |
-|---|------|------|------|------|
-| 5 | `internal/handler/middleware.go:55` + `pkg/api/response.go:21` | 死代码 | `WriteSuccessWithMeta` 和 `SuccessResponseWithMeta` 零生产调用者 | 移除两者及 ApiResponse 中未使用的 `Meta` 字段 |
-| 6 | `internal/handler/admin_handler.go:214` | 冗余抽象 | `WritePageResponse[T]` 仅调用 `c.JSON` 包装 `api.SuccessResponse`——仅 2 个调用者 | 移除并用 `WriteSuccess(c, http.StatusOK, result)` 替换 |
-| 7 | `internal/model/patient.go:26` | 数据冗余 | PatientContext 中的 MedicalHistory/Allergies/LongTermMedications 字段与 PatientProfile 重复 | 移除顶层字段；消费者应从 `ctx.Patient.*` 读取 |
-| 8 | `internal/service/visit/service.go:137` + `workbench/service.go:52` | 代码重复 | 两个 service 中完全相同的 `GetSession` 透传 `visitRepo.FindByID` | 让 workbench 委托给 visit.Service.GetSession |
-
-### C.3 低影响
-
-| # | 文件 | 类别 | 发现 | 建议 |
-|---|------|------|------|------|
-| 9 | `cmd/server/main.go:113-114` | 死代码 | `log.Fatalf` 后跟不可达的 `os.Exit(1)` | 移除不可达的 `os.Exit(1)` |
-| 10 | 多个 MySQL 仓库文件 | 重复模式 | 5 个仓库独立初始化 CreatedAt/UpdatedAt 时间戳 | 考虑 `touchTimestamps` 辅助函数或数据库级别的 DEFAULT CURRENT_TIMESTAMP |
-
----
-
-## D. STRUCTURE/SPEC 偏离
-
-### D.1 需更新文档（STRUCTURE.md / front-api.md）
-
-| # | 文件 | 严重度 | 违反章节 | 差距 | 建议 |
-|---|------|--------|----------|------|------|
-| 1 | `front-api.md` | 🟠 High | §4 端点清单 | `GET /api/medical-orders`（router.go:119）未在文档中 | 添加到 front-api.md 或移除路由 |
-| 2 | `internal/service/address/`、`admin/`、`auth/`、`billing/`、`medicalorder/` | 🟡 Medium | STRUCTURE §4 | 5 个未记录的 service 子包 | 添加到 STRUCTURE.md 包树 |
-| 3 | `internal/model/address.go`、`billing.go`、`medical_order.go`、`admin.go`、`admin_queries.go`、`user.go`、`settings.go`、`helpers.go` | 🟡 Medium | STRUCTURE §4 | 8 个未记录的 model 文件 | 添加到 STRUCTURE.md model 文件清单 |
-| 4 | `internal/middleware/admin_auth.go` + `admin_auth_test.go` | 🟠 High | STRUCTURE §3.1 / §4 | 第 6 种中间件类型未记录；token 生成逻辑分散在 middleware 和 service | 添加到 STRUCTURE.md 或将 token 生成移至共享包 |
-| 5 | `internal/llm/` 包 | 🟠 High | STRUCTURE §4 / §5.2 | 未记录的包被 workbench 导入 | 添加到 STRUCTURE.md 或移入 medagent/pkg |
-| 6 | `internal/service/workbench/consult.go`、`title.go`、`title_test.go` | 🟠 High | STRUCTURE §4 | 3 个未记录的 workbench 文件 | 添加到 STRUCTURE.md 文件清单 |
-| 7 | `internal/config/env.go` | 🟠 High | STRUCTURE §4 | 文档声明但文件不存在；env 解析内联在 config.go 中 | 创建 env.go 或更新 STRUCTURE.md |
-| 8 | `internal/service/medagent/` 文件清单 | 🟢 Low | STRUCTURE §4 | 列出 `adapter.go`/`adapter_test.go`，但实际文件为 `client.go`/`types.go` | 更新 STRUCTURE.md |
-| 9 | `internal/testutil/` | 🟡 Medium | STRUCTURE §4 | 仅记录了 `tests/testutil/`；`internal/testutil/` 及 mocks.go 未记录 | 添加到 STRUCTURE.md 或合并 |
-| 10 | go.mod 版本 | 🟢 Low | STRUCTURE §2.1 | 文档写 "Go 1.22+"，go.mod 指定 `1.22.0` | 对齐文档与实际版本约束 |
-| 11 | workbench title.go | 🟢 Low | STRUCTURE §2.3 / §4 | 标题生成绕过 medAgent 引擎；未记录的架构决策 | 在 STRUCTURE.md 中记录此 LLM 客户端复用决策 |
-
-### D.2 需修复代码
-
-| # | 文件 | 严重度 | 规范章节 | 差距 | 建议 |
-|---|------|--------|----------|------|------|
-| 12 | `internal/adapter/step_mapping.go` | 🟡 Medium | STRUCTURE §6.3 | StepDone 的 SecondaryCardKind 为 `treatment_plan` 而非 `completed_visit`/`advice_only` | 更新 STRUCTURE.md 或修复 step_mapping.go；为 chat.go handleDone 添加单元测试 |
-| 13 | `internal/model/enums.go` + `state_machine.go` | 🟠 High | STRUCTURE §6.4 | `transferred` 在 MachineStateToStatus 和 TerminalStates 中缺失 | 添加 transferred 机器状态；修复映射 |
-| 14 | `internal/model/visit.go:14,27` | 🔴 Critical | `front-api.md §5.2` | 内部字段在 JSON 中泄露 | 标记为 `json:"-"` |
-| 15 | `internal/model/patient.go:18-19` | 🔴 Critical | `front-api.md §5.1` | 非规范字段被序列化 | 移除或使用 DTO |
-| 16 | `internal/handler/sse_handler.go:54-62` | 🔴 Critical | `front-api.md §6.2` | SSE 错误格式错误（字符串 message 而非 SSEEventError 对象） | 填充 `.Error` 字段 |
-| 17 | `internal/service/admin/service.go:17` | 🔴 Critical | STRUCTURE §3.1 / §5.2 | Service 导入 middleware | 将 token 生成移至共享包 |
-| 18 | `internal/service/workbench/title.go:10` | 🟠 High | STRUCTURE §3.1 | Service 导入 `internal/errors`（HTTP 错误码） | 使用 model sentinel 错误 |
-| 19 | `internal/handler/router.go` | 🟢 Low | 测试最佳实践 | Handler 构造函数接受具体 service 类型而非接口 | 在 handler 包定义小型接口 |
-
----
-
-## E. 测试缺口
-
-### E.1 覆盖率未达标（低于 90%）
-
-| 包 | 当前覆盖率 | 目标 | 差距说明 |
-|----|-----------|------|----------|
-| `internal/handler` | **37.8%** | 90% | AuthHandler、AdminHandler、MedicalOrderHandler 零 HTTP 层测试 |
-| `internal/repository` | **56.6%** | 90% | Dashboard、Settings、Admin、AdminRefreshToken 仓库零集成测试 |
-| `internal/service/address` | 88.0% | 90% | 少量未覆盖分支 |
-| `internal/service/workbench` | 89.6% | 90% | 少量未覆盖分支 |
-| `pkg/api` | 87.5% | 90% | 小包，直接补齐 |
-
-### E.2 缺失的测试套件
-
-- **`internal/service/medagent/client.go`**：HTTP 客户端零专用测试。Adapter 测试使用 medagent 类型，但不覆盖 HTTP 请求/响应处理、错误场景或超时
-- **Model 层**：address.go、admin.go、admin_queries.go、billing.go、medical_order.go、settings.go、user.go 无直接序列化/验证测试
-
-### E.3 测试设计问题
-
-1. **Mock 重复定义**：每个 service 测试包在 8+ 个包中重复定义完全相同的 mock 仓库（mockPatientRepo、mockVisitRepo 等）。共享的 `internal/testutil/mocks.go` 已提供可复用的 mock，但 service 测试未使用它们
-2. **仓库隔离模型**：仓库测试在单个 MySQL 容器上跨子测试共享，而非 `STRUCTURE.md §7.1` 规定的 "per-test 独立数据库"
-3. **MedAgent 客户端不可 mock**：Workbench service 持有具体类型 `*medagent.Client`（非接口），使 service 层测试需要真实的 medAgent 服务器
-4. **CI 覆盖率门控未对齐**：`ci.yml` 仅对 3 个 service 包执行 90%，总门控为 75%，而非 SPEC.md 规定的全包 90%
-
----
-
-## F. 数据流与架构违规
-
-### F.1 层级违规（文档化依赖方向被反转）
-
-| 文件 | 方向 | 违规 | 影响 |
-|------|------|------|------|
-| `internal/service/admin/service.go:17` | Service → Middleware | 导入 `internal/middleware` 调用 `GenerateAdminAccessToken` | Token 生成逻辑耦合到 HTTP 传输层；middleware 签名的任何更改都会破坏 service |
-| `internal/service/workbench/title.go:10` | Service → HTTP errors | 导入 `internal/errors` 并在业务逻辑中创建 `apperrors.NewNotFoundError()` 等 | Service 层产出 HTTP 错误码而非领域错误；handler 无法独立重映射错误 |
-
-### F.2 跨层耦合
-
-| 文件 | 耦合 | 影响 |
-|------|------|------|
-| `internal/adapter/card_builder.go` | 导入 `medagent "internal/service/medagent"` 获取类型 | Adapter 依赖 service 层，在 workbench service 和 adapter 之间产生双向依赖 |
-| `internal/model/` | 领域实体与请求/响应 DTO 及验证逻辑混合在同一包中 | API 格式变更影响领域逻辑；JSON tag 将内部表示耦合到外部格式 |
-
-### F.3 不可变性违规
-
-| 文件 | 违规 |
+| 类别 | 数量 |
 |------|------|
-| `internal/service/address/service.go:105-125` | `UpdateAddress` 在写入仓库前原地修改 `addr` 领域对象（`addr.Name = *input.Name` 等） |
-| `internal/service/workbench/chat.go` | 多个方法直接修改 `session`（如 `session.AskRound++`） |
-
-### F.4 错误处理缺陷
-
-| 文件 | 问题 | 影响 |
-|------|------|------|
-| `internal/service/medagent/client.go:52-57` | 返回 `fmt.Errorf("medagent session not found")` 等，未包装 sentinel 错误 | Handler/service 代码无法使用 `errors.Is()` 区分 medAgent 错误类型；所有 medAgent 错误变为通用 500 |
-
-### F.5 请求 DTO 不一致
-
-| 文件 | 问题 |
-|------|------|
-| `internal/handler/workbench_handler.go` | 部分端点定义本地输入结构体，部分使用 `model.*Input` ——请求 DTO 分散在 handler 和 model 之间，无明确规则 |
+| 简化机会（Simplification） | 18 |
+| SPEC/STRUCTURE 合规性 | 10 |
+| 测试设计缺陷 | 7 |
+| 审计遗漏/盲区 | 8 |
+| 正确性缺陷 | 22 |
 
 ---
 
-## G. Quick Wins（低工作量高收益）
+## 二、简化机会（Simplification）
 
-| # | 文件 | 修复 | 预计耗时 | 影响 |
-|---|------|------|----------|------|
-| 1 | `internal/model/visit.go:14,27` | `json:"machineState"` → `json:"-"`；`json:"medagentSessionId,omitempty"` → `json:"-"` | 5 分钟 | 🔴 停止在每个 API 响应中泄露内部状态值和 medAgent 会话 ID |
-| 2 | `internal/model/patient.go:18-19` | 从 PatientProfile 移除 MedicalHistory 和 CreatedAt | 10 分钟 | 🔴 使 PatientProfile 符合规范，防止数据泄露 |
-| 3 | `cmd/server/main.go:114` | 移除不可达的 `os.Exit(1)` | 2 分钟 | 🟢 消除死代码 |
-| 4 | `internal/handler/sse_handler.go:54-62` | WriteError 接受 `*errors.ApiError` 并填充 `event.Error` 字段 | 20 分钟 | 🟠 修复所有流式端点的 SSE 错误合约合规性 |
-| 5 | `internal/handler/middleware.go` + `pkg/api/response.go` | 移除 `WriteSuccessWithMeta` 和 `SuccessResponseWithMeta` | 5 分钟 | 🟡 消除死 API 表面积 |
+### MEDIUM
 
----
+#### M1. `ValidAdminRoles` 是死代码 — `internal/model/admin.go:15-19`
 
-# 重构方案
+- **当前实现**：定义了 `map[AdminRole]bool` 和 `AdminRoleSuperAdmin`/`AdminRoleAdmin`/`AdminRoleOperator` 常量，但在任何生产代码中均未被引用（仅测试文件使用这些常量）。`RequireAdminRole` 中间件直接使用字符串字面量 `"super_admin"` 和 `"admin"`。
+- **修复方向**：删除 `ValidAdminRoles` 和未使用的 `AdminRole` 常量，或将中间件改为引用该映射，消除双源事实。
+- **预期收益**：消除 ~15 行死代码，强制使用类型安全的管理员角色。
 
-## H.1 概述
+#### M2. `StepMappingTable` 及 `GetMapping` 是死代码 — `internal/adapter/step_mapping.go`
 
-基于以上审计发现，制定分阶段重构方案。按优先级排序为 4 个阶段，总计约 **40-50 工作小时**。
+- **当前实现**：定义了完整的 `StepMapping` 结构体（含 `SSETypes`、`CardKind`、`IsTerminal`）和映射表，但没有任何生产代码路径调用 `GetMapping`。所有 SSE 事件通过 `chat.go` 中的 handler 直接发出。
+- **修复方向**：删除整个 `step_mapping.go` 文件及其在 `adapter_test.go` 中的测试引用，或将映射表接入运行时路由。
+- **预期收益**：消除约 80 行无人消费的死代码，降低开发者的认知负荷。
 
-## H.2 Phase 1：止血修复（预计 4 小时）
+#### M3. `NewDBTest` 是死代码 — `tests/testutil/dbtest.go`
 
-**目标**：修复所有 Critical 级别问题（数据泄露、合约违反、层级违规）
+- **当前实现**：76 行的 `NewDBTest` 函数用于创建独立测试数据库，但**全代码库零调用方**。此外，其 DSN 拼接方式（`baseDSN + dbName`）在 `baseDSN` 包含查询参数时是有缺陷的。
+- **修复方向**：删除 `tests/testutil/dbtest.go` 整个文件，或在测试基础设施中接入该函数。
+- **预期收益**：消除 76 行误导性的死代码，消除一个隐蔽的 DSN 拼接 bug。
 
-| 任务 | 文件 | 预计耗时 | 说明 |
-|------|------|----------|------|
-| 1.1 | `internal/model/visit.go` | 0.5h | 将 MachineState、MedAgentSessionID 标记为 `json:"-"`；验证所有序列化点 |
-| 1.2 | `internal/model/patient.go` | 0.5h | 从 PatientProfile 移除 MedicalHistory、CreatedAt；检查所有消费方 |
-| 1.3 | `internal/handler/sse_handler.go` | 1h | 重写 WriteError 接受 ApiError；填充 SSEEventError；更新所有调用方 |
-| 1.4 | `internal/service/admin/service.go` | 1h | 创建 `internal/auth/token.go`（GenerateAccessToken、GenerateAdminAccessToken）；更新 admin service + middleware 导入 |
-| 1.5 | `internal/service/workbench/title.go` | 0.5h | 移除 `internal/errors` 导入；改用 model sentinel 错误 |
-| 1.6 | `internal/model/enums.go` + `state_machine.go` | 0.5h | 添加 VisitMachineStateTransferred；补全 MachineStateToStatus 和 TerminalStates |
+#### M4. `RunMigrationsWithGolangMigrate` 是死代码 — `tests/testutil/mysql_container.go`
 
-**验收标准**：
-- `go build ./...` 通过
-- 现有测试全部通过
-- VisitSession JSON 输出不含 machineState/medagentSessionId
-- admin service 不再导入 middleware 包
+- **当前实现**：23 行的 `RunMigrationsWithGolangMigrate` 函数完全未被调用。实际的迁移运行器是 `RunMigrations`（直接执行 `.up.sql` 文件）。
+- **修复方向**：删除该函数。
+- **预期收益**：消除 23 行死代码和一种不存在的迁移策略的幻觉。
 
-## H.3 Phase 2：消除重复与死代码（预计 6 小时）
+#### M5. `middleware.GenerateAccessToken` / `GenerateAdminAccessToken` 是不必要的包装 — `internal/middleware/auth.go:85-87`, `admin_auth.go:96-98`
 
-**目标**：清理死代码、提取共享工具、减少重复
-
-| 任务 | 文件 | 预计耗时 | 说明 |
-|------|------|----------|------|
-| 2.1 | `internal/middleware/auth.go` | 0.5h | 移除 IsAuthenticated、CurrentPatient、RespondWithJSON、WriteJSONError |
-| 2.2 | `internal/middleware/auth.go` + `admin_auth.go` | 1.5h | 提取 `parseJWT()` 共享函数；两个 middleware 均调用之 |
-| 2.3 | `internal/repository/` 新建 `pagination.go` | 2h | 实现泛型 `PaginateCursor[T]`；重构 visit_mysql.go 和 timeline_mysql.go |
-| 2.4 | `internal/handler/workbench_handler.go` | 1.5h | 统一请求 DTO 定义（在 handler 包或 model 包）；消除 10 处重复的行内结构体 |
-| 2.5 | `cmd/server/main.go` + 死代码清理 | 0.5h | 移除不可达 os.Exit(1)、WriteSuccessWithMeta、SuccessResponseWithMeta、WritePageResponse |
-
-**验收标准**：
-- `golangci-lint run ./...` 零告警
-- 重复代码行数减少 ≥200 行
-- 提取的共享函数有单元测试覆盖
-
-## H.4 Phase 3：测试覆盖率补齐（预计 20 小时）
-
-**目标**：所有包覆盖率达到 ≥90%
-
-### H.4.1 Handler 层（预计 10h）
-
-| 子任务 | 文件 | 预计耗时 |
-|--------|------|----------|
-| 3.1a | `handler_test.go` — AuthHandler（Register/Login/Refresh/Logout） | 2h |
-| 3.1b | `handler_test.go` — AdminHandler（Login/Logout/Refresh/ListPatients/ListSessions） | 2h |
-| 3.1c | `handler_test.go` — MedicalOrderHandler（ListMedicalOrders） | 1h |
-| 3.1d | `handler_test.go` — WorkbenchHandler 缺失端点（Fulfillment/Treatment/Vitals/Exit/Timer/Dismiss/LockQuestion/Consult/Title/Classify） | 5h |
-
-### H.4.2 Repository 层（预计 6h）
-
-| 子任务 | 文件 | 预计耗时 |
-|--------|------|----------|
-| 3.2a | `repository_test.go` — Dashboard 仓库集成测试（CountPatients/CountSessions/ListPatients/ListSessions） | 2h |
-| 3.2b | `repository_test.go` — Settings 仓库集成测试（Get/Update） | 1h |
-| 3.2c | `repository_test.go` — Admin + AdminRefreshToken 仓库集成测试 | 2h |
-| 3.2d | 重构现有仓库测试使用 `NewDBTest` per-test 隔离 | 1h |
-
-### H.4.3 Service 层 + 其他（预计 4h）
-
-| 子任务 | 文件 | 预计耗时 |
-|--------|------|----------|
-| 3.3a | `service/address/service_test.go` — 补齐至 90% | 1h |
-| 3.3b | `service/workbench/service_test.go` — 补齐至 90% | 1h |
-| 3.3c | `service/medagent/client_test.go` — 新建，使用 httptest.NewServer | 1.5h |
-| 3.3d | `pkg/api/response_test.go` — 补齐至 90% | 0.5h |
-
-### H.4.4 Model 层序列化测试（预计 2h）
-
-| 子任务 | 文件 | 预计耗时 |
-|--------|------|----------|
-| 3.4a | `model/model_test.go` — 为 address/admin/billing/medical_order/settings/user 类型添加 JSON 序列化/反序列化测试 | 2h |
-
-**验收标准**：
-- `go test -race -cover ./...` 总覆盖率 ≥90%
-- 每包覆盖率 ≥90%
-- CI 中 coverage gate 更新至 90%
-
-## H.5 Phase 4：架构对齐与文档更新（预计 10 小时）
-
-**目标**：消除层级违规、统一接口设计、更新文档
-
-### H.5.1 架构修复（预计 6h）
-
-| 任务 | 文件 | 预计耗时 | 说明 |
-|------|------|----------|------|
-| 4.1a | `internal/service/workbench/service.go` | 2h | 定义 `medAgentClient` 接口；重构 workbench service 持有接口 |
-| 4.1b | `internal/service/medagent/` → `internal/model/` | 2h | 将 medAgent 类型（Step、StepKind、Result 等）移至 `internal/model/` 消除 adapter↔service 循环依赖 |
-| 4.1c | `internal/service/medagent/client.go` | 1h | 定义 sentinel 错误（ErrMedAgentSessionNotFound 等）；使用 `%w` 包装 |
-| 4.1d | `internal/handler/router.go` | 1h | Handler 构造函数改为接受接口；定义小型 service 接口 |
-
-### H.5.2 文档更新（预计 4h）
-
-| 任务 | 预计耗时 | 说明 |
-|------|----------|------|
-| 4.2a | 更新 `docs/STRUCTURE.md` | 2h | 补充 16 个未记录包/文件；更新依赖图；更新 middleware 清单；修正 config/env.go 引用；修正 medagent 文件清单 |
-| 4.2b | 更新 `docs/front-api.md` | 0.5h | 添加 GET /medical-orders 端点文档 |
-| 4.2c | 更新 `ci.yml` | 1h | 全包覆盖率门控 ≥90%（替换当前 75% 总门控和仅 3 个 service 包的 90% 门控） |
-| 4.2d | 更新 `CLAUDE.md` / `AGENTS.md` | 0.5h | 反映最终项目状态 |
-
-### H.5.3 不可变性修复（预计 2h）
-
-| 任务 | 文件 | 预计耗时 |
-|------|------|----------|
-| 4.3a | `internal/service/address/service.go` | 1h | UpdateAddress 替换原地修改为函数式更新模式 |
-| 4.3b | `internal/service/workbench/chat.go` | 1h | session 修改替换为不可变更新模式 |
-
-**验收标准**：
-- 无可跨层反向依赖
-- STRUCTURE.md 与实际代码一致
-- CI 90% 门控生效
-
-## H.6 时间线总结
-
-```
-Phase 1: ████ (4h)   止血修复
-Phase 2: ██████ (6h)   消除重复与死代码
-Phase 3: ████████████████████ (20h)  测试覆盖率补齐
-Phase 4: ██████████ (10h)  架构对齐与文档更新
-─────────────────────────────────
-Total:   ████████████████████████████████████████ (40-50h)
-```
-
-## H.7 优先级矩阵
-
-```
-高影响 │  Phase 1 (止血)    │  Phase 3 (测试)
-       │  B.1-B.7           │  E.1 覆盖率补齐
-       │  G.1-G.4           │
-───────┼─────────────────────┼─────────────────────
-低影响 │  Phase 2 (清理)    │  Phase 4 (架构)
-       │  C.1-C.10          │  F.1-F.5
-       │  G.5               │  D.1-D.19
-       └─────────────────────┴─────────────────────
-         低工作量              高工作量
-```
+- **当前实现**：两个函数是单行委托：直接调用 `auth.GenerateAccessToken(...)`。唯一的调用方是 `cmd/jwtgen/main.go`，而服务层代码已经直接调用 `auth.*` 版本。
+- **修复方向**：删除这两个包装函数，将 `cmd/jwtgen` 改为直接调用 `auth.GenerateAccessToken`（注意需同时更新 `middleware_test.go` 中引用它们的测试）。
+- **预期收益**：消除不必要的间接层和依赖边（`jwtgen → middleware → auth` 简化为 `jwtgen → auth`）。
 
 ---
 
-## 附录：审计方法
+### LOW
 
-- **工具**：7 个并行 Agent 通过 Workflow 编排
-- **Agent 角色**：代码简化专家 / 架构一致性审计师 / API 合约审计师 / 测试质量审计师 / 数据流审计师 / 综合报告师
-- **分析方法**：静态代码阅读 + 结构化输出 + 交叉验证
-- **读取文件数**：273 次工具调用，覆盖全部 123 个源文件和 20 个测试文件
-- **基准文档**：`docs/SPEC.md`、`docs/STRUCTURE.md`、`docs/front-api.md`、`docs/PLAN.md`
+#### L1. 重复的 `os.Unsetenv` 样板 — `internal/config/config_test.go:106-116`
+
+- **当前实现**：每个子测试前重复 11 次 `os.Unsetenv`。
+- **修复方向**：提取 `clearEnv(t *testing.T)` 辅助函数。
+- **预期收益**：将 11 行样板压缩为 1 行。
+
+#### L2. `TestTerminalReasons` 重复覆盖 — `internal/model/model_test.go:338-360`
+
+- **当前实现**：完全重复了 `TestEnumConstants` 中 `TerminalReason` 段的测试（第 239-246 行），零增量覆盖。
+- **修复方向**：删除该测试函数。
+- **预期收益**：消除约 20 行无价值的重复测试代码。
+
+#### L3. 手动 WHERE 子句组装 — `internal/repository/dashboard_mysql.go:147-153`
+
+- **当前实现**：使用 `for/append` 循环手动拼接 WHERE 条件。
+- **修复方向**：改为 `strings.Join(whereParts, " AND ")`。
+- **预期收益**：提高可读性，无行为变化。
+
+#### L4. `patient_mysql.go` 和 `visit_mysql.go` 定义相同的 scanner 接口
+
+- **当前实现**：两个文件分别定义了结构相同的 `scanner`/`patientScanner` 接口。
+- **修复方向**：移入共享的文档包或 `helpers.go`。
+- **预期收益**：消除接口定义重复。
+
+#### L5. `llm/client.go` 中多余的 `ctx.Err()` 检查 — `internal/llm/client.go:85-87`
+
+- **当前实现**：方法入口处的 `ctx.Err()` 检查与 `http.NewRequestWithContext` 内部检查重复。
+- **修复方向**：删除该方法入口检查。
+- **预期收益**：消除 3 行冗余代码。
+
+#### L6. `llm/client.go` 中 `Close()` 的不必要闭包包装 — `internal/llm/client.go:132`
+
+- **当前实现**：`defer func() { _ = resp.Body.Close() }()`
+- **修复方向**：改为 `defer resp.Body.Close()`
+- **预期收益**：采用 Go 惯用模式。
+
+#### L7. 查询 `machine_state` 列后丢弃 — `internal/repository/visit_mysql.go:88,96`
+
+- **当前实现**：`SELECT ... machine_state ...` 将结果扫描到 `machineState` 变量后立即用 `_ = machineState` 丢弃。`VisitSessionSummary` 没有 `MachineState` 字段。
+- **修复方向**：从 SELECT 列表中移除 `machine_state` 和对应的扫描目标。
+- **预期收益**：减少每次列表查询的 I/O。
+
+#### L8. `dashboard_mysql.go` 硬编码 `'' as birth_date` — `internal/repository/dashboard_mysql.go:96`
+
+- **当前实现**：SELECT 中写死 `'' as birth_date`，因为对应的迁移（`000013_add_patient_birth_date`）从未提交。
+- **修复方向**：提交迁移并改为使用实际的 `birth_date` 列，或删除此字段。
+- **预期收益**：消除永远不会返回真实数据的伪列。
+
+#### L9. `dbtest.go` 中的 `USE` 语句是死代码 — `tests/testutil/dbtest.go:39-41`
+
+- **当前实现**：对 `baseDB` 执行 `USE <dbname>`，但 `baseDB` 仅用于创建/删除数据库，实际测试操作通过已包含数据库名的 `testDSN` 连接。
+- **修复方向**：删除该 `USE` 语句。
+- **预期收益**：消除 3 行不产生任何作用的代码。
+
+#### L10. `mysql_container.go` 中多余的 `db.Ping()` — `tests/testutil/mysql_container.go:59-61`
+
+- **当前实现**：重试循环在 `db.Ping()` 成功后 `break`，但紧随其后又调用一次 `db.Ping()`，要么冗余（break 后），要么同样失败（循环超时后）。
+- **修复方向**：删除多余的 `db.Ping()`。
+- **预期收益**：消除重复的 ping 操作。
+
+#### L11. `CountPatientsSince` / `CountSessionsSince` 接受 `string` — `internal/repository/dashboard_repo.go:13,16`
+
+- **当前实现**：方法签名使用 `since string`，将日期格式化责任推给调用方。
+- **修复方向**：改为 `since time.Time`，将转换内聚在 repository 层。
+- **预期收益**：更好的类型安全。
+
+---
+
+## 三、SPEC/STRUCTURE 合规性问题
+
+### HIGH
+
+#### C7. `handleDone` 中 REFERRAL 分支的无保护解引用 — `internal/service/workbench/chat.go:489`
+
+- **不符合**：在同一方法中，第 503-504 行在访问 `result.Diagnosis.Name` 前检查了 `result.Diagnosis != nil`，但第 489 行没有。
+- **当前实现**：第 489 行直接访问 `result.Diagnosis.Name`，若 `Diagnosis` 为 nil 则 panic。
+- **修复方向**：在解引用前添加 nil 检查。
+
+---
+
+### MEDIUM
+
+#### C1. `ApiResponse` 缺少 `Meta` 字段 — `pkg/api/response.go:4-8` vs `docs/STRUCTURE.md §6.2`
+
+- **不符合**：STRUCTURE.md §6.2 定义响应信封为 `{success, data, error, meta}`，其中 `meta` 包含 `{"total": 100, "pageSize": 20}`。
+- **当前实现**：`ApiResponse` 仅定义 `Success`, `Data`, `Error` 三个字段，分页元数据嵌入在 `Data` 内部。
+- **修复方向**：在 `ApiResponse` 中添加 `Meta interface{} \`json:"meta,omitempty"\``，并更新 `SuccessResponse`/`ErrorResponse` 等构造函数。需评估前端实际消费方式后落地（`front-api.md`（真正的 API 契约）未提及 `meta`，因此严重性限于内部文档与实际实现不同步）。
+
+#### C2. STRUCTURE.md 中路径不正确 — `docs/STRUCTURE.md §4`
+
+- **不符合**：STRUCTURE.md §4 将 `response.go` 和 `pagination.go` 列在 `internal/testutil/` 下。
+- **当前实现**：两个文件实际位于 `pkg/api/response.go` 和 `pkg/api/pagination.go`。
+- **修复方向**：更新 STRUCTURE.md 中的路径。
+
+#### C3. 硬编码的限流值 — `cmd/server/main.go:102`
+
+- **不符合**：与项目配置原则（§8："配置应通过 .env 和 config.Config"）不一致。
+- **当前实现**：`middleware.RateLimitMiddleware(10, 20)` 使用硬编码值，未通过配置系统外部化。
+- **修复方向**：在 `config.Config` 中添加 `RateLimitRate` 和 `RateLimitBurst` 字段，在 `main.go` 中读取。
+
+#### C4. 缺少优雅关闭 — `cmd/server/main.go:110`
+
+- **不符合**：生产级服务应支持信号驱动的优雅关闭。
+- **当前实现**：`engine.Run(addr)` 阻塞直到进程被杀死，SIGTERM/Ctrl-C 立即终止，丢弃所有进行中的连接。
+- **修复方向**：添加 `signal.Notify` + `http.Server.Shutdown()`。
+
+#### C5. REFERRAL 状态的 MachineState 使用错误 — `internal/service/workbench/chat.go:497`
+
+- **不符合**：`MachineStateToStatus` 映射表（`state_machine.go:127`）规定 `Completed` 映射到 `VisitStatusCompleted`，但 REFERRAL 分支应使用 `VisitStatusTransferred`。
+- **当前实现**：`handleDone` 中 REFERRAL 分支设置 `State: VisitMachineStateCompleted` 但设置 `Status: VisitStatusTransferred`，状态不一致。
+- **修复方向**：将 MachineState 改为 `VisitMachineStateTransferred`，使其与 `VisitStatusTransferred` 一致。
+
+#### C6. `DismissEmergency` 违反状态机终端规则 — `internal/service/workbench/vitals.go:124`
+
+- **不符合**：`state_machine.go:88-90` 规定所有终端状态禁止转换，`IsTerminal(Terminated)` 返回 `true`。
+- **当前实现**：`DismissEmergency` 从 `VisitStatusEmergencyTerminated` / `VisitMachineStateEmergencyPending` 转换为 `Chatting`。
+- **修复方向**：要么在状态机中记录此路径为有意为之的逃生口（更新 `AllowedTransitions` 添加 `EmergencyPending → Chatting`），要么移除该功能。
+
+#### C8. CORS 配置中未使用的 `ServerMode` 字段 — `internal/middleware/cors.go`
+
+- **不符合**：STRUCTURE.md §8.1 要求生产环境 `AllowedOrigins` 不可为 `*`，但运行时 CORS 中间件未读取 `ServerMode`。
+- **当前实现**：`CORSConfig.ServerMode` 从 `cfg.ServerMode` 设置但从未被 `CORSMiddleware` 读取。该约束仅在 `config.Load()` 验证中实施。
+- **修复方向**：要么在 `CORSMiddleware` 中添加运行时检查，要么从 `CORSConfig` 中移除未使用的 `ServerMode` 字段。
+
+#### C9. 前端接口文档有 17 个状态但代码中有 18 个 — `internal/model/enums.go:24-42` vs `docs/front-api.md §3.2`
+
+- **不符合**：`front-api.md` §3.2 记录了 17 个 `VisitMachineState` 值，排除了 `transferred`。
+- **当前实现**：代码定义了 18 个常量，包括 `VisitMachineStateTransferred`。
+- **修复方向**：要么将 `transferred` 加入前端文档，要么在文档中注明其为后端内部过渡状态。
+
+#### C10. `DismissEmergency` 和部分 handler 遗漏 `session.UpdatedAt` 更新
+
+- **当前实现**：仅 `SendMessage` 和 `handleAsk` 在持久化前更新 `session.UpdatedAt`。其他 14 个 handler 均省略此操作。
+- **修复方向**：所有修改会话的 handler 都应在持久化前更新 `UpdatedAt`。
+
+---
+
+## 四、测试设计问题
+
+### MEDIUM
+
+#### T1. 缺少测试级数据库隔离 — `tests/testutil/dbtest.go`
+
+- **问题**：`NewDBTest` 全代码库零调用方（见 M3）。这意味着集成测试连接到 `baseDSN` 指向的某个共享数据库，违反 STRUCTURE.md §7.2 和 CI 统一 MySQL 的约定。
+- **影响**：共享数据库状态可能导致测试间相互干扰和 CI 不稳定。
+- **修复方向**：将 `NewDBTest` 接入测试基础设施，或确认当前测试是否使用了其他隔离机制并更新文档。
+
+#### T2. 仅 4/10 的 Repository 接口有共享 Mock — `internal/testutil/mocks.go`
+
+- **问题**：共享 mock 文件仅为 `PatientRepository`、`VisitRepository`、`TimelineRepository`、`FlowCardRepository` 提供了 mock。以下 7 个接口缺少共享 mock：`AddressRepository`、`UserRepository`、`RefreshTokenRepository`、`AdminRepository`、`AdminRefreshTokenRepository`、`DashboardRepository`、`SettingsRepository`。
+- **影响**：涉及这些接口的 Service 层测试必须各自重新实现 mock，导致代码重复。
+- **修复方向**：为所有 Repository 接口生成或编写共享 mock，或使用 mock 生成工具（如 mockgen）。
+
+#### T3. 迁移文件未排序 — `tests/testutil/mysql_container.go:82`
+
+- **问题**：`RunMigrations` 使用 `filepath.Glob` 查找迁移文件，但 `filepath.Glob` **不保证排序顺序**。此外，有两个迁移共享 `000008` 前缀，即使字母排序也存在歧义。
+- **修复方向**：在执行前通过 `sort.Strings(files)` 对 glob 结果排序，并确保迁移前缀唯一。
+
+#### T4. `TestErrorCodes` 仅覆盖 25 个错误码中的 11 个 — `internal/errors/errors_test.go:197-216`
+
+- **问题**：仅测试了 11 个错误码常量，遗漏了 `CodeAuthPhoneExists`、`CodeRateLimited`、`CodeLLMUnavailable`、`CodeAdminInvalidCredentials`、`CodeAddressNotFound` 等 14 个。
+- **影响**：新错误码若被意外定义为空字符串 `""`，无法被该测试捕获。
+- **修复方向**：增加循环反射或显式枚举所有 25 个常量。
+
+---
+
+### LOW
+
+#### T5. `handleDone` 中时间线追加操作的错误被忽略 — `internal/service/workbench/chat.go:462-465`
+
+- **问题**：已完成就诊卡的创建通过了错误检查，但后续的时间线追加操作错误被忽略。
+- **修复方向**：统一错误处理逻辑，不忽略任何步骤的错误。
+
+#### T6. 多个 handler 的 `switch err { case sentinel: }` 未使用 `errors.Is` — `internal/handler/workbench_handler.go:209-218`
+
+- **问题**：`SubmitFulfillment` 等 handler 使用值比较 `switch err { case model.ErrCardNotFound: }`，而该文件的其他所有错误检查都使用 `errors.Is`/`errors.As`。如果 Service 层将来包装这些 sentinel 错误，值比较会静默失败，返回通用内部错误而非恰当的状态码。
+- **修复方向**：统一改为 `switch { case errors.Is(err, model.ErrCardNotFound): ... }`。
+
+#### T7. `TokenExpired` 检查未使用 `errors.Is` — `internal/middleware/auth.go:104-108`
+
+- **问题**：`TokenExpired` 使用 `strings.Contains(err.Error(), "token is expired")`，而不是 `errors.Is(err, jwt.ErrTokenExpired)`。当前有效但若 jwt 库更改错误措辞则静默失效。
+- **修复方向**：改为 `errors.Is(err, jwt.ErrTokenExpired)`，正确解包 `%w` 错误链。
+
+---
+
+## 五、遗漏问题（审计盲区——对抗性验证发现）
+
+### HIGH
+
+#### H1. 缺少测试级数据库隔离（同 T1）
+
+**严重**：这是测试基础设施的根本性缺失，直接违反 STRUCTURE.md 和 CI 约定，可能导致不可重现的测试失败。
+
+---
+
+### MEDIUM
+
+#### H3. `timeline_mysql.go` `UpdateStatus` 返回裸错误 — `internal/repository/timeline_mysql.go:132`
+
+- **问题**：这是整个 repository 包中唯一不包装错误的方法，与其他 50+ 个方法不一致。调用方无法区分裸 SQL 驱动错误和业务错误。
+- **修复方向**：添加 `fmt.Errorf("update timeline status: %w", err)` 包装。
+
+#### H5. `handleDone` 中 RESULT 诊断的多余赋值 — `internal/service/workbench/chat.go:489-506`
+
+- **问题**：`handleDone` 在 switch 内部（REFERRAL 分支）设置 `session.Summary.Diagnosis`，之后又对所有情况设置同一字段（第 503-506 行）。外层赋值冗余覆盖内层值。
+- **修复方向**：删除第 489 行 REFERRAL 分支内的冗余 `session.Summary.Diagnosis` 赋值，仅保留外层赋值。
+
+#### H6. `handleOK` 绕过映射表 — `internal/service/workbench/chat.go:518-527`
+
+- **问题**：`handleOK` 直接发出 `"done"` SSE 事件，但 `step_mapping.go` 中 `StepOK` 声明 `SSETypes: []string{}`。若映射表未来接入运行时路径，`StepOK` 将停止发出事件，行为改变。
+- **修复方向**：要么更新映射表使其与运行时行为一致（`StepOK` → `SSETypes: ["done"]`），要么删除映射表。
+
+---
+
+### LOW
+
+#### L14. `visit_mysql.go` 中静默丢弃的 `json.Marshal` 错误 — `internal/repository/visit_mysql.go:23,157`
+
+- **问题**：`summaryJSON, _ := json.Marshal(visit.Summary)` — 与 `flow_card_mysql.go` 中检查 marshal 错误的模式不一致。虽然 `VisitSummary` 理论上不会 marshal 失败，但模式不一致。
+- **修复方向**：统一错误处理模式（检查并包装 marshal 错误），或在注释中说明为何安全丢弃。
+
+#### L15. `SubmitPayment` 实验室路径静默丢弃错误 — `internal/service/workbench/payment.go:77`
+
+- **问题**：`_ = s.SubmitLabResults(...)` — 如果实验室结果处理失败，调用方仍收到成功响应。
+- **修复方向**：捕获并处理 `SubmitLabResults` 的错误（至少记录日志），或将其返回值纳入 `result`。
+
+#### L19. `StreamEvents` 使用不一致的错误信封 — `internal/handler/sse_handler.go:94-106`
+
+- **问题**：使用 `c.JSON(http.StatusInternalServerError, gin.H{"error": "streaming not supported"})` 而非项目标准的 `apperrors.WriteError(c, ...)`。
+- **修复方向**：统一使用 `apperrors.WriteError`。
+
+#### L20. `SubmitLabResults` 创建的 card 未持久化 — `internal/service/workbench/lab.go:140-164`
+
+- **问题**：`SubmitLabResults` 构造了 `FlowCard` 但从未调用 `flowCardRepo.Create(ctx, card)`，仅追加了时间线条目。
+- **修复方向**：添加 `s.flowCardRepo.Create(ctx, card)` 调用。
+
+---
+
+## 六、优先修复路线图
+
+### 第一优先级：正确性缺陷（立即修复）
+
+| # | 发现 | 文件 | 严重度 | 估计工作量 |
+|---|------|------|--------|-----------|
+| P0-1 | `handleDone` REFERRAL 分支无保护解引用（panic 风险） | `internal/service/workbench/chat.go:489` | HIGH | 1 行 |
+| P0-2 | `DismissEmergency` 终端状态违反规则 | `internal/service/workbench/vitals.go:124` | MEDIUM | 评估：移除功能或更新状态机 |
+| P1-1 | REFERRAL 状态 MachineState/Status 不一致 | `internal/service/workbench/chat.go:497` | MEDIUM | 1 行 |
+| P1-2 | `SubmitLabResults` card 未持久化 | `internal/service/workbench/lab.go:140-164` | MEDIUM | 1 行 |
+| P1-3 | `handleDone` RESULT 诊断多余赋值 | `internal/service/workbench/chat.go:489-506` | MEDIUM | 删除冗余行 |
+
+### 第二优先级：合规性与结构一致性（本周完成）
+
+| # | 发现 | 文件 | 严重度 | 估计工作量 |
+|---|------|------|--------|-----------|
+| P2-1 | `ApiResponse` 添加 `Meta` 字段或更新文档 | `pkg/api/response.go`, `docs/STRUCTURE.md` | MEDIUM | 1 天（含前端协调） |
+| P2-2 | 迁移文件排序（`sort.Strings`） | `tests/testutil/mysql_container.go:82` | MEDIUM | 3 行 |
+| P2-3 | `TestErrorCodes` 覆盖全部 25 个错误码 | `internal/errors/errors_test.go:197-216` | MEDIUM | 0.5 天 |
+| P2-4 | `TokenExpired` 改为 `errors.Is(err, jwt.ErrTokenExpired)` | `internal/middleware/auth.go:104-108` | LOW | 3 行 |
+| P2-5 | handler `switch err` 改为 `errors.Is` | `internal/handler/workbench_handler.go:209-218` | LOW | 5 行 |
+| P2-6 | 14 个 handler 添加 `session.UpdatedAt` 更新 | 多个 handler 文件 | MEDIUM | 0.5 天 |
+| P2-7 | `timeline_mysql.go` `UpdateStatus` 错误包装 | `internal/repository/timeline_mysql.go:132` | MEDIUM | 3 行 |
+| P2-8 | 缺少测试级数据库隔离 | `tests/testutil/dbtest.go` | HIGH | 2-3 天 |
+| P2-9 | `handleOK` 绕过映射表（一致性修复） | `internal/service/workbench/chat.go:518-527` | MEDIUM | 1 行 |
+
+### 第三优先级：简化与清理（两周内完成）
+
+| # | 发现 | 文件 | 严重度 | 估计工作量 |
+|---|------|------|--------|-----------|
+| P3-1 | 删除 `ValidAdminRoles` 死代码 | `internal/model/admin.go` | MEDIUM | 1 天 |
+| P3-2 | 删除 `StepMappingTable` 死代码 | `internal/adapter/step_mapping.go` | MEDIUM | 0.5 天 |
+| P3-3 | 删除 `NewDBTest` 死代码 | `tests/testutil/dbtest.go` | MEDIUM | 0.5 天 |
+| P3-4 | 删除 `RunMigrationsWithGolangMigrate` 死代码 | `tests/testutil/mysql_container.go` | MEDIUM | 0.3 天 |
+| P3-5 | 删除 `middleware.GenerateAccessToken` 包装函数 | `internal/middleware/auth.go`, `admin_auth.go`, `cmd/jwtgen/main.go` | MEDIUM | 0.5 天 |
+| P3-6 | 硬编码限流值外部化到 Config | `cmd/server/main.go`, `internal/config/config.go` | MEDIUM | 0.5 天 |
+| P3-7 | 添加 `signal.Notify` 优雅关闭 | `cmd/server/main.go` | MEDIUM | 1 天 |
+| P3-8 | `CountPatientsSince` 等 string → `time.Time` | `internal/repository/dashboard_repo.go` | LOW | 0.3 天 |
+| P3-9 | `visit_mysql.go` 移除冗余 `machine_state` 列 | `internal/repository/visit_mysql.go:88,96` | LOW | 0.3 天 |
+| P3-10 | `visit_mysql.go` 处理 `json.Marshal` 错误 | `internal/repository/visit_mysql.go:23,157` | LOW | 0.3 天 |
+| P3-11 | `SubmitPayment` 处理 `SubmitLabResults` 错误 | `internal/service/workbench/payment.go:77` | LOW | 0.3 天 |
+| P3-12 | `dashboard_mysql.go` 移除硬编码 `'' as birth_date` | `internal/repository/dashboard_mysql.go:96` | LOW | 0.2 天 |
+| P3-13 | 为缺失的 7 个 Repository 接口添加共享 Mock | `internal/testutil/mocks.go` | MEDIUM | 1-2 天 |
+| P3-14 | `StreamEvents` 统一使用 `apperrors.WriteError` | `internal/handler/sse_handler.go:94-106` | LOW | 3 行 |
+
+### 第四优先级：文档与风格优化（持续改进）
+
+| # | 发现 | 文件 | 严重度 | 估计工作量 |
+|---|------|------|--------|-----------|
+| P4-1 | STRUCTURE.md 路径修正 | `docs/STRUCTURE.md §4` | LOW | 0.2 天 |
+| P4-2 | 注释 17 → 18 值修正 | `internal/model/model_test.go:220` | LOW | 1 行 |
+| P4-3 | 移除未使用的 `CORSConfig.ServerMode` | `internal/middleware/cors.go` | LOW | 0.3 天 |
+| P4-4 | 重复的 scanner 接口合并 | `internal/repository/patient_mysql.go`, `visit_mysql.go` | LOW | 0.3 天 |
+| P4-5 | `config_test.go` 样板代码抽取 `clearEnv` | `internal/config/config_test.go` | LOW | 0.3 天 |
+| P4-6 | `getEnv` vs `os.Getenv` 统一 | `internal/config/config.go` | LOW | 0.3 天 |
+| P4-7 | `TestTerminalReasons` 重复测试删除 | `internal/model/model_test.go` | LOW | 0.1 天 |
+| P4-8 | WHERE 子句 `strings.Join` 简化 | `internal/repository/dashboard_mysql.go` | LOW | 0.1 天 |
+| P4-9 | `llm/client.go` 移除多余 `ctx.Err()` | `internal/llm/client.go:85-87` | LOW | 0.1 天 |
+| P4-10 | `llm/client.go` `defer` 闭包简化 | `internal/llm/client.go:132` | LOW | 0.1 天 |
+| P4-11 | 数据库查询格式对齐 | 多个 `_mysql.go` 文件 | LOW | 0.5 天 |
+| P4-12 | `front-api.md` 与代码 `VisitMachineState` 枚举同步 | `docs/front-api.md`, `internal/model/enums.go` | LOW | 0.3 天 |
+
+---
+
+## 七、各阶段总估计工作量
+
+| 阶段 | 发现问题数 | 估计总工作量 |
+|------|-----------|-------------|
+| 第一优先级（正确性） | 5 | 1-2 天 |
+| 第二优先级（合规性） | 9 | 3-5 天 |
+| 第三优先级（简化清理） | 14 | 4-7 天 |
+| 第四优先级（文档风格） | 12 | 2-4 天 |
+| **总计** | **40** | **10-18 天** |
+
+---
+
+> **注**：本报告由 5 组独立审计 agent + 5 组对抗性验证 agent + 1 综合 agent 协作生成，基于代码静态分析。部分发现（如 `front-api.md` 同步、Meta 字段添加）需与前端团队协调确认后实施。
