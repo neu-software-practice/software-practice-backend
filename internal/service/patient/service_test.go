@@ -33,7 +33,7 @@ func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input mo
 
 // mockVisitRepo implements repository.VisitRepository for testing.
 type mockVisitRepo struct {
-	listByPatientFunc func(ctx context.Context, patientID string, _ string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
+	listByPatientFunc func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error)
 }
 
 func (m *mockVisitRepo) Create(ctx context.Context, v *model.VisitSession) error { return nil }
