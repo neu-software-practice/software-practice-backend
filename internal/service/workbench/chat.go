@@ -25,9 +25,9 @@ type SendMessageInput struct {
 
 // SendMessageResult is the result of sending a patient message.
 type SendMessageResult struct {
-	Session              model.VisitSession
-	PatientMessage       model.TimelineItem
-	AssistantPlaceholder *model.TimelineItem
+	Session              model.VisitSession  `json:"session"`
+	PatientMessage       model.TimelineItem  `json:"patientMessage"`
+	AssistantPlaceholder *model.TimelineItem `json:"assistantPlaceholder,omitempty"`
 }
 
 // SendMessage sends a patient message and returns a placeholder for the AI response.

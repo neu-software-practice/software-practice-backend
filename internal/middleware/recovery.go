@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
+	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
 // RecoveryMiddleware catches panics and returns structured JSON error responses.
@@ -18,11 +19,11 @@ func RecoveryMiddleware() gin.HandlerFunc {
 				stack := string(debug.Stack())
 				log.Printf("PANIC recovered: %v\n%s", r, stack)
 
-				c.AbortWithStatusJSON(http.StatusInternalServerError, apperrors.NewApiError(
+				c.AbortWithStatusJSON(http.StatusInternalServerError, api.ErrorResponse(apperrors.NewApiError(
 					apperrors.CodeInternalError,
 					"internal server error",
 					http.StatusInternalServerError,
-				))
+				)))
 			}
 		}()
 		c.Next()
