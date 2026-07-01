@@ -95,11 +95,13 @@ func (m *MockVisitRepo) Update(ctx context.Context, v *model.VisitSession) error
 
 // MockTimelineRepo is a shared mock implementation of TimelineRepository.
 type MockTimelineRepo struct {
-	AppendFunc                 func(ctx context.Context, item *model.TimelineItem) error
-	AppendBatchFunc            func(ctx context.Context, items []model.TimelineItem) error
-	ListBySessionFunc          func(ctx context.Context, sid string, cursor *string, ps int) ([]model.TimelineItem, *string, bool, error)
-	FindLastPatientMessageFunc func(ctx context.Context, sessionID string) (string, error)
-	UpdateStatusFunc           func(ctx context.Context, id, status string) error
+	AppendFunc                   func(ctx context.Context, item *model.TimelineItem) error
+	AppendBatchFunc              func(ctx context.Context, items []model.TimelineItem) error
+	ListBySessionFunc            func(ctx context.Context, sid string, cursor *string, ps int) ([]model.TimelineItem, *string, bool, error)
+	FindLastPatientMessageFunc   func(ctx context.Context, sessionID string) (string, error)
+	FindLastStreamingMessageFunc func(ctx context.Context, sessionID string) (*model.TimelineItem, error)
+	UpdateStatusFunc             func(ctx context.Context, id, status string) error
+	UpdateContentFunc            func(ctx context.Context, id string, item *model.TimelineItem) error
 }
 
 func (m *MockTimelineRepo) Append(ctx context.Context, item *model.TimelineItem) error {
@@ -126,9 +128,21 @@ func (m *MockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID
 	}
 	return "", ErrNotImplemented
 }
+func (m *MockTimelineRepo) FindLastStreamingMessage(ctx context.Context, sessionID string) (*model.TimelineItem, error) {
+	if m.FindLastStreamingMessageFunc != nil {
+		return m.FindLastStreamingMessageFunc(ctx, sessionID)
+	}
+	return nil, ErrNotImplemented
+}
 func (m *MockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) error {
 	if m.UpdateStatusFunc != nil {
 		return m.UpdateStatusFunc(ctx, id, status)
+	}
+	return ErrNotImplemented
+}
+func (m *MockTimelineRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {
+	if m.UpdateContentFunc != nil {
+		return m.UpdateContentFunc(ctx, id, item)
 	}
 	return ErrNotImplemented
 }

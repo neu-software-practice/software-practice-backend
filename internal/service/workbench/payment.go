@@ -69,6 +69,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		session.Status = status
 		session.ActiveCardID = nil
 		session.UpdatedAt = now
+		session.LastActivityAt = &now
 		_ = s.visitRepo.Update(ctx, session)
 
 		// Auto-generate lab results
@@ -91,6 +92,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		session.MachineState = string(model.VisitMachineStateMedicationFulfillment)
 		status := string(model.VisitStatusBlocked)
 		session.UpdatedAt = now
+		session.LastActivityAt = &now
 		session.Status = status
 		_ = s.visitRepo.Update(ctx, session)
 

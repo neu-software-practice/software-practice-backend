@@ -87,6 +87,12 @@ func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id, status string) 
 func (m *mockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID string) (string, error) {
 	return "", nil
 }
+func (m *mockTimelineRepo) FindLastStreamingMessage(ctx context.Context, sessionID string) (*model.TimelineItem, error) {
+	return nil, nil
+}
+func (m *mockTimelineRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {
+	return nil
+}
 
 type mockFlowCardRepo struct {
 	createFunc       func(ctx context.Context, card *model.FlowCard) error

@@ -25,6 +25,12 @@ func NewService(visitRepo repository.VisitRepository, timelineRepo repository.Ti
 	}
 }
 
+// SuspendVisitResult is the response for the suspend visit endpoint.
+type SuspendVisitResult struct {
+	Session      model.VisitSession `json:"session"`
+	TimelineItem model.TimelineItem `json:"timelineItem"`
+}
+
 // createSessionParams holds the parameters for creating a new or follow-up session.
 type createSessionParams struct {
 	PatientID       string
@@ -49,6 +55,7 @@ func (s *Service) createSession(ctx context.Context, params createSessionParams)
 		ParentSessionID: params.ParentSessionID,
 		AskRoundLimit:   20,
 		LabRoundLimit:   10,
+		LastActivityAt:  &now,
 		Summary:         model.VisitSummary{},
 	}
 
@@ -178,4 +185,61 @@ func (s *Service) UpdateStatus(ctx context.Context, sessionID, newMachineState s
 
 	status := GetStatusForState(newMachineState)
 	return s.visitRepo.UpdateStatus(ctx, sessionID, status, newMachineState)
+}
+
+// SuspendVisit suspends a visit session due to idle timeout.
+// It is not a terminal state — endedAt and terminalReason are not set.
+func (s *Service) SuspendVisit(ctx context.Context, sessionID string) (*SuspendVisitResult, error) {
+	session, err := s.visitRepo.FindByID(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the session can transition to suspended state
+	if _, err := Transition(session.MachineState, string(model.VisitMachineStateSuspended)); err != nil {
+		return nil, fmt.Errorf("%w: %s", model.ErrInvalidState, err.Error())
+	}
+
+	now := time.Now()
+
+	// If there is an active streaming assistant message, mark it as idle-interrupted
+	streamingMsg, err := s.timelineRepo.FindLastStreamingMessage(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("find streaming message: %w", err)
+	}
+	if streamingMsg != nil {
+		idle := string(model.InterruptedByIdle)
+		streamingMsg.InterruptedBy = &idle
+		streamingMsg.Status = string(model.TimelineItemStatusDone)
+		if err := s.timelineRepo.UpdateContent(ctx, streamingMsg.ID, streamingMsg); err != nil {
+			return nil, fmt.Errorf("update streaming message: %w", err)
+		}
+	}
+
+	// Clear the active card ID and transition to suspended
+	session.ActiveCardID = nil
+	session.Status = GetStatusForState(string(model.VisitMachineStateSuspended))
+	session.MachineState = string(model.VisitMachineStateSuspended)
+	session.UpdatedAt = now
+	// NOTE: LastActivityAt is NOT refreshed here — suspend is a result of inactivity
+
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update session: %w", err)
+	}
+
+	// Create system event for timeline
+	suspendEvent := adapter.BuildSystemEventTimelineItem(
+		sessionID,
+		string(model.SystemEventTypeSessionSuspended),
+		"会话已暂停",
+		"会话因空闲超时已暂停，患者可直接输入或按复诊流程继续",
+	)
+	if err := s.timelineRepo.Append(ctx, &suspendEvent); err != nil {
+		return nil, fmt.Errorf("append suspend event: %w", err)
+	}
+
+	return &SuspendVisitResult{
+		Session:      *session,
+		TimelineItem: suspendEvent,
+	}, nil
 }

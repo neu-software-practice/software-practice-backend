@@ -17,6 +17,7 @@ type VisitSession struct {
 	EndedAt           *time.Time   `json:"endedAt,omitempty"`
 	TimeoutAt         *time.Time   `json:"timeoutAt,omitempty"`
 	PausedAt          *time.Time   `json:"pausedAt,omitempty"`
+	LastActivityAt    *time.Time   `json:"lastActivityAt,omitempty"`
 	AskRound          int          `json:"askRound"`
 	AskRoundLimit     int          `json:"askRoundLimit"`
 	LabRound          int          `json:"labRound"`
@@ -46,6 +47,7 @@ type VisitSessionSummary struct {
 	Status          string       `json:"status"`
 	StartedAt       time.Time    `json:"startedAt"`
 	UpdatedAt       time.Time    `json:"updatedAt"`
+	LastActivityAt  *time.Time   `json:"lastActivityAt,omitempty"`
 	EndedAt         *time.Time   `json:"endedAt,omitempty"`
 	ParentSessionID *string      `json:"parentSessionId,omitempty"`
 	TerminalReason  *string      `json:"terminalReason,omitempty"`

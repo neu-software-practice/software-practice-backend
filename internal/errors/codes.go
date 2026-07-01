@@ -23,6 +23,8 @@ const (
 	CodeTitleAlreadyExists = "TITLE_ALREADY_EXISTS"
 	CodeLLMUnavailable     = "LLM_UNAVAILABLE"
 
+	CodeInvalidState = "INVALID_STATE"
+
 	CodeAddressNotFound      = "ADDRESS_NOT_FOUND"
 	CodeAddressLimitExceeded = "ADDRESS_LIMIT_EXCEEDED"
 	CodeAddressRequired      = "ADDRESS_REQUIRED"

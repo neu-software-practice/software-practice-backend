@@ -86,6 +86,7 @@ func SetupRoutes(engine *gin.Engine, cfg *config.Config, router *Router) {
 		auth.GET("/visits", router.Visit.ListSessions)
 		auth.GET("/visits/:sessionId", router.Visit.GetSession)
 		auth.GET("/visits/:sessionId/snapshot", router.Visit.GetSnapshot)
+		auth.POST("/visits/:sessionId/suspend", router.Visit.SuspendVisit)
 
 		// Workbench routes
 		auth.GET("/visits/:sessionId/timeline", router.Workbench.ListTimeline)
