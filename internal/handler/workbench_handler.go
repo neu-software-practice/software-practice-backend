@@ -405,7 +405,13 @@ func (h *WorkbenchHandler) DismissEmergency(c *gin.Context) {
 		SessionID: sessionID,
 	})
 	if err != nil {
-		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
+		if errors.Is(err, model.ErrSessionNotFound) {
+			apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
+		} else if errors.Is(err, model.ErrValidation) {
+			apperrors.WriteValidationError(c, "session is not in emergency state")
+		} else {
+			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
+		}
 		return
 	}
 
