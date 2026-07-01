@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/neuhis/software-practice-backend/internal/middleware"
+	"github.com/neuhis/software-practice-backend/internal/auth"
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
 )
@@ -74,7 +74,7 @@ func (s *Service) Login(ctx context.Context, input model.AdminLoginInput) (*mode
 		return nil, model.ErrAdminInvalidCredentials
 	}
 
-	accessToken, err := middleware.GenerateAdminAccessToken(admin.ID, string(admin.Role), s.jwtSecret, adminAccessTokenTTL)
+	accessToken, err := auth.GenerateAdminAccessToken(admin.ID, string(admin.Role), s.jwtSecret, adminAccessTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("generate access token: %w", err)
 	}
@@ -148,7 +148,7 @@ func (s *Service) Refresh(ctx context.Context, rawToken string) (*model.AdminTok
 		return nil, fmt.Errorf("find admin for refresh: %w", err)
 	}
 
-	accessToken, err := middleware.GenerateAdminAccessToken(admin.ID, string(admin.Role), s.jwtSecret, adminAccessTokenTTL)
+	accessToken, err := auth.GenerateAdminAccessToken(admin.ID, string(admin.Role), s.jwtSecret, adminAccessTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("generate access token: %w", err)
 	}
@@ -292,7 +292,7 @@ func (s *Service) UpdateSettings(ctx context.Context, input model.UpdateSystemSe
 
 // BuildAccessToken generates an admin access token for testing or direct use.
 func (s *Service) BuildAccessToken(adminID, role string) (string, error) {
-	return middleware.GenerateAdminAccessToken(adminID, role, s.jwtSecret, adminAccessTokenTTL)
+	return auth.GenerateAdminAccessToken(adminID, role, s.jwtSecret, adminAccessTokenTTL)
 }
 
 func generateAdminRefreshTokenRaw() (string, error) {

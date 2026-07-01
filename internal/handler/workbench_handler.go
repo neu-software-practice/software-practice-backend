@@ -73,12 +73,7 @@ func (h *WorkbenchHandler) ListTimeline(c *gin.Context) {
 func (h *WorkbenchHandler) SendMessage(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type sendMessageInput struct {
-		SessionID       string `json:"sessionId"`
-		Content         string `json:"content"`
-		ClientMessageID string `json:"clientMessageId"`
-	}
-	input, err := BindJSON[sendMessageInput](c)
+	input, err := BindJSON[SendMessageRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -106,12 +101,7 @@ func (h *WorkbenchHandler) SendMessage(c *gin.Context) {
 func (h *WorkbenchHandler) StreamAssistantMessage(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type streamInput struct {
-		SessionID       string `json:"sessionId"`
-		RequestID       string `json:"requestId"`
-		ClientMessageID string `json:"clientMessageId,omitempty"`
-	}
-	input, err := BindJSON[streamInput](c)
+	input, err := BindJSON[StreamAssistantRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -137,7 +127,12 @@ func (h *WorkbenchHandler) StreamAssistantMessage(c *gin.Context) {
 	})
 
 	if err != nil {
-		writer.WriteError(input.SessionID, input.RequestID, err)
+		var apiErr *apperrors.ApiError
+		if errors.As(err, &apiErr) {
+			writer.WriteError(input.SessionID, input.RequestID, apiErr)
+		} else {
+			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewInternalError(err.Error()))
+		}
 	}
 	writer.Close()
 }
@@ -146,12 +141,7 @@ func (h *WorkbenchHandler) StreamAssistantMessage(c *gin.Context) {
 func (h *WorkbenchHandler) SubmitLabDecision(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type labDecisionInput struct {
-		SessionID string `json:"sessionId"`
-		CardID    string `json:"cardId"`
-		Decision  string `json:"decision"`
-	}
-	input, err := BindJSON[labDecisionInput](c)
+	input, err := BindJSON[LabDecisionRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -260,11 +250,7 @@ func (h *WorkbenchHandler) SubmitTreatmentExecution(c *gin.Context) {
 func (h *WorkbenchHandler) AckAdvice(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type ackInput struct {
-		SessionID string `json:"sessionId"`
-		CardID    string `json:"cardId"`
-	}
-	input, err := BindJSON[ackInput](c)
+	input, err := BindJSON[AckAdviceRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -291,11 +277,7 @@ func (h *WorkbenchHandler) AckAdvice(c *gin.Context) {
 func (h *WorkbenchHandler) ClassifyIntent(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type classifyInput struct {
-		SessionID string `json:"sessionId"`
-		Content   string `json:"content"`
-	}
-	input, err := BindJSON[classifyInput](c)
+	input, err := BindJSON[ClassifyIntentRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -322,13 +304,7 @@ func (h *WorkbenchHandler) ClassifyIntent(c *gin.Context) {
 func (h *WorkbenchHandler) ReportVitals(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type vitalsInput struct {
-		SessionID string                 `json:"sessionId"`
-		Source    string                 `json:"source"`
-		Vitals    map[string]interface{} `json:"vitals,omitempty"`
-		Symptoms  []string               `json:"symptoms"`
-	}
-	input, err := BindJSON[vitalsInput](c)
+	input, err := BindJSON[VitalsRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -386,11 +362,7 @@ func (h *WorkbenchHandler) ExitVisit(c *gin.Context) {
 func (h *WorkbenchHandler) ToggleTimer(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type timerInput struct {
-		SessionID string `json:"sessionId"`
-		Action    string `json:"action"` // pause, resume
-	}
-	input, err := BindJSON[timerInput](c)
+	input, err := BindJSON[TimerRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -447,13 +419,7 @@ func (h *WorkbenchHandler) DismissEmergency(c *gin.Context) {
 func (h *WorkbenchHandler) AskLockedQuestion(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type lockQuestionInput struct {
-		SessionID string `json:"sessionId"`
-		CardID    string `json:"cardId"`
-		Content   string `json:"content"`
-		RequestID string `json:"requestId"`
-	}
-	input, err := BindJSON[lockQuestionInput](c)
+	input, err := BindJSON[LockQuestionRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -470,7 +436,12 @@ func (h *WorkbenchHandler) AskLockedQuestion(c *gin.Context) {
 			return writer.WriteEvent(event)
 		})
 	if err != nil {
-		writer.WriteError(input.SessionID, input.RequestID, err)
+		var apiErr *apperrors.ApiError
+		if errors.As(err, &apiErr) {
+			writer.WriteError(input.SessionID, input.RequestID, apiErr)
+		} else {
+			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewInternalError(err.Error()))
+		}
 	}
 	writer.Close()
 }
@@ -479,12 +450,7 @@ func (h *WorkbenchHandler) AskLockedQuestion(c *gin.Context) {
 func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type consultInput struct {
-		SessionID string `json:"sessionId"`
-		Content   string `json:"content"`
-		RequestID string `json:"requestId"`
-	}
-	input, err := BindJSON[consultInput](c)
+	input, err := BindJSON[ConsultRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return
@@ -501,7 +467,12 @@ func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 			return writer.WriteEvent(event)
 		})
 	if err != nil {
-		writer.WriteError(input.SessionID, input.RequestID, err)
+		var apiErr *apperrors.ApiError
+		if errors.As(err, &apiErr) {
+			writer.WriteError(input.SessionID, input.RequestID, apiErr)
+		} else {
+			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewInternalError(err.Error()))
+		}
 	}
 	writer.Close()
 }
@@ -510,10 +481,7 @@ func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 func (h *WorkbenchHandler) GenerateTitle(c *gin.Context) {
 	sessionID := ParseSessionID(c)
 
-	type generateTitleInput struct {
-		SessionID string `json:"sessionId"`
-	}
-	input, err := BindJSON[generateTitleInput](c)
+	input, err := BindJSON[GenerateTitleRequest](c)
 	if err != nil {
 		apperrors.WriteValidationError(c, "invalid request body")
 		return

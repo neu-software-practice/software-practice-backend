@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
 
@@ -50,13 +51,19 @@ func (w *SSEWriter) WriteEvent(event model.AssistantStreamEvent) error {
 	return nil
 }
 
-// WriteError writes an SSE error event.
-func (w *SSEWriter) WriteError(sessionID, requestID string, err error) {
+// WriteError writes an SSE error event with a structured error payload.
+func (w *SSEWriter) WriteError(sessionID, requestID string, apiErr *apperrors.ApiError) {
 	event := model.AssistantStreamEvent{
 		Type:      "error",
 		SessionID: sessionID,
 		RequestID: requestID,
-		Message:   err.Error(),
+		Error: &model.SSEEventError{
+			Code:      apiErr.Code,
+			Message:   apiErr.Message,
+			Status:    apiErr.Status,
+			Details:   apiErr.Details,
+			Retriable: apiErr.Retriable,
+		},
 	}
 	_ = w.WriteEvent(event)
 }

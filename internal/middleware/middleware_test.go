@@ -336,7 +336,7 @@ func TestRequirePatientID(t *testing.T) {
 	t.Run("with patient id", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		middleware.SetPatientID(c, "p001")
+		c.Set("patientId", "p001")
 
 		r := setupRouter()
 		r.Use(middleware.RequirePatientID())
@@ -391,98 +391,6 @@ type mockError struct {
 
 func (e *mockError) Error() string {
 	return e.msg
-}
-
-func TestIsAuthenticated(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("authenticated", func(t *testing.T) {
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		middleware.SetPatientID(c, "p001")
-		if !middleware.IsAuthenticated(c) {
-			t.Error("should be authenticated")
-		}
-	})
-
-	t.Run("not authenticated", func(t *testing.T) {
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		if middleware.IsAuthenticated(c) {
-			t.Error("should not be authenticated")
-		}
-	})
-}
-
-func TestSetPatientID(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	middleware.SetPatientID(c, "p002")
-
-	id := middleware.GetPatientID(c)
-	if id != "p002" {
-		t.Errorf("got %s, want p002", id)
-	}
-}
-
-func TestCurrentPatient(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	r := setupRouter()
-	r.Use(middleware.CurrentPatient())
-	r.GET("/test", func(c *gin.Context) {
-		c.String(200, "ok")
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/test", nil)
-	r.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("status = %d, want 200", w.Code)
-	}
-}
-
-func TestRespondWithJSON(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("success response", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		middleware.RespondWithJSON(c, 200, gin.H{"key": "value"})
-
-		if w.Code != 200 {
-			t.Errorf("status = %d, want 200", w.Code)
-		}
-		body := w.Body.String()
-		if body == "" {
-			t.Error("body should not be empty")
-		}
-	})
-
-	t.Run("error response", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		middleware.RespondWithJSON(c, 400, gin.H{"error": "bad request"})
-
-		if w.Code != 400 {
-			t.Errorf("status = %d, want 400", w.Code)
-		}
-	})
-}
-
-func TestWriteJSONError(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	middleware.WriteJSONError(c, 404, "NOT_FOUND", "resource not found")
-
-	if w.Code != 404 {
-		t.Errorf("status = %d, want 404", w.Code)
-	}
-	body := w.Body.String()
-	if body == "" {
-		t.Error("body should not be empty")
-	}
 }
 
 func TestGetPatientIDNone(t *testing.T) {

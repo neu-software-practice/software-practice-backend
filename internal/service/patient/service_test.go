@@ -342,17 +342,17 @@ func TestGetContext(t *testing.T) {
 	if ctx2.Patient.ID != "p001" {
 		t.Errorf("id = %s", ctx2.Patient.ID)
 	}
-	if len(ctx2.Allergies) != 1 {
-		t.Errorf("allergies = %d", len(ctx2.Allergies))
+	if len(ctx2.Patient.Allergies) != 1 {
+		t.Errorf("allergies = %d", len(ctx2.Patient.Allergies))
 	}
 	if ctx2.PriorVisit != nil {
 		t.Error("expected PriorVisit to be nil")
 	}
-	if len(ctx2.MedicalHistory) != 1 || ctx2.MedicalHistory[0] != "腰椎间盘突出" {
-		t.Errorf("MedicalHistory = %v, want [腰椎间盘突出]", ctx2.MedicalHistory)
+	if len(ctx2.Patient.MedicalHistory) != 1 || ctx2.Patient.MedicalHistory[0] != "腰椎间盘突出" {
+		t.Errorf("MedicalHistory = %v, want [腰椎间盘突出]", ctx2.Patient.MedicalHistory)
 	}
-	if len(ctx2.LongTermMedications) != 1 || ctx2.LongTermMedications[0] != "阿司匹林" {
-		t.Errorf("LongTermMedications = %v, want [阿司匹林]", ctx2.LongTermMedications)
+	if len(ctx2.Patient.LongTermMedications) != 1 || ctx2.Patient.LongTermMedications[0] != "阿司匹林" {
+		t.Errorf("LongTermMedications = %v, want [阿司匹林]", ctx2.Patient.LongTermMedications)
 	}
 }
 
@@ -514,11 +514,11 @@ func TestGetContext_ListError(t *testing.T) {
 	if ctx2.PriorVisit != nil {
 		t.Error("expected PriorVisit to be nil when ListByPatient fails")
 	}
-	if len(ctx2.Allergies) != 1 || ctx2.Allergies[0] != "青霉素" {
-		t.Errorf("allergies = %v, want [青霉素]", ctx2.Allergies)
+	if len(ctx2.Patient.Allergies) != 1 || ctx2.Patient.Allergies[0] != "青霉素" {
+		t.Errorf("allergies = %v, want [青霉素]", ctx2.Patient.Allergies)
 	}
-	if len(ctx2.MedicalHistory) != 1 || ctx2.MedicalHistory[0] != "2024年阑尾炎手术" {
-		t.Errorf("MedicalHistory = %v, want [2024年阑尾炎手术]", ctx2.MedicalHistory)
+	if len(ctx2.Patient.MedicalHistory) != 1 || ctx2.Patient.MedicalHistory[0] != "2024年阑尾炎手术" {
+		t.Errorf("MedicalHistory = %v, want [2024年阑尾炎手术]", ctx2.Patient.MedicalHistory)
 	}
 }
 

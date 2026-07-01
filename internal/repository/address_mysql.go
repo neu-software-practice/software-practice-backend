@@ -19,13 +19,7 @@ func NewAddressRepository(db *sql.DB) AddressRepository {
 }
 
 func (r *addressMySQLRepo) Create(ctx context.Context, addr *model.Address) error {
-	now := time.Now()
-	if addr.CreatedAt.IsZero() {
-		addr.CreatedAt = now
-	}
-	if addr.UpdatedAt.IsZero() {
-		addr.UpdatedAt = now
-	}
+	touchTimestamps(&addr.CreatedAt, &addr.UpdatedAt)
 
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO addresses (id, patient_id, name, phone, province, city, district, detail, is_default, tag, created_at, updated_at)

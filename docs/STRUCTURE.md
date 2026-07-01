@@ -23,7 +23,7 @@
 
 | 项目 | 选型 | 说明 |
 | --- | --- | --- |
-| 语言 | Go 1.22+ | 与 medAgent 模块一致 |
+| 语言 | Go 1.22 | 与 medAgent 模块一致，go.mod 指定 `1.22.0` |
 | HTTP 框架 | [Gin](https://github.com/gin-gonic/gin) | 高性能 HTTP router，中间件生态丰富 |
 | 数据库 | MySQL 8.0 | 经 Docker 提供，所有集成测试使用 per-test 临时数据库 |
 | 数据库驱动 | [go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) | 纯 Go MySQL 驱动 |
@@ -108,7 +108,9 @@
 | **Repository** | `internal/repository/` | 数据持久化接口与 MySQL 实现（Repository Pattern） | → MySQL |
 | **Model** | `internal/model/` | 领域实体、枚举、DTO 定义 | 无外部依赖 |
 | **Adapter** | `internal/adapter/` | medAgent Step ↔ SSE 事件 / FlowCard / TimelineItem 映射 | → medAgent, Model |
-| **Middleware** | `internal/middleware/` | Gin 中间件（auth、CORS、logging、recovery、rate-limit） | → Config |
+| **Auth** | `internal/auth/` | 共享 JWT 工具（token 生成/解析），供 middleware 和 service 共同使用 | → 无外部依赖 |
+| **Middleware** | `internal/middleware/` | Gin 中间件（auth、admin-auth、CORS、logging、recovery、rate-limit） | → Auth, Config |
+| **LLM** | `internal/llm/` | LLM 客户端（标题生成等辅助功能） | → 无内部依赖 |
 
 ---
 
@@ -122,20 +124,30 @@ software-practice-backend/
 │       └── main.go                  # 入口：加载配置、初始化 DB、注册路由、启动 Gin
 │
 ├── internal/                        # 私有应用代码（不可外部导入）
+│   ├── auth/                        # 共享 JWT 工具（token 生成、解析）
+│   │   └── token.go                # GenerateAccessToken / GenerateAdminAccessToken / ParseJWT
+│   │
 │   ├── config/
-│   │   ├── config.go               # Config 结构体 + Load()：读取 .env 并校验
-│   │   ├── env.go                   # .env 文件解析（支持 .env.local 覆盖）
+│   │   ├── config.go               # Config 结构体 + Load()：读取 .env 并校验；env 解析内联于此
 │   │   └── config_test.go
 │   │
 │   ├── model/                       # 领域模型（纯数据结构，零依赖）
-│   │   ├── patient.go              # PatientProfile, PatientContext, PriorVisit
-│   │   ├── visit.go                # VisitSession, VisitSummary, VisitStatus 枚举
+│   │   ├── patient.go              # PatientProfile, PatientContext, PriorVisit, ProfileUpdateInput
+│   │   ├── visit.go                # VisitSession, VisitSummary, VisitSessionSummary, VisitSnapshot
 │   │   ├── timeline.go             # TimelineItem 判别联合（message/flow_card/system_event/terminal）
 │   │   ├── flow_card.go            # FlowCard 各类型 + FlowCardStatus 枚举
-│   │   ├── sse.go                  # AssistantStreamEvent 各类型
-│   │   ├── payment.go              # PaymentStatus 枚举
+│   │   ├── sse.go                  # AssistantStreamEvent 各类型 + SSEEventError
+│   │   ├── payment.go              # Payment 相关 DTO
 │   │   ├── enums.go                # 全部状态枚举常量
-│   │   └── errors.go               # 业务错误 sentinel（ErrSessionNotFound, ErrPatientNotFound...）
+│   │   ├── errors.go               # 业务错误 sentinel（ErrSessionNotFound, ErrPatientNotFound...）
+│   │   ├── address.go              # Address, CreateAddressInput, UpdateAddressInput 等
+│   │   ├── admin.go                # AdminUser, AdminTokens, AdminLoginInput/Result 等
+│   │   ├── admin_queries.go        # AdminPatientQuery, AdminSessionQuery, DashboardStats 等
+│   │   ├── billing.go              # BillingRecord, BillingLineItem 等
+│   │   ├── medical_order.go        # MedicalOrderRecord, LabTestItem, MedicationItem 等
+│   │   ├── settings.go             # SystemSettings, UpdateSystemSettingsInput
+│   │   ├── user.go                 # User, RefreshToken 等
+│   │   └── helpers.go              # 共享辅助函数
 │   │
 │   ├── repository/                  # 数据访问层（Repository Pattern）
 │   │   ├── patient_repo.go         # PatientRepository 接口定义
@@ -145,7 +157,20 @@ software-practice-backend/
 │   │   ├── timeline_repo.go        # TimelineRepository 接口
 │   │   ├── timeline_mysql.go
 │   │   ├── flow_card_repo.go       # FlowCardRepository 接口
-│   │   └── flow_card_mysql.go
+│   │   ├── flow_card_mysql.go
+│   │   ├── address_repo.go         # AddressRepository 接口
+│   │   ├── address_mysql.go
+│   │   ├── user_repo.go            # UserRepository 接口
+│   │   ├── user_mysql.go
+│   │   ├── admin_repo.go           # AdminRepository 接口
+│   │   ├── admin_mysql.go
+│   │   ├── admin_refresh_token_repo.go   # AdminRefreshTokenRepository 接口
+│   │   ├── admin_refresh_token_mysql.go
+│   │   ├── dashboard_repo.go       # DashboardRepository 接口
+│   │   ├── dashboard_mysql.go
+│   │   ├── settings_repo.go        # SettingsRepository 接口
+│   │   ├── settings_mysql.go
+│   │   └── pagination.go           # PaginateCursor[T] 泛型游标分页
 │   │
 │   ├── service/                     # 业务逻辑层
 │   │   ├── patient/
@@ -165,27 +190,51 @@ software-practice-backend/
 │   │   │   ├── vitals.go           # 体征上报 + 急症复检
 │   │   │   ├── exit.go             # 主动退出结算（四档后果）
 │   │   │   ├── timer.go            # 暂停/恢复总计时
+│   │   │   ├── consult.go          # 完成态咨询问答
+│   │   │   ├── title.go            # LLM 标题生成（绕过 medAgent，直接复用 LLM 客户端）
+│   │   │   ├── title_test.go
 │   │   │   └── service_test.go
-│   │   └── medagent/
-│   │       ├── adapter.go          # MedAgentAdapter：Step → SSE/Card 映射
-│   │       ├── client.go           # medAgent HTTP 客户端（或嵌入式调用）
-│   │       └── adapter_test.go
+│   │   ├── medagent/
+│   │   │   ├── client.go           # medAgent HTTP 客户端
+│   │   │   └── types.go            # Step, StepKind, Result, DrugInfo 等 medAgent 领域类型
+│   │   ├── auth/
+│   │   │   ├── service.go          # AuthService：注册/登录/刷新/登出
+│   │   │   └── service_test.go
+│   │   ├── admin/
+│   │   │   ├── service.go          # AdminService：管理员登录/登出/仪表盘/患者列表/会话管理/设置
+│   │   │   └── service_test.go
+│   │   ├── address/
+│   │   │   ├── service.go          # AddressService：收货地址 CRUD
+│   │   │   └── service_test.go
+│   │   ├── billing/
+│   │   │   ├── service.go          # BillingService：账单记录查询
+│   │   │   └── service_test.go
+│   │   └── medicalorder/
+│   │       ├── service.go          # MedicalOrderService：医嘱记录查询
+│   │       └── service_test.go
 │   │
 │   ├── handler/                     # HTTP 处理器（Gin handlers）
 │   │   ├── router.go               # 路由注册：将 handler 挂载到 Gin router
 │   │   ├── patient_handler.go      # /patients/* endpoints
 │   │   ├── visit_handler.go        # /visits CRUD endpoints
+│   │   ├── auth_handler.go         # /auth/* endpoints
+│   │   ├── admin_handler.go        # /admin/* endpoints
 │   │   ├── workbench_handler.go    # /visits/:id/messages, /assistant-stream, /lab-decision, etc.
+│   │   ├── workbench_requests.go   # 工作台端点共享请求 DTO 类型
 │   │   ├── sse_handler.go          # SSE 流式传输工具（delta/message_final/card/state/emergency/done/error）
+│   │   ├── address_handler.go      # /patients/:id/addresses/* endpoints
+│   │   ├── billing_handler.go      # /billing/* endpoints
+│   │   ├── medical_order_handler.go # /medical-orders endpoint
 │   │   ├── middleware.go           # Handler 层通用工具（参数解析、错误响应封装）
 │   │   └── handler_test.go
 │   │
 │   ├── middleware/                   # Gin 中间件
-│   │   ├── auth.go                 # JWT 鉴权中间件（从 Header/Cookie 提取 token）
+│   │   ├── auth.go                 # JWT 患者鉴权中间件（AuthMiddleware, RequirePatientID）
+│   │   ├── admin_auth.go           # JWT 管理员鉴权中间件（AdminAuthMiddleware, RequireAdminRole）
 │   │   ├── cors.go                 # CORS 配置（production 禁止通配符）
-│   │   ├── logging.go             # 请求日志（含 request_id）
-│   │   ├── recovery.go            # Panic 恢复 + 结构化错误响应
-│   │   ├── rate_limit.go          # 速率限制
+│   │   ├── logging.go              # 请求日志（含 request_id）
+│   │   ├── recovery.go             # Panic 恢复 + 结构化错误响应
+│   │   ├── rate_limit.go           # 速率限制
 │   │   └── middleware_test.go
 │   │
 │   ├── adapter/                     # medAgent 适配层
@@ -194,13 +243,20 @@ software-practice-backend/
 │   │   ├── timeline_builder.go     # 从 medAgent Turns 构造 TimelineItem
 │   │   └── adapter_test.go
 │   │
-│   └── errors/                      # 统一错误处理
-│       ├── api_error.go            # ApiError 结构体（code/message/status/details/retriable）
-│       ├── codes.go                # 错误码常量（SESSION_NOT_FOUND, PATIENT_NOT_FOUND, CARD_NOT_FOUND...）
-│       └── handler.go              # Gin 错误响应辅助函数
-│
-├── pkg/                             # 可公开导出的共享包
-│   └── api/
+│   ├── errors/                      # 统一错误处理
+│   │   ├── api_error.go            # ApiError 结构体（code/message/status/details/retriable）
+│   │   ├── codes.go                # 错误码常量（SESSION_NOT_FOUND, PATIENT_NOT_FOUND, CARD_NOT_FOUND...）
+│   │   ├── handler.go              # Gin 错误响应辅助函数
+│   │   ├── doc.go                  # 包文档
+│   │   └── errors_test.go
+│   │
+│   ├── llm/                         # LLM 客户端（标题生成等）
+│   │   ├── client.go               # LLM 客户端实现（支持多 Provider）
+│   │   └── client_test.go
+│   │
+│   └── testutil/                    # 测试辅助工具
+│       ├── mocks.go                # 共享 Mock 仓库实现
+│       └── ...
 │       ├── response.go             # 统一 API 响应信封（success + data + error + metadata）
 │       ├── pagination.go           # PageResult[T] 游标分页
 │       └── response_test.go
@@ -318,6 +374,13 @@ require (
 
 ### 5.2 内部依赖图
 
+> DESIGN NOTE: The `adapter` package imports `internal/service/medagent` for the
+> medAgent domain types (Step, Result, StepKind, etc.). This creates a dependency
+> `adapter → service/medagent`. The `workbench` service depends on both `adapter`
+> and `service/medagent`, so there is no true circular dependency. For ideal clean
+> architecture, the shared medAgent types could be moved to `internal/model/medagent/`
+> in the future.
+
 ```
 cmd/server
   └── internal/config
@@ -325,12 +388,26 @@ cmd/server
         └── internal/service/patient
         │     └── internal/repository (PatientRepo)
         └── internal/service/visit
-        │     └── internal/repository (VisitRepo)
+        │     └── internal/repository (VisitRepo, TimelineRepo)
         └── internal/service/workbench
-        │     └── internal/repository (TimelineRepo, FlowCardRepo)
+        │     └── internal/repository (TimelineRepo, FlowCardRepo, AddressRepo)
+        │     └── internal/service/visit (GetSession delegation)
         │     └── internal/service/medagent
-        │           └── medAgent/agent (HTTP client / 嵌入)
+        │     │     └── medAgent/agent (HTTP client)
+        │     └── internal/llm (title generation)
+        └── internal/service/auth
+        │     └── internal/repository (UserRepo, RefreshTokenRepo)
+        └── internal/service/admin
+        │     └── internal/repository (AdminRepo, DashboardRepo, SettingsRepo)
+        │     └── internal/auth (token generation)
+        └── internal/service/address
+        │     └── internal/repository (AddressRepo)
+        └── internal/service/billing
+        │     └── internal/repository (VisitRepo, FlowCardRepo)
+        └── internal/service/medicalorder
+        │     └── internal/repository (VisitRepo, FlowCardRepo)
         └── internal/middleware
+              └── internal/auth
               └── internal/config
 ```
 
@@ -391,7 +468,7 @@ type PatientRepository interface {
 
 ### 6.4 状态机
 
-VisitSession 有 10 种对外状态（`VisitStatus`），内部状态机 17 种（`VisitMachineState`）。后端 Service 层驱动状态转移，关键约束：
+VisitSession 有 10 种对外状态（`VisitStatus`），内部状态机 18 种（`VisitMachineState`）。后端 Service 层驱动状态转移，关键约束：
 
 - `blocked` 状态必须携带 `activeCardId`
 - `new` 入口不得带 `parentSessionId`

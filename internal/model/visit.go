@@ -11,7 +11,7 @@ type VisitSession struct {
 	PatientID         string       `json:"patientId"`
 	EntryType         string       `json:"entryType"`
 	Status            string       `json:"status"`
-	MachineState      string       `json:"machineState"`
+	MachineState      string       `json:"-"`
 	StartedAt         time.Time    `json:"startedAt"`
 	UpdatedAt         time.Time    `json:"updatedAt"`
 	EndedAt           *time.Time   `json:"endedAt,omitempty"`
@@ -24,7 +24,7 @@ type VisitSession struct {
 	ParentSessionID   *string      `json:"parentSessionId,omitempty"`
 	TerminalReason    *string      `json:"terminalReason,omitempty"`
 	ActiveCardID      *string      `json:"activeCardId,omitempty"`
-	MedAgentSessionID *string      `json:"medagentSessionId,omitempty"`
+	MedAgentSessionID *string      `json:"-"`
 	TimerPaused       bool         `json:"timerPaused"`
 	Summary           VisitSummary `json:"summary"`
 }

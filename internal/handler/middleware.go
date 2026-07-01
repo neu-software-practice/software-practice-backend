@@ -51,11 +51,6 @@ func WriteSuccess[T any](c *gin.Context, status int, data T) {
 	c.JSON(status, api.SuccessResponse(data))
 }
 
-// WriteSuccessWithMeta writes a success response with metadata.
-func WriteSuccessWithMeta[T any](c *gin.Context, status int, data T, meta interface{}) {
-	c.JSON(status, api.SuccessResponseWithMeta(data, meta))
-}
-
 // WritePageResult writes a paginated response.
 func WritePageResult[T any](c *gin.Context, page api.PageResult[T]) {
 	c.JSON(http.StatusOK, api.SuccessResponse(page))
