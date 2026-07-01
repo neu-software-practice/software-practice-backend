@@ -3178,3 +3178,73 @@ func TestAdminHandler_Refresh_Valid(t *testing.T) {
 		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestWorkbenchHandler_GenerateTitle_InvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{}, nil)
+	h := handler.NewWorkbenchHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+	c.Request = httptest.NewRequest("POST", "/visits/s001/generate-title", strings.NewReader(`bad`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.GenerateTitle(c)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want 422", w.Code)
+	}
+}
+
+func TestWorkbenchHandler_GenerateTitle_SessionIDMismatch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{}, nil)
+	h := handler.NewWorkbenchHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+	c.Request = httptest.NewRequest("POST", "/visits/s001/generate-title", strings.NewReader(`{"sessionId":"s002"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.GenerateTitle(c)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want 422", w.Code)
+	}
+}
+
+func TestWorkbenchHandler_ReportVitals_InvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{}, nil)
+	h := handler.NewWorkbenchHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+	c.Request = httptest.NewRequest("POST", "/visits/s001/vitals", strings.NewReader(`bad`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.ReportVitals(c)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want 422", w.Code)
+	}
+}
+
+func TestWorkbenchHandler_ToggleTimer_Resume(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{ID: id, PatientID: "p001", Status: "active", TimerPaused: true}, nil
+		},
+		updateFunc: func(ctx context.Context, v *model.VisitSession) error { return nil },
+	}
+	svc := newWorkbenchServiceForTest(visitRepo, &mockTimelineRepo{}, nil)
+	h := handler.NewWorkbenchHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+	c.Request = httptest.NewRequest("POST", "/visits/s001/timer", strings.NewReader(`{"sessionId":"s001","action":"resume"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.ToggleTimer(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
