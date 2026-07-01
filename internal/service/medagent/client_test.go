@@ -282,3 +282,61 @@ func TestDeleteSession_NotFound(t *testing.T) {
 		t.Error("expected error for 404")
 	}
 }
+
+func TestCreateSession_MarshalError(t *testing.T) {
+	// Passing a channel in the map triggers json.Marshal error
+	ch := make(chan int)
+	c := NewClient("http://localhost:1") // doesn't matter, marshal fails first
+	_, err := c.CreateSession(context.Background(), map[string]interface{}{"ch": ch}, true, nil)
+	if err == nil {
+		t.Error("expected marshal error")
+	}
+}
+
+func TestTestResults_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, err := c.TestResults(context.Background(), "s1", []TestResult{{Item: "test", Value: "ok"}})
+	if err == nil {
+		t.Error("expected server error")
+	}
+}
+
+func TestDrugInfo_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, err := c.DrugInfo(context.Background(), "s1", []DrugInfo{{Name: "a", Spec: "100mg"}})
+	if err == nil {
+		t.Error("expected server error")
+	}
+}
+
+func TestPurchaseResult_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, err := c.PurchaseResult(context.Background(), "s1", []DrugPurchase{{Name: "a", Bought: true, Quantity: 1}})
+	if err == nil {
+		t.Error("expected server error")
+	}
+}
+
+func TestVitals_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, err := c.Vitals(context.Background(), "s1", map[string]interface{}{"temp": 37})
+	if err == nil {
+		t.Error("expected server error")
+	}
+}

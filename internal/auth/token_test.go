@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -104,5 +105,31 @@ func TestParseJWT_ExpiredToken(t *testing.T) {
 	_, err = ParseJWT(expiredToken, secret)
 	if err == nil {
 		t.Error("expected error for expired token")
+	}
+}
+
+func TestGenerateAccessToken_SigningError(t *testing.T) {
+	orig := jwtSign
+	jwtSign = func(token *jwt.Token, secret []byte) (string, error) {
+		return "", fmt.Errorf("injected signing error")
+	}
+	defer func() { jwtSign = orig }()
+
+	_, err := GenerateAccessToken("u1", "p1", "", "secret")
+	if err == nil {
+		t.Error("expected signing error")
+	}
+}
+
+func TestGenerateAdminAccessToken_SigningError(t *testing.T) {
+	orig := jwtSign
+	jwtSign = func(token *jwt.Token, secret []byte) (string, error) {
+		return "", fmt.Errorf("injected signing error")
+	}
+	defer func() { jwtSign = orig }()
+
+	_, err := GenerateAdminAccessToken("a1", "admin", "secret", 900)
+	if err == nil {
+		t.Error("expected signing error")
 	}
 }

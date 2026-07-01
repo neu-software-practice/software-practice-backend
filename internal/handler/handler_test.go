@@ -26,6 +26,7 @@ import (
 	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
 	"github.com/neuhis/software-practice-backend/pkg/api"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func pf(v float64) *float64 { return &v }
@@ -2972,6 +2973,207 @@ func TestWorkbenchHandler_SubmitPayment_Valid(t *testing.T) {
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("patientId", "p001")
 	h.SubmitPayment(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestSSEWriter_Heartbeat_ContextDone(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.Request = httptest.NewRequest("GET", "/stream", nil).WithContext(ctx)
+	writer, _ := handler.NewSSEWriter(c)
+	done := make(chan struct{})
+	stop := make(chan struct{})
+	go func() {
+		writer.Heartbeat(500*time.Millisecond, stop)
+		close(done)
+	}()
+	// Cancel context — should cause Heartbeat to exit via Done() channel
+	time.Sleep(5 * time.Millisecond)
+	cancel()
+	select {
+	case <-done:
+		// Success
+	case <-time.After(200 * time.Millisecond):
+		t.Error("Heartbeat did not exit after context cancel")
+	}
+	close(stop)
+}
+
+func TestVisitHandler_ListSessions_Valid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			return []model.VisitSessionSummary{}, nil, false, nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	h := handler.NewVisitHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/visits?patientId=p001", nil)
+	c.Set("patientId", "p001")
+	h.ListSessions(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestVisitHandler_CreateSession_Valid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	visitRepo := &mockVisitRepo{
+		createFunc: func(ctx context.Context, v *model.VisitSession) error { return nil },
+	}
+	timelineRepo := &mockTimelineRepo{
+		appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil },
+	}
+	svc := visitsvc.NewService(visitRepo, timelineRepo)
+	h := handler.NewVisitHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/visits", strings.NewReader(`{"patientId":"p001","entryType":"new"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.CreateSession(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestPatientHandler_GetContext_ValidFull(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	patientRepo := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return &model.PatientProfile{ID: id, Name: "Test", Gender: "male", Age: 30}, nil
+		},
+	}
+	visitRepo := &mockVisitRepo{
+		listByPatientFunc: func(ctx context.Context, pid string, cursor *string, ps int) ([]model.VisitSessionSummary, *string, bool, error) {
+			return nil, nil, false, nil
+		},
+	}
+	svc := patientsvc.NewService(patientRepo, visitRepo)
+	h := handler.NewPatientHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	c.Request = httptest.NewRequest("GET", "/patients/p001/context", nil)
+	c.Set("patientId", "p001")
+	h.GetContext(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestPatientHandler_UpdateProfile_Valid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	patientRepo := &mockPatientRepo{
+		updateFunc: func(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
+			return &model.PatientProfile{ID: id, Name: "Test", Gender: "male", Age: 30}, nil
+		},
+	}
+	svc := patientsvc.NewService(patientRepo, &mockVisitRepo{})
+	h := handler.NewPatientHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	c.Request = httptest.NewRequest("PATCH", "/patients/p001/profile", strings.NewReader(`{"allergies":["penicillin"]}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.UpdateProfile(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_CreateAddress_ValidFull(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	addrRepo := &mockAddressRepo{
+		countByPatientFunc: func(ctx context.Context, patientID string) (int, error) { return 0, nil },
+		createFunc:         func(ctx context.Context, addr *model.Address) error { return nil },
+	}
+	svc := addresssvc.NewService(addrRepo)
+	h := handler.NewAddressHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}}
+	c.Request = httptest.NewRequest("POST", "/patients/p001/addresses", strings.NewReader(`{"name":"Home","phone":"13800138000","province":"Beijing","city":"Beijing","district":"Haidian","detail":"No.1"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("patientId", "p001")
+	h.CreateAddress(c)
+	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
+		t.Errorf("status = %d, want 200/201, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_DeleteAddress_Valid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	addrRepo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return &model.Address{ID: id, PatientID: "p001", Name: "Home"}, nil
+		},
+		deleteFunc: func(ctx context.Context, id string) error { return nil },
+	}
+	svc := addresssvc.NewService(addrRepo)
+	h := handler.NewAddressHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "p001"}, {Key: "addressId", Value: "a1"}}
+	c.Request = httptest.NewRequest("DELETE", "/patients/p001/addresses/a1", nil)
+	c.Set("patientId", "p001")
+	h.DeleteAddress(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminHandler_Login_Valid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("pass"), bcrypt.MinCost)
+	adminRepo := &mockAdminRepo{
+		findByUsernameFunc: func(ctx context.Context, username string) (*model.AdminUser, error) {
+			return &model.AdminUser{ID: "a1", Username: "admin", PasswordHash: string(hash), Role: model.AdminRoleSuperAdmin, DisplayName: "Admin"}, nil
+		},
+	}
+	tokenRepo := &mockAdminRefreshTokenRepo{
+		createFunc: func(ctx context.Context, token *model.AdminRefreshToken) error { return nil },
+	}
+	adminSvc := adminsvc.NewService(adminRepo, tokenRepo, &mockDashboardRepo{}, &mockSettingsRepo{}, &mockPatientRepo{}, &mockVisitRepo{}, handlerTestSecret)
+	h := handler.NewAdminHandler(adminSvc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/admin/auth/login", strings.NewReader(`{"username":"admin","password":"pass"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.Login(c)
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminHandler_Refresh_Valid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adminRepo := &mockAdminRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.AdminUser, error) {
+			return &model.AdminUser{ID: id, Username: "admin", Role: model.AdminRoleSuperAdmin, DisplayName: "Admin"}, nil
+		},
+	}
+	tokenRepo := &mockAdminRefreshTokenRepo{
+		findByTokenHashFunc: func(ctx context.Context, hash string) (*model.AdminRefreshToken, error) {
+			return &model.AdminRefreshToken{ID: "rt1", AdminID: "a1", ExpiresAt: time.Now().Add(time.Hour)}, nil
+		},
+		markUsedFunc: func(ctx context.Context, id string) error { return nil },
+		createFunc:   func(ctx context.Context, token *model.AdminRefreshToken) error { return nil },
+	}
+	adminSvc := adminsvc.NewService(adminRepo, tokenRepo, &mockDashboardRepo{}, &mockSettingsRepo{}, &mockPatientRepo{}, &mockVisitRepo{}, handlerTestSecret)
+	h := handler.NewAdminHandler(adminSvc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/admin/auth/refresh", strings.NewReader(`{"refreshToken":"valid"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.Refresh(c)
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200, body=%s", w.Code, w.Body.String())
 	}
