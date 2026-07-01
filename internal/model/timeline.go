@@ -16,7 +16,7 @@ type TimelineItem struct {
 
 	// message kind fields
 	Role          string  `json:"role,omitempty"`
-	Content       string  `json:"content,omitempty"`
+	Content       string  `json:"content"`
 	LocalKey      *string `json:"localKey,omitempty"`
 	InterruptedBy *string `json:"interruptedBy,omitempty"`
 
