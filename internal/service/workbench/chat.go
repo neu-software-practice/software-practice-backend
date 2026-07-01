@@ -198,12 +198,14 @@ func (s *Service) handleAsk(ctx context.Context, sessionID, requestID string, se
 	}
 
 	// Send delta
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "delta",
 		SessionID: sessionID,
 		RequestID: requestID,
 		Content:   content,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Create message timeline item
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", content)
@@ -212,27 +214,33 @@ func (s *Service) handleAsk(ctx context.Context, sessionID, requestID string, se
 	}
 
 	// Send message_final
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:             "message_final",
 		SessionID:        sessionID,
 		RequestID:        requestID,
 		MessageFinalItem: &msgItem,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Send state update
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "state",
 		SessionID: sessionID,
 		State:     string(model.VisitMachineStateChatting),
 		Status:    string(model.VisitStatusChatting),
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Send done
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Update session
 	session.AskRound++
@@ -251,12 +259,14 @@ func (s *Service) handleNeedTests(ctx context.Context, sessionID, requestID stri
 	}
 
 	// Send card event
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "card",
 		SessionID: sessionID,
 		RequestID: requestID,
 		Card:      card,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Create timeline item for the card
 	tlItem := adapter.BuildFlowCardTimelineItem(sessionID, card)
@@ -264,13 +274,15 @@ func (s *Service) handleNeedTests(ctx context.Context, sessionID, requestID stri
 		return fmt.Errorf("append card timeline: %w", err)
 	}
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:             "card",
 		SessionID:        sessionID,
 		RequestID:        requestID,
 		Card:             card,
 		CardTimelineItem: &tlItem,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Update state to labDecision (blocked)
 	newState := string(model.VisitMachineStateLabDecision)
@@ -279,31 +291,37 @@ func (s *Service) handleNeedTests(ctx context.Context, sessionID, requestID stri
 	session.Status = status
 	session.ActiveCardID = &cardID
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:         "state",
 		SessionID:    sessionID,
 		State:        newState,
 		Status:       status,
 		ActiveCardID: &cardID,
-	})
+	}); err != nil {
+		return err
+	}
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (s *Service) handleDrugQuery(ctx context.Context, sessionID, requestID, maSessionID string, session *model.VisitSession, step *medagent.Step, callback StreamAssistantEventCallback) error {
 	// Send state event (drug query is transparent to user)
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "state",
 		SessionID: sessionID,
 		State:     string(model.VisitMachineStateAnalyzing),
 		Status:    string(model.VisitStatusAnalyzing),
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Auto-fill drug info with mock data and continue
 	infos := make([]medagent.DrugInfo, len(step.DrugNames))
@@ -332,12 +350,14 @@ func (s *Service) handlePurchase(ctx context.Context, sessionID, requestID strin
 	}
 
 	// Send card event
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "card",
 		SessionID: sessionID,
 		RequestID: requestID,
 		Card:      card,
-	})
+	}); err != nil {
+		return err
+	}
 
 	tlItem := adapter.BuildFlowCardTimelineItem(sessionID, card)
 	if err := s.timelineRepo.Append(ctx, &tlItem); err != nil {
@@ -351,31 +371,46 @@ func (s *Service) handlePurchase(ctx context.Context, sessionID, requestID strin
 	session.Status = status
 	session.ActiveCardID = &cardID
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:         "state",
 		SessionID:    sessionID,
 		State:        newState,
 		Status:       status,
 		ActiveCardID: &cardID,
-	})
+	}); err != nil {
+		return err
+	}
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (s *Service) handleEmergency(ctx context.Context, sessionID, requestID string, session *model.VisitSession, step *medagent.Step, callback StreamAssistantEventCallback) error {
 	// Send emergency event
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "emergency",
 		SessionID: sessionID,
 		Severity:  string(model.EmergencySeverityCritical),
 		Message:   step.Emergency,
-	})
+	}); err != nil {
+		return err
+	}
+
+	// Send done event
+	if err := callback(model.AssistantStreamEvent{
+		Type:      "done",
+		SessionID: sessionID,
+		RequestID: requestID,
+	}); err != nil {
+		return err
+	}
 
 	// Create terminal timeline item
 	termItem := adapter.BuildTerminalTimelineItem(sessionID,
@@ -408,12 +443,14 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 	if err := s.flowCardRepo.Create(ctx, diagCard); err != nil {
 		return fmt.Errorf("create diagnosis card: %w", err)
 	}
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "card",
 		SessionID: sessionID,
 		RequestID: requestID,
 		Card:      diagCard,
-	})
+	}); err != nil {
+		return err
+	}
 	diagTL := adapter.BuildFlowCardTimelineItem(sessionID, diagCard)
 	_ = s.timelineRepo.Append(ctx, &diagTL)
 
@@ -427,12 +464,14 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 	switch result.Plan {
 	case "MEDICATION":
 		// Will be followed by PURCHASE step
-		_ = callback(model.AssistantStreamEvent{
+		if err := callback(model.AssistantStreamEvent{
 			Type:      "state",
 			SessionID: sessionID,
 			State:     string(model.VisitMachineStateDiagnosis),
 			Status:    string(model.VisitStatusDiagnosis),
-		})
+		}); err != nil {
+			return err
+		}
 
 	case "ADVICE_ONLY":
 		// Create advice_only card
@@ -440,25 +479,29 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 		if err := s.flowCardRepo.Create(ctx, adviceCard); err != nil {
 			return fmt.Errorf("create advice card: %w", err)
 		}
-		_ = callback(model.AssistantStreamEvent{
+		if err := callback(model.AssistantStreamEvent{
 			Type:      "card",
 			SessionID: sessionID,
 			RequestID: requestID,
 			Card:      adviceCard,
-		})
+		}); err != nil {
+			return err
+		}
 		adviceTL := adapter.BuildFlowCardTimelineItem(sessionID, adviceCard)
 		_ = s.timelineRepo.Append(ctx, &adviceTL)
 
 		cardID := adviceCard.ID
 		session.ActiveCardID = &cardID
 
-		_ = callback(model.AssistantStreamEvent{
+		if err := callback(model.AssistantStreamEvent{
 			Type:         "state",
 			SessionID:    sessionID,
 			State:        string(model.VisitMachineStateAdviceOnly),
 			Status:       string(model.VisitStatusBlocked),
 			ActiveCardID: &cardID,
-		})
+		}); err != nil {
+			return err
+		}
 
 	case "REFERRAL":
 		// Create completed visit card with referral
@@ -466,12 +509,14 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 		if err := s.flowCardRepo.Create(ctx, completedCard); err != nil {
 			return fmt.Errorf("create completed card: %w", err)
 		}
-		_ = callback(model.AssistantStreamEvent{
+		if err := callback(model.AssistantStreamEvent{
 			Type:      "card",
 			SessionID: sessionID,
 			RequestID: requestID,
 			Card:      completedCard,
-		})
+		}); err != nil {
+			return err
+		}
 		compTL := adapter.BuildFlowCardTimelineItem(sessionID, completedCard)
 		_ = s.timelineRepo.Append(ctx, &compTL)
 
@@ -492,12 +537,14 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 		ts := result.Plan
 		session.Summary.TreatmentSummary = &ts
 
-		_ = callback(model.AssistantStreamEvent{
+		if err := callback(model.AssistantStreamEvent{
 			Type:      "state",
 			SessionID: sessionID,
 			State:     string(model.VisitMachineStateTransferred),
 			Status:    string(model.VisitStatusTransferred),
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	// Set diagnosis in session summary
@@ -507,22 +554,26 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 	}
 
 	// Send done
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (s *Service) handleOK(ctx context.Context, sessionID, requestID string, session *model.VisitSession, callback StreamAssistantEventCallback) error {
 	// OK is a confirmation step — per spec, no SSE state events are emitted.
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }

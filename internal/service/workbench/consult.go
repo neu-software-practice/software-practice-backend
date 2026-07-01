@@ -70,31 +70,37 @@ func (s *Service) StreamConsultationReply(ctx context.Context, sessionID, conten
 	}
 
 	// Stream delta
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "delta",
 		SessionID: sessionID,
 		RequestID: requestID,
 		Content:   reply,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Create message item
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", reply)
 	_ = s.timelineRepo.Append(ctx, &msgItem)
 
 	// Message final
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:             "message_final",
 		SessionID:        sessionID,
 		RequestID:        requestID,
 		MessageFinalItem: &msgItem,
-	})
+	}); err != nil {
+		return err
+	}
 
 	// Done
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -110,28 +116,34 @@ func (s *Service) AskLockedQuestion(ctx context.Context, sessionID, cardID, cont
 		card.Title, content)
 
 	// Stream delta
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "delta",
 		SessionID: sessionID,
 		RequestID: requestID,
 		Content:   reply,
-	})
+	}); err != nil {
+		return err
+	}
 
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", reply)
 	_ = s.timelineRepo.Append(ctx, &msgItem)
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:             "message_final",
 		SessionID:        sessionID,
 		RequestID:        requestID,
 		MessageFinalItem: &msgItem,
-	})
+	}); err != nil {
+		return err
+	}
 
-	_ = callback(model.AssistantStreamEvent{
+	if err := callback(model.AssistantStreamEvent{
 		Type:      "done",
 		SessionID: sessionID,
 		RequestID: requestID,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }

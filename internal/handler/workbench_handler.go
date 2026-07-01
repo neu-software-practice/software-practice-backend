@@ -436,7 +436,11 @@ func (h *WorkbenchHandler) AskLockedQuestion(c *gin.Context) {
 		return
 	}
 
-	writer, _ := NewSSEWriter(c)
+	writer, err := NewSSEWriter(c)
+	if err != nil {
+		apperrors.WriteError(c, apperrors.NewInternalError("SSE not supported"))
+		return
+	}
 	err = h.svc.AskLockedQuestion(c.Request.Context(), input.SessionID, input.CardID, input.Content, input.RequestID,
 		func(event model.AssistantStreamEvent) error {
 			return writer.WriteEvent(event)
@@ -467,7 +471,11 @@ func (h *WorkbenchHandler) StreamConsultationReply(c *gin.Context) {
 		return
 	}
 
-	writer, _ := NewSSEWriter(c)
+	writer, err := NewSSEWriter(c)
+	if err != nil {
+		apperrors.WriteError(c, apperrors.NewInternalError("SSE not supported"))
+		return
+	}
 	err = h.svc.StreamConsultationReply(c.Request.Context(), input.SessionID, input.Content, input.RequestID,
 		func(event model.AssistantStreamEvent) error {
 			return writer.WriteEvent(event)
