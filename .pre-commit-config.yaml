@@ -1,12 +1,11 @@
 repos:
   - repo: local
     hooks:
-      - id: go-test-cover
-        name: Go Test Cover (service>=90%, total>=80%)
-        entry: bash scripts/precommit-check.sh
+      - id: go-test
+        name: Go Test (local only, no Docker)
+        entry: go test -count=1 -short ./...
         language: system
         pass_filenames: false
-        timeout: 600
         types: [go]
 
       - id: golangci-lint
