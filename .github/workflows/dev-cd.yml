@@ -24,14 +24,16 @@ jobs:
             git reset --hard origin/dev
             git submodule update --init --recursive
           else
-            echo "First deployment, setting up directory..."
-            sudo mkdir -p "${DEV_DIR}"
-            sudo chown -R "$(whoami):$(whoami)" "${DEV_DIR}"
-            git clone --branch dev --depth 1 \
-              https://github.com/neuhis/software-practice-backend.git \
-              "${DEV_DIR}"
-            cd "${DEV_DIR}"
-            git submodule update --init --recursive
+            echo "=============================================="
+            echo "  FIRST-TIME SETUP REQUIRED"
+            echo "  Run the following on the server as root:"
+            echo ""
+            echo "  mkdir -p ${DEV_DIR}"
+            echo "  chown -R \$(whoami) ${DEV_DIR}"
+            echo ""
+            echo "  (The runner user needs write access to this directory)"
+            echo "=============================================="
+            exit 1
           fi
           echo "Deploying commit: $(git -C "${DEV_DIR}" rev-parse --short HEAD)"
 
