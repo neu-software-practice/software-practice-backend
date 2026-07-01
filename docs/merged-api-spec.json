@@ -1,0 +1,1769 @@
+{
+  "baseUrl": "/api",
+  "auth": {
+    "mechanism": "JWT Bearer dual-token mode (accessToken + refreshToken) with rotation. Patient identity additionally verified via POST /patients/verify to establish which patient record the authenticated user is acting on. The admin panel uses a separate JWT token system under the /admin prefix, independent from the patient token system.",
+    "headerName": "Authorization",
+    "tokenTypes": [
+      "accessToken (JWT, HS256/RS256, 15-minute expiry, payload: sub=userId, patientId, phone, iat, exp)",
+      "refreshToken (opaque >=32 bytes Base64 URL-safe, 7-day validity, single-use rotation)"
+    ],
+    "refreshEndpoint": "POST /auth/refresh"
+  },
+  "globalErrorFormat": {
+    "name": "ApiError",
+    "envelope": "{\"success\":false,\"data\":null,\"error\":{\"code\":\"...\",\"message\":\"...\",\"status\":...,\"details\":...,\"retriable\":...}}",
+    "type": "object",
+    "fields": {
+      "code": {
+        "type": "string (min 1)",
+        "required": true,
+        "description": "Error code string, see error code list"
+      },
+      "message": {
+        "type": "string (min 1)",
+        "required": true,
+        "description": "Developer-readable error description (not shown to patients)"
+      },
+      "status": {
+        "type": "number (int > 0)",
+        "required": false,
+        "description": "HTTP status code"
+      },
+      "details": {
+        "type": "unknown",
+        "required": false,
+        "description": "Additional details; Zod validation failure issues when applicable"
+      },
+      "retriable": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether the operation is worth retrying; UI fallback rules apply when absent"
+      }
+    },
+    "errorCodes": [
+      { "code": "VALIDATION_ERROR", "retriable": false, "meaning": "Response data does not match frontend contract; details contains Zod issues" },
+      { "code": "UNKNOWN_ERROR", "retriable": true, "meaning": "Unrecognized exception fallback" },
+      { "code": "NETWORK_ERROR", "retriable": true, "meaning": "Unstable network connection" },
+      { "code": "HTTP_<status>", "retriable": "4xx false / 5xx true", "meaning": "Non-2xx HTTP response parsed from status code" },
+      { "code": "SESSION_NOT_FOUND", "retriable": false, "meaning": "Visit session not found" },
+      { "code": "PATIENT_NOT_FOUND", "retriable": false, "meaning": "Patient information not found" },
+      { "code": "CARD_NOT_FOUND", "retriable": true, "meaning": "Flow card has been updated or invalidated; prompt refresh" },
+      { "code": "AUTH_PHONE_EXISTS", "retriable": false, "meaning": "Phone number already registered" },
+      { "code": "AUTH_INVALID_CREDENTIALS", "retriable": false, "meaning": "Invalid phone number or password" },
+      { "code": "AUTH_TOKEN_EXPIRED", "retriable": true, "meaning": "Access token has expired" },
+      { "code": "AUTH_REFRESH_INVALID", "retriable": false, "meaning": "Refresh token is invalid or has been rotated" },
+      { "code": "AUTH_REFRESH_EXPIRED", "retriable": false, "meaning": "Refresh token has expired" },
+      { "code": "RATE_LIMITED", "retriable": true, "meaning": "Rate limit exceeded; retry after backoff" },
+      { "code": "TITLE_ALREADY_EXISTS", "retriable": false, "meaning": "Session already has a title (idempotency guard)" },
+      { "code": "LLM_UNAVAILABLE", "retriable": true, "meaning": "LLM service unavailable; degraded fallback" },
+      { "code": "ADDRESS_LIMIT_EXCEEDED", "retriable": false, "meaning": "Maximum number of addresses reached" },
+      { "code": "ADDRESS_NOT_FOUND", "retriable": false, "meaning": "Delivery address not found" },
+      { "code": "ADDRESS_REQUIRED", "retriable": false, "meaning": "Delivery address ID required when mode=delivery" },
+      { "code": "INVALID_CREDENTIALS", "retriable": false, "meaning": "Invalid admin credentials" },
+      { "code": "UNAUTHORIZED", "retriable": false, "meaning": "Not authorized for admin operation" },
+      { "code": "INVALID_REFRESH_TOKEN", "retriable": false, "meaning": "Invalid admin refresh token" },
+      { "code": "INVALID_SETTINGS", "retriable": false, "meaning": "Invalid system settings values" },
+      { "code": "INVALID_STATE", "retriable": false, "meaning": "Session is not in the required state for this operation" }
+    ],
+    "httpStatusUiMapping": [
+      { "status": 401, "meaning": "Login expired, not retriable" },
+      { "status": 403, "meaning": "Cannot access this record, not retriable" },
+      { "status": 404, "meaning": "Content not found, not retriable" },
+      { "status": 408, "meaning": "Request timeout, retriable" },
+      { "status": ">= 500", "meaning": "Retriable" },
+      { "status": "4xx other", "meaning": "Not retriable" }
+    ]
+  },
+  "enums": [
+    {
+      "name": "CredentialType",
+      "values": ["id_card", "phone"]
+    },
+    {
+      "name": "Gender",
+      "values": ["male", "female", "other", "unknown"]
+    },
+    {
+      "name": "ReadableScope",
+      "values": ["profile", "history", "allergies", "medications"]
+    },
+    {
+      "name": "VisitStatus",
+      "values": ["loading_context", "chatting", "analyzing", "blocked", "diagnosis", "treatment", "completed", "suspended", "transferred", "emergency_terminated", "exited"]
+    },
+    {
+      "name": "VisitMachineState",
+      "values": ["loadingContext", "chatting", "analyzing", "labDecision", "labPayment", "labExecution", "diagnosis", "treatmentDecision", "medicationPayment", "medicationFulfillment", "treatmentExecution", "adviceOnly", "completed", "suspended", "emergencyPending", "terminated", "exitSettlement", "exited"]
+    },
+    {
+      "name": "TerminalReason",
+      "values": ["emergency", "timeout", "ask_limit_reached", "lab_limit_reached", "referral", "capability_insufficient", "exited"]
+    },
+    {
+      "name": "PaymentStatus",
+      "values": ["unpaid", "pending", "paid", "failed", "refunded"]
+    },
+    {
+      "name": "VisitEntryType",
+      "values": ["new", "follow_up"]
+    },
+    {
+      "name": "FlowCardKind",
+      "values": ["lab_decision", "payment", "lab_execution", "diagnosis", "treatment_plan", "medication_fulfillment", "treatment_execution", "advice_only", "completed_visit"]
+    },
+    {
+      "name": "FlowCardStatus",
+      "values": ["pending", "accepted", "skipped", "vetoed", "paid", "processing", "completed", "failed", "invalidated"]
+    },
+    {
+      "name": "TimelineItemKind",
+      "values": ["message", "flow_card", "system_event", "terminal"]
+    },
+    {
+      "name": "TimelineItemStatus",
+      "values": ["pending", "streaming", "done", "failed", "invalidated"]
+    },
+    {
+      "name": "SystemEventType",
+      "values": ["context_loaded", "agent_thinking", "lab_result_received", "payment_succeeded", "drug_purchased", "follow_up_started", "emergency_dismissed", "exit_settled", "session_suspended"]
+    },
+    {
+      "name": "AssistantStreamEventType",
+      "values": ["delta", "message_final", "card", "state", "emergency", "done", "error"]
+    },
+    {
+      "name": "LabDecision",
+      "values": ["accepted", "skipped", "vetoed"]
+    },
+    {
+      "name": "PaymentPurpose",
+      "values": ["lab", "medication"]
+    },
+    {
+      "name": "FulfillmentMode",
+      "values": ["pickup", "delivery"]
+    },
+    {
+      "name": "TreatmentAction",
+      "values": ["schedule", "confirm_arrival", "start", "complete", "cancel"]
+    },
+    {
+      "name": "VitalsSource",
+      "values": ["patient_report", "device", "manual"]
+    },
+    {
+      "name": "EmergencySeverity",
+      "values": ["suspected", "critical"]
+    },
+    {
+      "name": "ExitReason",
+      "values": ["patient_request", "timeout", "emergency", "other"]
+    },
+    {
+      "name": "ExitConsequenceKind",
+      "values": ["no_fee", "refundable", "executed_no_refund", "medication_dispensed"]
+    },
+    {
+      "name": "IntentType",
+      "values": ["consultation", "follow_up", "uncertain"]
+    },
+    {
+      "name": "DiagnosisConfidence",
+      "values": ["low", "medium", "high"]
+    },
+    {
+      "name": "EvidenceSource",
+      "values": ["history", "answer", "lab_result"]
+    },
+    {
+      "name": "TreatmentPlanType",
+      "values": ["medication", "treatment", "advice_only", "referral"]
+    },
+    {
+      "name": "Capability",
+      "values": ["available", "limited", "unavailable"]
+    },
+    {
+      "name": "LabExecutionStatus",
+      "values": ["waiting_payment", "queued", "collecting", "testing", "result_ready", "completed"]
+    },
+    {
+      "name": "MedicationFulfillmentStatus",
+      "values": ["pending", "confirmed", "completed"]
+    },
+    {
+      "name": "TreatmentExecutionStatus",
+      "values": ["pending", "scheduled", "arrived", "in_progress", "completed", "canceled"]
+    },
+    {
+      "name": "MessageRole",
+      "values": ["patient", "assistant"]
+    },
+    {
+      "name": "InterruptedBy",
+      "values": ["emergency", "timeout", "exit", "idle"]
+    },
+    {
+      "name": "TimerAction",
+      "values": ["pause", "resume"]
+    },
+    {
+      "name": "AddressTag",
+      "values": ["家", "公司", "医院", "其他"],
+      "description": "Delivery address label (v5)"
+    },
+    {
+      "name": "AdminRole",
+      "values": ["super_admin", "admin", "operator"],
+      "description": "Admin user role (v7, independent system)"
+    },
+    {
+      "name": "MedicalOrderKind",
+      "values": ["advice", "medication"],
+      "description": "Medical order record type (v8)"
+    },
+    {
+      "name": "FulfillmentStatus",
+      "values": ["pending", "confirmed", "completed"],
+      "description": "Medication fulfillment status (v8, same values as MedicationFulfillmentStatus)"
+    }
+  ],
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/patients/verify",
+      "summary": "Identity verification, returns patient summary and readable scopes",
+      "authRequired": false,
+      "isSSE": false,
+      "statusCodes": [200, 401],
+      "errorCodes": ["PATIENT_NOT_FOUND", "VALIDATION_ERROR", "HTTP_401"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "credentialType": { "type": "enum (id_card | phone)", "required": true, "description": "Credential type" },
+          "credential": { "type": "string (min 4)", "required": true, "description": "Credential number" },
+          "name": { "type": "string (min 1)", "required": false, "description": "Patient name" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "patient": {
+            "type": "PatientProfile", "required": true, "description": "Patient profile summary",
+            "fields": {
+              "id": { "type": "PatientId (non-empty string)", "required": true },
+              "name": { "type": "string (min 1)", "required": true },
+              "gender": { "type": "enum (male|female|other|unknown)", "required": true },
+              "age": { "type": "int (0-130)", "required": true },
+              "phoneMasked": { "type": "string", "required": false },
+              "idCardMasked": { "type": "string", "required": false },
+              "allergies": { "type": "string[]", "required": true },
+              "chronicDiseases": { "type": "string[]", "required": true },
+              "longTermMedications": { "type": "string[]", "required": true },
+              "updatedAt": { "type": "ISO8601 datetime", "required": true }
+            }
+          },
+          "readableScopes": { "type": "array of enum (profile|history|allergies|medications)", "required": true, "description": "Readable scope list" },
+          "verifiedAt": { "type": "ISO8601 datetime", "required": true, "description": "Verification time" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/patients/:patientId/context",
+      "summary": "Read patient context (medical history, allergies, prior diagnosis)",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 403, 404],
+      "errorCodes": ["PATIENT_NOT_FOUND", "HTTP_403", "HTTP_404"],
+      "queryParams": [],
+      "pathParams": [{ "name": "patientId", "type": "PatientId", "required": true, "description": "Patient identifier" }],
+      "headers": [],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "patient": { "type": "PatientProfile", "required": true },
+          "chiefComplaint": { "type": "string", "required": false, "description": "Chief complaint" },
+          "medicalHistory": { "type": "string[]", "required": true, "description": "Medical history" },
+          "allergies": { "type": "string[]", "required": true, "description": "Allergies" },
+          "longTermMedications": { "type": "string[]", "required": true, "description": "Long-term medications" },
+          "priorVisit": {
+            "type": "PatientPriorVisit", "required": false, "description": "Prior visit summary",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "completedAt": { "type": "ISO8601 datetime", "required": true },
+              "diagnosis": { "type": "string", "required": true },
+              "labResultSummary": { "type": "string", "required": false },
+              "treatmentSummary": { "type": "string", "required": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/patients/:patientId/profile",
+      "summary": "Update patient profile — add/edit allergies, chronicDiseases, longTermMedications, and medicalHistory. Optional fields are omitted entirely from the request body to leave the existing value unchanged.",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 400, 403, 404],
+      "errorCodes": ["VALIDATION_ERROR", "PATIENT_NOT_FOUND", "HTTP_403"],
+      "queryParams": [],
+      "pathParams": [{ "name": "patientId", "type": "PatientId", "required": true, "description": "Patient identifier" }],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer JWT accessToken" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "patientId": { "type": "PatientId", "required": true, "description": "Patient ID (must match path parameter)" },
+          "allergies": { "type": "string[]", "required": false, "description": "Allergies (full replacement). Each element trimmed, min 1 char. Omit to leave unchanged, pass [] to clear." },
+          "chronicDiseases": { "type": "string[]", "required": false, "description": "Chronic diseases (full replacement). Each element trimmed, min 1 char. Omit to leave unchanged, pass [] to clear." },
+          "longTermMedications": { "type": "string[]", "required": false, "description": "Long-term medications (full replacement). Each element trimmed, min 1 char. Omit to leave unchanged, pass [] to clear." },
+          "medicalHistory": { "type": "string[]", "required": false, "description": "NEW in v2. Medical history (full replacement). Each element trimmed, min 1 char. Omit to leave unchanged, pass [] to clear. Stored at PatientContext level, not PatientProfile." }
+        }
+      },
+      "responseBody": {
+        "type": "PatientProfile",
+        "description": "Updated patient profile (does NOT include medicalHistory; medicalHistory is accessible via GET /patients/:patientId/context)",
+        "fields": {
+          "id": { "type": "PatientId", "required": true },
+          "name": { "type": "string (min 1)", "required": true },
+          "gender": { "type": "enum (male|female|other|unknown)", "required": true },
+          "age": { "type": "int (0-130)", "required": true },
+          "phoneMasked": { "type": "string", "required": false },
+          "idCardMasked": { "type": "string", "required": false },
+          "allergies": { "type": "string[]", "required": true },
+          "chronicDiseases": { "type": "string[]", "required": true },
+          "longTermMedications": { "type": "string[]", "required": true },
+          "updatedAt": { "type": "ISO8601 datetime", "required": true }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits",
+      "summary": "Create new visit session",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 201],
+      "errorCodes": ["VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "strict": true,
+        "fields": {
+          "patientId": { "type": "PatientId", "required": true, "description": "Patient ID" },
+          "entryType": { "type": "literal 'new'", "required": true, "description": "Fixed to new visit" },
+          "chiefComplaint": { "type": "string (1-2000)", "required": false, "description": "Chief complaint" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "session": {
+            "type": "VisitSession", "required": true, "description": "Created session",
+            "fields": {
+              "id": { "type": "SessionId", "required": true },
+              "patientId": { "type": "PatientId", "required": true },
+              "entryType": { "type": "VisitEntryType (new|follow_up)", "required": true },
+              "status": { "type": "VisitStatus", "required": true },
+              "startedAt": { "type": "ISO8601", "required": true },
+              "updatedAt": { "type": "ISO8601", "required": true },
+              "endedAt": { "type": "ISO8601", "required": false },
+              "timeoutAt": { "type": "ISO8601", "required": false },
+              "pausedAt": { "type": "ISO8601", "required": false },
+              "askRound": { "type": "int (>=0)", "required": true },
+              "askRoundLimit": { "type": "int (>0)", "required": true },
+              "labRound": { "type": "int (>=0)", "required": true },
+              "labRoundLimit": { "type": "int (>0)", "required": true },
+              "parentSessionId": { "type": "SessionId", "required": false },
+              "terminalReason": { "type": "TerminalReason", "required": false },
+              "activeCardId": { "type": "string", "required": false },
+              "timerPaused": { "type": "boolean", "required": true },
+              "lastActivityAt": { "type": "ISO8601 datetime", "required": false, "description": "v9: Idle timer baseline timestamp" },
+              "summary": {
+                "type": "VisitSummary", "required": true,
+                "fields": {
+                  "title": { "type": "string", "required": false, "description": "v4: AI-generated session title (1-50 chars)" },
+                  "chiefComplaint": { "type": "string", "required": false },
+                  "diagnosis": { "type": "string", "required": false },
+                  "treatmentSummary": { "type": "string", "required": false },
+                  "lastMessage": { "type": "string", "required": false }
+                }
+              }
+            }
+          },
+          "initialTimeline": { "type": "TimelineItem[]", "required": true, "description": "Initial timeline items" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/follow-up",
+      "summary": "Create follow-up visit session from parent session",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 201],
+      "errorCodes": ["VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Parent session ID" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "patientId": { "type": "PatientId", "required": true, "description": "Patient ID" },
+          "parentSessionId": { "type": "SessionId", "required": true, "description": "Parent session ID" },
+          "chiefComplaint": { "type": "string (1-2000)", "required": false, "description": "Chief complaint" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "session": { "type": "VisitSession", "required": true },
+          "initialTimeline": { "type": "TimelineItem[]", "required": true }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/visits",
+      "summary": "List historical visit sessions with cursor pagination",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200],
+      "errorCodes": ["VALIDATION_ERROR"],
+      "queryParams": [
+        { "name": "patientId", "type": "PatientId", "required": false, "description": "Filter by patient" },
+        { "name": "status", "type": "VisitStatus", "required": false, "description": "Filter by session status" },
+        { "name": "cursor", "type": "string", "required": false, "description": "Pagination cursor" },
+        { "name": "pageSize", "type": "int (1-50, default 20)", "required": false, "description": "Items per page" }
+      ],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "PageResult<VisitSessionSummary>",
+        "fields": {
+          "items": {
+            "type": "VisitSessionSummary[]", "required": true,
+            "items": {
+              "type": "object",
+              "fields": {
+                "id": { "type": "SessionId", "required": true },
+                "patientId": { "type": "PatientId", "required": true },
+                "entryType": { "type": "VisitEntryType", "required": true },
+                "status": { "type": "VisitStatus", "required": true },
+                "startedAt": { "type": "ISO8601", "required": true },
+                "updatedAt": { "type": "ISO8601", "required": true },
+                "endedAt": { "type": "ISO8601", "required": false },
+                "parentSessionId": { "type": "SessionId", "required": false },
+                "terminalReason": { "type": "TerminalReason", "required": false },
+                "summary": { "type": "VisitSummary", "required": false }
+              }
+            }
+          },
+          "nextCursor": { "type": "string", "required": false, "description": "Opaque cursor for next page; absent when no more data" },
+          "hasMore": { "type": "boolean", "required": true, "description": "Whether more data is available" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/visits/:sessionId",
+      "summary": "Get visit session detail and current status",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 403, 404],
+      "errorCodes": ["SESSION_NOT_FOUND", "HTTP_403", "HTTP_404"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "VisitSession",
+        "description": "Full visit session object",
+        "fields": {
+          "id": { "type": "SessionId", "required": true },
+          "patientId": { "type": "PatientId", "required": true },
+          "entryType": { "type": "VisitEntryType (new|follow_up)", "required": true },
+          "status": { "type": "VisitStatus", "required": true },
+          "startedAt": { "type": "ISO8601", "required": true },
+          "updatedAt": { "type": "ISO8601", "required": true },
+          "endedAt": { "type": "ISO8601", "required": false },
+          "timeoutAt": { "type": "ISO8601", "required": false },
+          "pausedAt": { "type": "ISO8601", "required": false },
+          "askRound": { "type": "int (>=0)", "required": true },
+          "askRoundLimit": { "type": "int (>0)", "required": true },
+          "labRound": { "type": "int (>=0)", "required": true },
+          "labRoundLimit": { "type": "int (>0)", "required": true },
+          "parentSessionId": { "type": "SessionId", "required": false },
+          "terminalReason": { "type": "TerminalReason", "required": false },
+          "activeCardId": { "type": "string", "required": false },
+          "timerPaused": { "type": "boolean", "required": true },
+          "lastActivityAt": { "type": "ISO8601 datetime", "required": false, "description": "v9: Idle timer baseline timestamp" },
+          "summary": {
+            "type": "VisitSummary", "required": true,
+            "fields": {
+              "title": { "type": "string", "required": false, "description": "v4: AI-generated session title" },
+              "chiefComplaint": { "type": "string", "required": false },
+              "diagnosis": { "type": "string", "required": false },
+              "treatmentSummary": { "type": "string", "required": false },
+              "lastMessage": { "type": "string", "required": false }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/visits/:sessionId/snapshot",
+      "summary": "Read-only complete session snapshot with full timeline",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "session": { "type": "VisitSession", "required": true, "description": "Session detail" },
+          "timeline": { "type": "TimelineItem[]", "required": true, "description": "Complete timeline" },
+          "readonly": { "type": "literal true", "required": true, "description": "Read-only flag" },
+          "terminalReason": { "type": "TerminalReason", "required": false, "description": "Termination reason" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/visits/:sessionId/timeline",
+      "summary": "Paginated timeline of messages and cards",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND"],
+      "queryParams": [
+        { "name": "cursor", "type": "string", "required": false, "description": "Pagination cursor for earlier data" },
+        { "name": "pageSize", "type": "int (1-100, default 50)", "required": false, "description": "Items per page" }
+      ],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "PageResult<TimelineItem>",
+        "fields": {
+          "items": { "type": "TimelineItem[]", "required": true },
+          "nextCursor": { "type": "string", "required": false },
+          "hasMore": { "type": "boolean", "required": true }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/messages",
+      "summary": "Send patient message, returns placeholder and session status",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "content": { "type": "string (1-2000)", "required": true, "description": "Message content" },
+          "clientMessageId": { "type": "string (min 1)", "required": true, "description": "Client-side idempotency ID" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "session": { "type": "VisitSession", "required": true, "description": "Updated session" },
+          "patientMessage": { "type": "TimelineItem", "required": true, "description": "The created patient message timeline item" },
+          "assistantPlaceholder": { "type": "TimelineItem", "required": false, "description": "Optional placeholder for assistant response" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/assistant-stream",
+      "summary": "SSE stream for AI reply generation and cards",
+      "authRequired": true,
+      "isSSE": true,
+      "statusCodes": [200],
+      "errorCodes": ["SESSION_NOT_FOUND", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [{ "name": "Accept", "type": "string", "required": true, "description": "text/event-stream" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "requestId": { "type": "string (min 1)", "required": true, "description": "Stream request ID for this turn" },
+          "clientMessageId": { "type": "string (min 1)", "required": false, "description": "Associated patient message ID" }
+        }
+      },
+      "responseBody": {
+        "type": "SSE event stream",
+        "description": "Server-Sent Events. Each event validated against assistantStreamEventSchema. Supports AbortSignal for interruption.",
+        "events": [
+          {
+            "type": "delta",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "requestId": { "type": "string", "required": true },
+              "content": { "type": "string", "required": true, "description": "Text delta chunk" }
+            }
+          },
+          {
+            "type": "message_final",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "requestId": { "type": "string", "required": true },
+              "item": { "type": "TimelineItem (message kind)", "required": true, "description": "Final assembled message timeline item" }
+            }
+          },
+          {
+            "type": "card",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "requestId": { "type": "string", "required": true },
+              "card": { "type": "FlowCard", "required": true },
+              "timelineItem": { "type": "TimelineItem (flow_card kind)", "required": false }
+            }
+          },
+          {
+            "type": "state",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "state": { "type": "VisitMachineState", "required": true },
+              "status": { "type": "VisitStatus", "required": false },
+              "activeCardId": { "type": "FlowCardId", "required": false }
+            }
+          },
+          {
+            "type": "emergency",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "severity": { "type": "enum (suspected|critical)", "required": true },
+              "message": { "type": "string (min 1)", "required": true }
+            }
+          },
+          {
+            "type": "done",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": true },
+              "requestId": { "type": "string", "required": true }
+            }
+          },
+          {
+            "type": "error",
+            "fields": {
+              "sessionId": { "type": "SessionId", "required": false },
+              "requestId": { "type": "string", "required": false },
+              "error": { "type": "ApiError", "required": true }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/lab-decision",
+      "summary": "Submit lab test decision (accept/skip/veto)",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["CARD_NOT_FOUND", "SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "cardId": { "type": "FlowCardId", "required": true, "description": "Lab decision card ID" },
+          "decision": { "type": "enum (accepted|skipped|vetoed)", "required": true, "description": "Accept lab test, skip, or defer decision" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true },
+          "status": { "type": "VisitStatus", "required": true },
+          "activeCardId": { "type": "FlowCardId", "required": false },
+          "card": { "type": "FlowCard", "required": false, "description": "New or updated flow card" },
+          "timelineItems": { "type": "TimelineItem[]", "required": true },
+          "message": { "type": "string", "required": false }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/payments",
+      "summary": "Create or confirm lab/medication payment",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["CARD_NOT_FOUND", "SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "cardId": { "type": "FlowCardId", "required": true, "description": "Payment card ID" },
+          "purpose": { "type": "enum (lab|medication)", "required": true, "description": "Lab fee or medication fee" },
+          "paymentMethodId": { "type": "string (min 1)", "required": false, "description": "Payment method ID" },
+          "simulateStatus": { "type": "PaymentStatus", "required": false, "description": "Mock payment result simulation" },
+          "defer": { "type": "boolean", "required": false, "description": "Defer payment" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true },
+          "status": { "type": "VisitStatus", "required": true },
+          "activeCardId": { "type": "FlowCardId", "required": false },
+          "card": { "type": "FlowCard", "required": false },
+          "timelineItems": { "type": "TimelineItem[]", "required": true },
+          "message": { "type": "string", "required": false }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/fulfillment",
+      "summary": "Submit medication pickup/delivery confirmation. v5: addressId conditionally required when mode=delivery.",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 400, 404],
+      "errorCodes": ["CARD_NOT_FOUND", "SESSION_NOT_FOUND", "ADDRESS_REQUIRED", "ADDRESS_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "cardId": { "type": "FlowCardId", "required": true, "description": "Fulfillment card ID" },
+          "mode": { "type": "enum (pickup|delivery)", "required": true, "description": "Pickup or delivery mode" },
+          "addressId": { "type": "string", "required": false, "description": "v5: Delivery address ID. Conditionally required when mode=delivery." }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true },
+          "status": { "type": "VisitStatus", "required": true },
+          "activeCardId": { "type": "FlowCardId", "required": false },
+          "card": { "type": "FlowCard", "required": false },
+          "timelineItems": { "type": "TimelineItem[]", "required": true },
+          "message": { "type": "string", "required": false }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/treatment-execution",
+      "summary": "Automated treatment progression (schedule/arrive/start/complete/cancel)",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["CARD_NOT_FOUND", "SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "cardId": { "type": "FlowCardId", "required": true, "description": "Treatment execution card ID" },
+          "action": { "type": "enum (schedule|confirm_arrival|start|complete|cancel)", "required": true, "description": "Execution action" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true },
+          "status": { "type": "VisitStatus", "required": true },
+          "activeCardId": { "type": "FlowCardId", "required": false },
+          "card": { "type": "FlowCard", "required": false },
+          "timelineItems": { "type": "TimelineItem[]", "required": true },
+          "message": { "type": "string", "required": false }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/advice-ack",
+      "summary": "Acknowledge advice-only disposition and close visit",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["CARD_NOT_FOUND", "SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "cardId": { "type": "FlowCardId", "required": true, "description": "Advice-only card ID" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true },
+          "status": { "type": "VisitStatus", "required": true },
+          "activeCardId": { "type": "FlowCardId", "required": false },
+          "card": { "type": "FlowCard", "required": false },
+          "timelineItems": { "type": "TimelineItem[]", "required": true },
+          "message": { "type": "string", "required": false }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/lock-question",
+      "summary": "SSE: Ask a question on a locked card (bypass question, does not advance main flow)",
+      "authRequired": true,
+      "isSSE": true,
+      "statusCodes": [200, 404],
+      "errorCodes": ["CARD_NOT_FOUND", "SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [{ "name": "Accept", "type": "string", "required": true, "description": "text/event-stream" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "cardId": { "type": "FlowCardId", "required": true, "description": "Locked card ID" },
+          "content": { "type": "string (1-1000)", "required": true, "description": "Question content" },
+          "requestId": { "type": "string (min 1)", "required": true, "description": "Stream request ID" }
+        }
+      },
+      "responseBody": {
+        "type": "SSE event stream",
+        "description": "SSE stream for bypass question answering on locked card"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/classify-intent",
+      "summary": "Classify input intent in completed state (consultation/follow_up/uncertain)",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "content": { "type": "string (1-1000)", "required": true, "description": "Input content" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "intent": { "type": "enum (consultation|follow_up|uncertain)", "required": true, "description": "Classified intent" },
+          "confidence": { "type": "number (0-1)", "required": true, "description": "Confidence score" },
+          "reason": { "type": "string", "required": false, "description": "Judgment reason" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/consult",
+      "summary": "SSE: Completed-state consultation Q&A (does not create follow-up session)",
+      "authRequired": true,
+      "isSSE": true,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [{ "name": "Accept", "type": "string", "required": true, "description": "text/event-stream" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "content": { "type": "string (1-1000)", "required": true, "description": "Question content" },
+          "requestId": { "type": "string (min 1)", "required": true, "description": "Stream request ID" }
+        }
+      },
+      "responseBody": {
+        "type": "SSE event stream",
+        "description": "SSE stream for completed-state consultation answering based on current record"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/vitals",
+      "summary": "Report vitals triggering emergency recheck",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "source": { "type": "enum (patient_report|device|manual)", "required": true, "description": "Vitals source" },
+          "symptoms": { "type": "string[]", "required": true, "description": "Symptom list" },
+          "vitals": {
+            "type": "object", "required": false, "description": "Vital sign measurements",
+            "fields": {
+              "temperature": { "type": "number", "required": false },
+              "heartRate": { "type": "int (>0)", "required": false },
+              "systolicPressure": { "type": "int (>0)", "required": false },
+              "diastolicPressure": { "type": "int (>0)", "required": false },
+              "spo2": { "type": "number (0-100)", "required": false }
+            }
+          }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "emergency": { "type": "boolean", "required": true, "description": "Whether emergency triggered" },
+          "severity": { "type": "enum (suspected|critical)", "required": false, "description": "Emergency severity level" },
+          "message": { "type": "string", "required": false, "description": "Additional message" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/exit",
+      "summary": "Active exit with settlement result",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "reason": { "type": "enum (patient_request|timeout|emergency|other)", "required": true, "description": "Exit reason" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true },
+          "terminalReason": { "type": "TerminalReason", "required": true },
+          "refundAmount": { "type": "number (>=0)", "required": true },
+          "payableAmount": { "type": "number (>=0)", "required": true },
+          "timelineItem": { "type": "TimelineItem", "required": true, "description": "Terminal timeline item" },
+          "consequence": {
+            "type": "ExitConsequence", "required": false,
+            "fields": {
+              "kind": { "type": "enum (no_fee|refundable|executed_no_refund|medication_dispensed)", "required": true },
+              "amount": { "type": "number (>=0)", "required": false },
+              "text": { "type": "string (min 1)", "required": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/timer",
+      "summary": "Pause or resume the overall visit timer",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" },
+          "action": { "type": "enum (pause|resume)", "required": true, "description": "Timer action (injected by transport)" }
+        }
+      },
+      "responseBody": {
+        "type": "VisitSession",
+        "description": "Updated session with timerPaused, pausedAt, timeoutAt reflecting timer state"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/dismiss-emergency",
+      "summary": "Dismiss emergency (false alarm appeal), restore from emergency state",
+      "authRequired": true,
+      "isSSE": false,
+      "statusCodes": [200, 404],
+      "errorCodes": ["SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session identifier" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "session": { "type": "VisitSession", "required": true, "description": "Updated session" },
+          "timelineItem": { "type": "TimelineItem", "required": true, "description": "Timeline item (usually system_event: emergency_dismissed)" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "summary": "Register a new user. On success, directly issues a token pair (no second login required).",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v3",
+      "statusCodes": [201, 409, 422],
+      "errorCodes": ["AUTH_PHONE_EXISTS", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "phone": { "type": "string", "required": true, "description": "11-digit Chinese mainland phone number" },
+          "password": { "type": "string", "required": true, "description": "Minimum 8 characters" },
+          "realName": { "type": "string", "required": false, "description": "Optional; stored as empty if omitted; can be filled later" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "accessToken": { "type": "string", "required": true, "description": "JWT access token" },
+          "refreshToken": { "type": "string", "required": true, "description": "Opaque refresh token" },
+          "expiresIn": { "type": "number", "required": true, "description": "accessToken validity in seconds (900)" },
+          "user": {
+            "type": "object", "required": true,
+            "fields": {
+              "userId": { "type": "string", "required": true },
+              "patientId": { "type": "string", "required": true, "description": "Auto-created patient profile on registration" },
+              "phone": { "type": "string", "required": true },
+              "realName": { "type": "string", "required": false, "description": "null if not provided during registration" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "summary": "Login with phone + password, issue a new token pair.",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v3",
+      "statusCodes": [200, 401, 429],
+      "errorCodes": ["AUTH_INVALID_CREDENTIALS", "RATE_LIMITED"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "phone": { "type": "string", "required": true, "description": "Phone number" },
+          "password": { "type": "string", "required": true, "description": "Password" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "accessToken": { "type": "string", "required": true, "description": "JWT access token" },
+          "refreshToken": { "type": "string", "required": true, "description": "Opaque refresh token" },
+          "expiresIn": { "type": "number", "required": true, "description": "accessToken validity in seconds (900)" },
+          "user": {
+            "type": "object", "required": true,
+            "fields": {
+              "userId": { "type": "string", "required": true },
+              "patientId": { "type": "string", "required": true },
+              "phone": { "type": "string", "required": true },
+              "realName": { "type": "string", "required": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/refresh",
+      "summary": "Exchange a refreshToken for a new token pair. The old refreshToken is immediately invalidated (rotation).",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v3",
+      "statusCodes": [200, 401],
+      "errorCodes": ["AUTH_REFRESH_INVALID", "AUTH_REFRESH_EXPIRED"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "refreshToken": { "type": "string", "required": true, "description": "Currently held refreshToken" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "accessToken": { "type": "string", "required": true, "description": "New JWT access token" },
+          "refreshToken": { "type": "string", "required": true, "description": "New refresh token (old one is invalidated)" },
+          "expiresIn": { "type": "number", "required": true, "description": "accessToken validity in seconds (900)" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "summary": "Logout current session, invalidate the server-held refreshToken. Idempotent — returns 200 even if token is already invalid.",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v3",
+      "statusCodes": [200, 401],
+      "errorCodes": ["AUTH_REFRESH_INVALID"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "refreshToken": { "type": "string", "required": true, "description": "The refreshToken to invalidate" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "success": { "type": "boolean", "required": true, "description": "Always true" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/generate-title",
+      "summary": "Call backend LLM to generate a short consultation title (1-50 Chinese characters) based on conversation context. Idempotent: if session already has a title, backend may return existing title or regenerate.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v4",
+      "statusCodes": [200, 404, 422, 409, 503],
+      "errorCodes": ["SESSION_NOT_FOUND", "VALIDATION_ERROR", "TITLE_ALREADY_EXISTS", "LLM_UNAVAILABLE"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session ID" }],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer <accessToken>" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Session ID (must match path parameter)" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "Echoed session ID" },
+          "title": { "type": "string (1-50)", "required": true, "description": "Generated title, trimmed, short Chinese phrase without punctuation" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/patients/:patientId/addresses",
+      "summary": "Query patient delivery address list",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v5",
+      "statusCodes": [200],
+      "errorCodes": [],
+      "queryParams": [],
+      "pathParams": [{ "name": "patientId", "type": "PatientId", "required": true, "description": "Patient ID" }],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer JWT accessToken" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "addresses": {
+            "type": "array", "required": true,
+            "items": {
+              "type": "object",
+              "description": "Address object",
+              "fields": {
+                "id": { "type": "string", "required": true },
+                "patientId": { "type": "string", "required": true },
+                "name": { "type": "string", "required": true, "description": "Recipient name, 1-20 chars" },
+                "phone": { "type": "string", "required": true, "description": "11-digit phone number" },
+                "province": { "type": "string", "required": true },
+                "city": { "type": "string", "required": true },
+                "district": { "type": "string", "required": true },
+                "detail": { "type": "string", "required": true, "description": "Detailed address, 1-200 chars" },
+                "isDefault": { "type": "boolean", "required": true },
+                "tag": { "type": "string", "required": false, "description": "Address label. Enum: 家, 公司, 医院, 其他. Min 1, max 20 chars, cannot be cleared once set (v9)." },
+                "createdAt": { "type": "ISO8601 datetime", "required": true },
+                "updatedAt": { "type": "ISO8601 datetime", "required": true }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/patients/:patientId/addresses",
+      "summary": "Create a new delivery address. Auto-sets as default if it is the first address. If isDefault=true, cancels other default addresses.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v5",
+      "statusCodes": [200, 400, 422],
+      "errorCodes": ["ADDRESS_LIMIT_EXCEEDED", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [{ "name": "patientId", "type": "PatientId", "required": true, "description": "Patient ID" }],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer JWT accessToken" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "patientId": { "type": "string", "required": true, "description": "Patient ID, must match path param" },
+          "name": { "type": "string", "required": true, "description": "Recipient name, 1-20 chars" },
+          "phone": { "type": "string", "required": true, "description": "11-digit mainland China phone number" },
+          "province": { "type": "string", "required": true, "description": "Province" },
+          "city": { "type": "string", "required": true, "description": "City" },
+          "district": { "type": "string", "required": true, "description": "District" },
+          "detail": { "type": "string", "required": true, "description": "Detailed address, 1-200 chars" },
+          "isDefault": { "type": "boolean", "required": false, "default": false, "description": "Whether to set as default address" },
+          "tag": { "type": "string", "required": false, "description": "Address label. Enum: 家, 公司, 医院, 其他" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "description": "The created Address object with all address fields",
+        "fields": {
+          "id": { "type": "string", "required": true },
+          "patientId": { "type": "string", "required": true },
+          "name": { "type": "string", "required": true },
+          "phone": { "type": "string", "required": true },
+          "province": { "type": "string", "required": true },
+          "city": { "type": "string", "required": true },
+          "district": { "type": "string", "required": true },
+          "detail": { "type": "string", "required": true },
+          "isDefault": { "type": "boolean", "required": true },
+          "tag": { "type": "string", "required": false },
+          "createdAt": { "type": "ISO8601 datetime", "required": true },
+          "updatedAt": { "type": "ISO8601 datetime", "required": true }
+        }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/patients/:patientId/addresses/:addressId",
+      "summary": "Update a delivery address. All fields optional. Submitting isDefault=true cancels other defaults.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v5",
+      "statusCodes": [200, 404, 422],
+      "errorCodes": ["ADDRESS_NOT_FOUND", "VALIDATION_ERROR"],
+      "queryParams": [],
+      "pathParams": [
+        { "name": "patientId", "type": "PatientId", "required": true, "description": "Patient ID" },
+        { "name": "addressId", "type": "string", "required": true, "description": "Address ID" }
+      ],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer JWT accessToken" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "name": { "type": "string", "required": false, "description": "Recipient name, 1-20 chars" },
+          "phone": { "type": "string", "required": false, "description": "11-digit mainland China phone number" },
+          "province": { "type": "string", "required": false, "description": "Province" },
+          "city": { "type": "string", "required": false, "description": "City" },
+          "district": { "type": "string", "required": false, "description": "District" },
+          "detail": { "type": "string", "required": false, "description": "Detailed address, 1-200 chars" },
+          "isDefault": { "type": "boolean", "required": false, "description": "Whether to set as default address" },
+          "tag": { "type": "string", "required": false, "description": "Address label. Enum: 家, 公司, 医院, 其他" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "description": "The updated Address object"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/patients/:patientId/addresses/:addressId",
+      "summary": "Delete a delivery address. If deleting the default address and addresses remain, auto-sets the first remaining as default.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v5",
+      "statusCodes": [200, 404],
+      "errorCodes": ["ADDRESS_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [
+        { "name": "patientId", "type": "PatientId", "required": true, "description": "Patient ID" },
+        { "name": "addressId", "type": "string", "required": true, "description": "Address ID" }
+      ],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer JWT accessToken" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "success": { "type": "boolean", "required": true, "description": "Always true on success" }
+        }
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/patients/:patientId/addresses/:addressId/default",
+      "summary": "Set a delivery address as the default. Cancels other default addresses.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v5",
+      "statusCodes": [200, 404],
+      "errorCodes": ["ADDRESS_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [
+        { "name": "patientId", "type": "PatientId", "required": true, "description": "Patient ID" },
+        { "name": "addressId", "type": "string", "required": true, "description": "Address ID" }
+      ],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer JWT accessToken" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "description": "The updated Address object with isDefault=true"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/billing/records",
+      "summary": "Aggregate all historical payment card records for the current patient, sorted by createdAt descending",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v6",
+      "statusCodes": [200],
+      "errorCodes": ["VALIDATION_ERROR", "UNKNOWN_ERROR", "NETWORK_ERROR", "HTTP_401", "HTTP_403", "HTTP_404"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer token identifying the current patient" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "items": {
+            "type": "array", "required": true,
+            "description": "BillingRecord[] sorted by createdAt descending",
+            "items": {
+              "type": "object",
+              "fields": {
+                "paymentId": { "type": "string", "required": true, "description": "Payment ID" },
+                "sessionId": { "type": "string", "required": true, "description": "Associated session ID" },
+                "sessionTitle": { "type": "string", "required": true, "description": "Session title from chiefComplaint/diagnosis" },
+                "purpose": { "type": "enum (lab|medication)", "required": true, "description": "Payment purpose" },
+                "items": {
+                  "type": "array", "required": true,
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "name": { "type": "string", "required": true, "description": "Item name" },
+                      "amount": { "type": "number", "required": true, "description": "Item amount (min 0)" },
+                      "quantity": { "type": "integer", "required": false, "description": "Quantity (positive int, omitted when <= 1)" }
+                    }
+                  },
+                  "description": "Billed line items"
+                },
+                "totalAmount": { "type": "number", "required": true, "description": "Total amount (min 0)" },
+                "insuranceAmount": { "type": "number", "required": true, "description": "Insurance coverage amount (min 0)" },
+                "selfPayAmount": { "type": "number", "required": true, "description": "Self-pay amount (min 0)" },
+                "paymentStatus": { "type": "PaymentStatus", "required": true, "description": "Payment status" },
+                "createdAt": { "type": "ISO8601 datetime", "required": true, "description": "Creation time" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/medical-orders",
+      "summary": "Aggregate all completed/confirmed medical orders and medication records from historical consultations for the authenticated patient, sorted by handledAt descending.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v8",
+      "statusCodes": [200],
+      "errorCodes": [],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "items": {
+            "type": "array", "required": true,
+            "description": "List of medical order records sorted by handledAt descending",
+            "items": {
+              "type": "object",
+              "description": "MedicalOrderRecord",
+              "fields": {
+                "recordId": { "type": "string", "required": true, "description": "Record ID (corresponds to card ID)" },
+                "sessionId": { "type": "SessionId", "required": true, "description": "Associated session ID" },
+                "sessionTitle": { "type": "string", "required": true, "description": "Session title" },
+                "kind": { "type": "enum (advice|medication)", "required": true, "description": "Record type" },
+                "advices": { "type": "string[]", "required": false, "description": "kind=advice: advice suggestions" },
+                "watchItems": { "type": "string[]", "required": false, "description": "kind=advice: items to observe" },
+                "followUpRecommendation": { "type": "string", "required": false, "description": "kind=advice: follow-up recommendation" },
+                "medications": { "type": "array", "required": false, "description": "kind=medication: medication list", "items": { "type": "object", "description": "MedicationItem", "fields": { "name": { "type": "string", "required": true }, "spec": { "type": "string", "required": true }, "quantity": { "type": "integer", "required": true, "description": "positive int" }, "dosage": { "type": "string", "required": true }, "days": { "type": "integer", "required": true, "description": "positive int" }, "price": { "type": "number", "required": true, "description": "min 0" } } } },
+                "fulfillmentStatus": { "type": "enum (pending|confirmed|completed)", "required": false, "description": "kind=medication: fulfillment status" },
+                "deliveryAddress": { "type": "object", "required": false, "description": "kind=medication: delivery address summary", "fields": { "name": { "type": "string", "required": true }, "phone": { "type": "string", "required": true }, "fullAddress": { "type": "string", "required": true } } },
+                "handledAt": { "type": "ISO8601 datetime", "required": true, "description": "Handling time" },
+                "createdAt": { "type": "ISO8601 datetime", "required": true, "description": "Creation time" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/visits/:sessionId/suspend",
+      "summary": "Suspend a visit session when idle timeout triggers (lastActivityAt exceeds idle threshold). Non-terminal state — does not write endedAt or terminalReason, only sets status to 'suspended' and clears activeCardId.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v9",
+      "statusCodes": [200, 404, 422],
+      "errorCodes": ["SESSION_NOT_FOUND", "INVALID_STATE"],
+      "queryParams": [],
+      "pathParams": [{ "name": "sessionId", "type": "SessionId", "required": true, "description": "Session ID of the visit to suspend" }],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "sessionId": { "type": "SessionId", "required": true, "description": "The session ID to suspend" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "session": { "type": "VisitSession", "required": true, "description": "Updated visit session with status=suspended" },
+          "timelineItem": { "type": "TimelineItem", "required": true, "description": "System_event type TimelineItem with eventType=session_suspended" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/auth/login",
+      "summary": "Admin login, returns access tokens and user info. Uses independent JWT token system from patient API.",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401],
+      "errorCodes": ["INVALID_CREDENTIALS"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "username": { "type": "string", "required": true, "description": "Admin username" },
+          "password": { "type": "string", "required": true, "description": "Admin password" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "tokens": {
+            "type": "object", "required": true,
+            "fields": {
+              "accessToken": { "type": "string", "required": true, "description": "JWT access token" },
+              "refreshToken": { "type": "string", "required": true, "description": "Admin refresh token" },
+              "expiresIn": { "type": "number", "required": true, "description": "accessToken validity in seconds" }
+            }
+          },
+          "user": {
+            "type": "object", "required": true,
+            "fields": {
+              "id": { "type": "string", "required": true, "description": "Admin ID" },
+              "username": { "type": "string", "required": true, "description": "Username" },
+              "role": { "type": "enum (super_admin|admin|operator)", "required": true, "description": "Role" },
+              "displayName": { "type": "string", "required": true, "description": "Display name" },
+              "createdAt": { "type": "ISO8601 datetime", "required": true, "description": "Creation time" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/auth/logout",
+      "summary": "Admin logout, invalidates current refreshToken. Returns success even if token is already invalid.",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200],
+      "errorCodes": [],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "refreshToken": { "type": "string", "required": true, "description": "The refreshToken to invalidate" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "success": { "type": "boolean", "required": true, "description": "Always true" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/admin/auth/refresh",
+      "summary": "Refresh admin access token (rotation mechanism, old refreshToken is immediately invalidated).",
+      "authRequired": false,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401],
+      "errorCodes": ["INVALID_REFRESH_TOKEN"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "refreshToken": { "type": "string", "required": true, "description": "Currently valid refresh token" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "tokens": {
+            "type": "object", "required": true,
+            "fields": {
+              "accessToken": { "type": "string", "required": true, "description": "New JWT access token" },
+              "refreshToken": { "type": "string", "required": true, "description": "New refresh token (old one invalidated)" },
+              "expiresIn": { "type": "number", "required": true, "description": "accessToken validity in seconds" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/dashboard/stats",
+      "summary": "Get dashboard statistics",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401],
+      "errorCodes": ["UNAUTHORIZED"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "totalPatients": { "type": "integer (>=0)", "required": true, "description": "Total patient count" },
+          "totalSessions": { "type": "integer (>=0)", "required": true, "description": "Total session count" },
+          "activeSessions": { "type": "integer (>=0)", "required": true, "description": "Currently active sessions" },
+          "todayNewPatients": { "type": "integer (>=0)", "required": true, "description": "New patients today" },
+          "todayNewSessions": { "type": "integer (>=0)", "required": true, "description": "New sessions today" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/patients",
+      "summary": "Paginated patient list with fuzzy search by realName or phone",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401],
+      "errorCodes": ["UNAUTHORIZED"],
+      "queryParams": [
+        { "name": "page", "type": "int", "required": false, "default": 1, "description": "Page number (1-indexed)" },
+        { "name": "pageSize", "type": "int", "required": false, "default": 20, "description": "Items per page, max 100" },
+        { "name": "search", "type": "string", "required": false, "description": "Fuzzy search by realName or phone" }
+      ],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "items": {
+            "type": "array", "required": true,
+            "items": {
+              "type": "object",
+              "fields": {
+                "id": { "type": "string", "required": true, "description": "Patient ID" },
+                "realName": { "type": "string", "required": true, "description": "Real name" },
+                "phone": { "type": "string", "required": true, "description": "Phone number" },
+                "gender": { "type": "enum (male|female|unknown)", "required": true },
+                "birthDate": { "type": "string (YYYY-MM-DD)", "required": true, "description": "Birth date" },
+                "createdAt": { "type": "ISO8601 datetime", "required": true, "description": "Registration time" },
+                "sessionCount": { "type": "integer (>=0)", "required": true, "description": "Historical visit count" }
+              }
+            }
+          },
+          "total": { "type": "integer (>=0)", "required": true, "description": "Total count" },
+          "page": { "type": "integer", "required": true, "description": "Current page number" },
+          "pageSize": { "type": "integer", "required": true, "description": "Items per page" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/patients/:id",
+      "summary": "Get single patient's full profile. Reuses patient-side PatientProfile response structure.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401, 404],
+      "errorCodes": ["UNAUTHORIZED", "PATIENT_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "id", "type": "string", "required": true, "description": "Patient ID" }],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "PatientProfile",
+        "description": "Full PatientProfile object (same structure as patient-side GET /patients/:patientId/context patient field)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/sessions",
+      "summary": "Paginated session list with status and patient filtering",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401],
+      "errorCodes": ["UNAUTHORIZED"],
+      "queryParams": [
+        { "name": "page", "type": "int", "required": false, "default": 1, "description": "Page number (1-indexed)" },
+        { "name": "pageSize", "type": "int", "required": false, "default": 20, "description": "Items per page, max 100" },
+        { "name": "status", "type": "VisitStatus", "required": false, "description": "Filter by session status" },
+        { "name": "patientId", "type": "PatientId", "required": false, "description": "Filter by patient ID" }
+      ],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "items": {
+            "type": "array", "required": true,
+            "items": {
+              "type": "object",
+              "fields": {
+                "id": { "type": "string", "required": true, "description": "Session ID" },
+                "patientId": { "type": "string", "required": true, "description": "Patient ID" },
+                "patientName": { "type": "string", "required": true, "description": "Patient name" },
+                "title": { "type": "string", "required": true, "description": "Session title" },
+                "status": { "type": "VisitStatus", "required": true, "description": "Session status" },
+                "createdAt": { "type": "ISO8601 datetime", "required": true, "description": "Creation time" },
+                "updatedAt": { "type": "ISO8601 datetime", "required": true, "description": "Last update time" }
+              }
+            }
+          },
+          "total": { "type": "integer (>=0)", "required": true, "description": "Total count" },
+          "page": { "type": "integer", "required": true, "description": "Current page number" },
+          "pageSize": { "type": "integer", "required": true, "description": "Items per page" }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/sessions/:id",
+      "summary": "Get single session's full details. Reuses patient-side VisitSession response structure with full timeline.",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401, 404],
+      "errorCodes": ["UNAUTHORIZED", "SESSION_NOT_FOUND"],
+      "queryParams": [],
+      "pathParams": [{ "name": "id", "type": "string", "required": true, "description": "Session ID" }],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "description": "Full VisitSession object with timeline (same structure as patient-side GET /visits/:sessionId/snapshot)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/settings",
+      "summary": "Get system settings",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 401],
+      "errorCodes": ["UNAUTHORIZED"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": { "description": "No request body" },
+      "responseBody": {
+        "type": "object",
+        "fields": {
+          "siteName": { "type": "string", "required": true, "description": "Site name" },
+          "maxConcurrentSessions": { "type": "integer (>0)", "required": true, "description": "Max concurrent sessions per patient" },
+          "sessionTimeoutMinutes": { "type": "integer (>0)", "required": true, "description": "Session timeout in minutes" },
+          "enableRegistration": { "type": "boolean", "required": true, "description": "Whether registration is open" }
+        }
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/settings",
+      "summary": "Update system settings (partial update supported)",
+      "authRequired": true,
+      "isSSE": false,
+      "version": "v7",
+      "statusCodes": [200, 400, 401],
+      "errorCodes": ["UNAUTHORIZED", "INVALID_SETTINGS"],
+      "queryParams": [],
+      "pathParams": [],
+      "headers": [{ "name": "Authorization", "type": "string", "required": true, "description": "Admin Bearer token, format: Bearer <accessToken>" }],
+      "requestBody": {
+        "type": "object",
+        "fields": {
+          "siteName": { "type": "string", "required": false, "description": "Site name" },
+          "maxConcurrentSessions": { "type": "integer (>0)", "required": false, "description": "Max concurrent sessions per patient" },
+          "sessionTimeoutMinutes": { "type": "integer (>0)", "required": false, "description": "Session timeout in minutes" },
+          "enableRegistration": { "type": "boolean", "required": false, "description": "Whether registration is open" }
+        }
+      },
+      "responseBody": {
+        "type": "object",
+        "description": "The complete, updated SystemSettings object (same structure as GET /admin/settings response)",
+        "fields": {
+          "siteName": { "type": "string", "required": true },
+          "maxConcurrentSessions": { "type": "integer (>0)", "required": true },
+          "sessionTimeoutMinutes": { "type": "integer (>0)", "required": true },
+          "enableRegistration": { "type": "boolean", "required": true }
+        }
+      }
+    }
+  ],
+  "totalEndpoints": 46,
+  "patchVersionsApplied": ["v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"],
+  "mergeNotes": "Merge of 1 base spec + 8 incremental patches. PATCH /patients/:patientId/profile from base and v2 were merged (v2 adds medicalHistory field). POST /visits/:sessionId/fulfillment from base and v5 were merged (v5 adds conditionally-required addressId for delivery mode). Enums: VisitStatus and VisitMachineState gained 'suspended' (v9); SystemEventType gained 'session_suspended' (v9); InterruptedBy gained 'idle' (v9). VisitSession gained 'lastActivityAt' (v9) and VisitSummary gained 'title' (v4). The auth evolved from a token-carrier-agnostic model (base) to JWT Bearer dual-token (v2-v4). Admin API (v7) uses a separate base path /admin with independent auth. Admin endpoints are listed with full /admin prefix in their paths (they are not under the /api base URL). The admin API's error format is not standardized; each admin endpoint documents its own status codes paired with string error codes (INVALID_CREDENTIALS, UNAUTHORIZED, INVALID_REFRESH_TOKEN, INVALID_SETTINGS). Admin gender enum (male, female, unknown) is a subset of the patient Gender enum; the full patient Gender (male, female, other, unknown) is authoritative. FulfillmentStatus (v8) shares values with MedicationFulfillmentStatus but is used in the medical-orders context."
+}
