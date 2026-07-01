@@ -27,6 +27,8 @@ jobs:
           # 中国访问 GitHub HTTP/2 不稳定，强制 HTTP/1.1
           git config --global http.version HTTP/1.1
           git config --global http.postBuffer 524288000
+          # 子模块 SSH URL 转 HTTPS，统一用 token 认证
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
           if [ -d "${DEV_DIR}/.git" ]; then
             echo "Existing repo found, pulling latest dev..."
             cd "${DEV_DIR}"
