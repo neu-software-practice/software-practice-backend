@@ -7,6 +7,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// jwtSign is a package-level function for JWT signing, overridable in tests.
+var jwtSign = func(token *jwt.Token, secret []byte) (string, error) {
+	return token.SignedString(secret)
+}
+
 // GenerateAccessToken creates a patient JWT access token with standard claims.
 // TTL is fixed at 900 seconds (15 minutes).
 func GenerateAccessToken(userID, patientID, phone, secret string) (string, error) {
@@ -19,7 +24,7 @@ func GenerateAccessToken(userID, patientID, phone, secret string) (string, error
 		"exp":       now.Add(900 * time.Second).Unix(),
 	})
 
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenString, err := jwtSign(token, []byte(secret))
 	if err != nil {
 		return "", fmt.Errorf("generate access token: %w", err)
 	}
@@ -36,7 +41,7 @@ func GenerateAdminAccessToken(adminID, role, secret string, ttlSeconds int) (str
 		"exp":  now.Add(time.Duration(ttlSeconds) * time.Second).Unix(),
 	})
 
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenString, err := jwtSign(token, []byte(secret))
 	if err != nil {
 		return "", fmt.Errorf("generate admin access token: %w", err)
 	}
