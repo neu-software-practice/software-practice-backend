@@ -90,6 +90,14 @@ func (h *WorkbenchHandler) SendMessage(c *gin.Context) {
 		ClientMessageID: input.ClientMessageID,
 	})
 	if err != nil {
+		if errors.Is(err, model.ErrInvalidState) {
+			apperrors.WriteError(c, apperrors.NewApiError(
+				apperrors.CodeInvalidState,
+				err.Error(),
+				http.StatusUnprocessableEntity,
+			))
+			return
+		}
 		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
 		return
 	}
@@ -130,6 +138,12 @@ func (h *WorkbenchHandler) StreamAssistantMessage(c *gin.Context) {
 		var apiErr *apperrors.ApiError
 		if errors.As(err, &apiErr) {
 			writer.WriteError(input.SessionID, input.RequestID, apiErr)
+		} else if errors.Is(err, model.ErrInvalidState) {
+			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewApiError(
+				apperrors.CodeInvalidState,
+				err.Error(),
+				http.StatusUnprocessableEntity,
+			))
 		} else {
 			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewInternalError(err.Error()))
 		}

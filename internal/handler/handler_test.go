@@ -5303,7 +5303,7 @@ func TestSSEWriter_StreamEvents_WriteError(t *testing.T) {
 func TestWorkbenchHandler_SendMessage_InternalError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	session := &model.VisitSession{
-		ID: "s001", PatientID: "p001", Status: "active", MachineState: "in_visit",
+		ID: "s001", PatientID: "p001", Status: string(model.VisitStatusChatting), MachineState: string(model.VisitMachineStateChatting),
 	}
 	visitRepo := &mockVisitRepo{
 		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {

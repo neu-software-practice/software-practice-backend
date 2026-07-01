@@ -38,6 +38,14 @@ func (s *Service) SendMessage(ctx context.Context, input SendMessageInput) (*Sen
 		return nil, err
 	}
 
+	// Only allow patient messages when the visit is in chatting state.
+	// In blocked/terminal states the medAgent session is waiting for a different
+	// tool result (order_test, query_drug_spec, purchase_drug) or is already closed,
+	// so PatientSay would fail with ErrWrongStep/ErrSessionClosed.
+	if session.Status != string(model.VisitStatusChatting) {
+		return nil, fmt.Errorf("%w: cannot send message in state %s", model.ErrInvalidState, session.Status)
+	}
+
 	// Create patient message timeline item
 	patientMsg := adapter.BuildMessageTimelineItem(input.SessionID, "patient", input.Content)
 	patientMsg.ID = input.ClientMessageID
@@ -91,6 +99,13 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 	session, err := s.visitRepo.FindByID(ctx, input.SessionID)
 	if err != nil {
 		return err
+	}
+
+	// Only allow assistant streaming when the visit is in chatting state.
+	// In blocked/terminal states the medAgent session is waiting for a different
+	// tool result or is already closed, so PatientSay would fail.
+	if session.Status != string(model.VisitStatusChatting) {
+		return fmt.Errorf("%w: cannot stream assistant in state %s", model.ErrInvalidState, session.Status)
 	}
 
 	// Determine the last patient message
