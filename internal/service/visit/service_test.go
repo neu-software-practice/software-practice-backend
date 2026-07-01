@@ -68,6 +68,32 @@ func (m *mockTimelineRepo) UpdateContent(ctx context.Context, id string, item *m
 	return nil
 }
 
+type mockPatientRepo struct {
+	findByIDFunc func(ctx context.Context, id string) (*model.PatientProfile, error)
+}
+
+func (m *mockPatientRepo) FindByCredential(ctx context.Context, ct, cred string) (*model.PatientProfile, error) {
+	return nil, nil
+}
+func (m *mockPatientRepo) FindByID(ctx context.Context, id string) (*model.PatientProfile, error) {
+	if m.findByIDFunc != nil {
+		return m.findByIDFunc(ctx, id)
+	}
+	return nil, model.ErrPatientNotFound
+}
+func (m *mockPatientRepo) Create(ctx context.Context, p *model.PatientProfile) error { return nil }
+func (m *mockPatientRepo) UpdateProfile(ctx context.Context, id string, input model.ProfileUpdateInput) (*model.PatientProfile, error) {
+	return nil, nil
+}
+
+func newMockPatientRepo() *mockPatientRepo {
+	return &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return &model.PatientProfile{ID: id, Name: "测试患者"}, nil
+		},
+	}
+}
+
 var allMachineStates = []string{
 	string(model.VisitMachineStateLoadingContext),
 	string(model.VisitMachineStateChatting),
@@ -110,7 +136,7 @@ func TestCreateSession(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateSessionInput{
 		PatientID:      "p001",
@@ -139,7 +165,7 @@ func TestCreateSession_Invalid(t *testing.T) {
 	visitRepo := &mockVisitRepo{}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	// Invalid entry type
 	input := model.CreateSessionInput{
@@ -169,8 +195,13 @@ func TestCreateSession_EmptyPatientID(t *testing.T) {
 			return nil
 		},
 	}
+	patientRepo := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, patientRepo)
 
 	input := model.CreateSessionInput{
 		PatientID:      "",
@@ -178,12 +209,9 @@ func TestCreateSession_EmptyPatientID(t *testing.T) {
 		ChiefComplaint: "头痛",
 	}
 
-	result, err := svc.CreateSession(ctx, input)
-	if err != nil {
-		t.Fatalf("CreateSession with empty PatientID: %v", err)
-	}
-	if result.Session.PatientID != "" {
-		t.Errorf("patientID = %q, want empty", result.Session.PatientID)
+	_, err := svc.CreateSession(ctx, input)
+	if err != model.ErrPatientNotFound {
+		t.Fatalf("expected ErrPatientNotFound, got %v", err)
 	}
 }
 
@@ -220,7 +248,7 @@ func TestCreateFollowUp(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateFollowUpInput{
 		PatientID:       "p001",
@@ -253,7 +281,7 @@ func TestGetSession(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	session, err := svc.GetSession(ctx, "v001")
 	if err != nil {
@@ -274,7 +302,7 @@ func TestGetSession_NotFound(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	_, err := svc.GetSession(ctx, "nonexistent")
 	if err != model.ErrSessionNotFound {
@@ -308,7 +336,7 @@ func TestGetSnapshot_Success(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	snapshot, err := svc.GetSnapshot(ctx, "v001")
 	if err != nil {
@@ -337,7 +365,7 @@ func TestListSessions(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	items, _, hasMore, err := svc.ListSessions(ctx, "p001", "", nil, 20)
 	if err != nil {
@@ -367,7 +395,7 @@ func TestListSessions_WithCursor(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	items, nextCursor, hasMore, err := svc.ListSessions(ctx, "p001", "", &cursor, 2)
 	if err != nil {
@@ -403,7 +431,7 @@ func TestCreateSession_WithComplaint(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateSessionInput{
 		PatientID:      "p001",
@@ -437,7 +465,7 @@ func TestCreateSession_TimelineError(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateSessionInput{
 		PatientID:      "p001",
@@ -461,7 +489,7 @@ func TestCreateSession_CreateError(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateSessionInput{
 		PatientID:      "p001",
@@ -485,7 +513,7 @@ func TestCreateFollowUp_ParentNotFound(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateFollowUpInput{
 		PatientID:       "p001",
@@ -527,7 +555,7 @@ func TestCreateFollowUp_TimelineError(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateFollowUpInput{
 		PatientID:       "p001",
@@ -566,7 +594,7 @@ func TestCreateFollowUp_CreateError(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	input := model.CreateFollowUpInput{
 		PatientID:       "p001",
@@ -590,7 +618,7 @@ func TestListSessions_Empty(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	items, _, hasMore, err := svc.ListSessions(ctx, "p001", "", nil, 20)
 	if err != nil {
@@ -614,7 +642,7 @@ func TestGetSnapshot_NotFound(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	_, err := svc.GetSnapshot(ctx, "nonexistent")
 	if err == nil {
@@ -644,7 +672,7 @@ func TestGetSnapshot_TimelineError(t *testing.T) {
 		},
 	}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	_, err := svc.GetSnapshot(ctx, "v001")
 	if err == nil {
@@ -672,7 +700,7 @@ func TestUpdateStatus_Success(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	err := svc.UpdateStatus(ctx, "v001", "analyzing")
 	if err != nil {
@@ -690,7 +718,7 @@ func TestUpdateStatus_NotFound(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	err := svc.UpdateStatus(ctx, "nonexistent", "analyzing")
 	if err == nil {
@@ -714,7 +742,7 @@ func TestUpdateStatus_InvalidTransition(t *testing.T) {
 	}
 	timelineRepo := &mockTimelineRepo{}
 
-	svc := visit.NewService(visitRepo, timelineRepo)
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 	// chatting -> completed is not a valid transition
 	err := svc.UpdateStatus(ctx, "v001", "completed")
@@ -780,7 +808,7 @@ func TestUpdateStatus_MultipleTransitions(t *testing.T) {
 			}
 			timelineRepo := &mockTimelineRepo{}
 
-			svc := visit.NewService(visitRepo, timelineRepo)
+			svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
 
 			err := svc.UpdateStatus(ctx, "v001", tt.toState)
 			if tt.wantErr {

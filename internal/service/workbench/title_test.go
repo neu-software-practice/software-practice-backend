@@ -25,7 +25,11 @@ func newTestServiceWithLLM(
 	timelineRepo *mockTimelineRepo,
 	llmClient wbsvc.LLMClient,
 ) *wbsvc.Service {
-	visitSvc := visitsvc.NewService(visitRepo, timelineRepo)
+	visitSvc := visitsvc.NewService(visitRepo, timelineRepo, &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return &model.PatientProfile{ID: id, Name: "测试患者"}, nil
+		},
+	})
 	return wbsvc.NewService(
 		&mockPatientRepo{},
 		visitRepo,

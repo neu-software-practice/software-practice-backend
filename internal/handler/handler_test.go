@@ -1135,6 +1135,15 @@ func TestPatientHandler_UpdateProfile(t *testing.T) {
 	})
 }
 
+func newVisitService(vr *mockVisitRepo, tr *mockTimelineRepo) *visitsvc.Service {
+	pr := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return &model.PatientProfile{ID: id, Name: "Test Patient"}, nil
+		},
+	}
+	return visitsvc.NewService(vr, tr, pr)
+}
+
 // ---------------------------------------------------------------------------
 // Visit Handler tests
 // ---------------------------------------------------------------------------
@@ -1147,7 +1156,7 @@ func TestVisitHandler_CreateSession(t *testing.T) {
 			return nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 
 	t.Run("valid request", func(t *testing.T) {
@@ -1174,7 +1183,7 @@ func TestVisitHandler_ListSessions(t *testing.T) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 
 	t.Run("valid request", func(t *testing.T) {
@@ -1201,7 +1210,7 @@ func TestVisitHandler_GetSession(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 
 	t.Run("valid request", func(t *testing.T) {
@@ -1229,7 +1238,7 @@ func TestVisitHandler_GetSnapshot(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 
 	t.Run("valid request", func(t *testing.T) {
@@ -1257,7 +1266,7 @@ func TestVisitHandler_CreateFollowUp(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 
 	t.Run("valid request", func(t *testing.T) {
@@ -1277,6 +1286,69 @@ func TestVisitHandler_CreateFollowUp(t *testing.T) {
 	})
 }
 
+func TestVisitHandler_CreateSession_PatientNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	visitRepo := &mockVisitRepo{}
+	pr := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{}, pr)
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("patient not found returns 404", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/visits",
+			strings.NewReader(`{"patientId":"nonexistent","chiefComplaint":"头疼","entryType":"new"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("patientId", "nonexistent")
+
+		h.CreateSession(c)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404, body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestVisitHandler_CreateFollowUp_PatientNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	pr := &mockPatientRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
+			return nil, model.ErrPatientNotFound
+		},
+	}
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return &model.VisitSession{
+				ID: id, PatientID: "nonexistent", Status: "active",
+			}, nil
+		},
+	}
+	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{}, pr)
+	h := handler.NewVisitHandler(svc)
+
+	t.Run("patient not found returns 404", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "sessionId", Value: "s001"}}
+		c.Request = httptest.NewRequest("POST", "/visits/s001/follow-up",
+			strings.NewReader(`{"patientId":"nonexistent","chiefComplaint":"复诊"}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("patientId", "nonexistent")
+
+		h.CreateFollowUp(c)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want 404, body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Workbench Handler tests
 // ---------------------------------------------------------------------------
@@ -1292,7 +1364,7 @@ func newWorkbenchServiceForTest(
 		timelineRepo,
 		&mockFlowCardRepo{},
 		&mockAddressRepo{},
-		visitsvc.NewService(visitRepo, &mockTimelineRepo{}),
+		newVisitService(visitRepo, &mockTimelineRepo{}),
 		maClient,
 		"test",
 		nil, // llmClient
@@ -1351,7 +1423,7 @@ func TestWorkbenchHandler_GetSession(t *testing.T) {
 
 func TestNewRouter(t *testing.T) {
 	patientSvc := patientsvc.NewService(&mockPatientRepo{}, &mockVisitRepo{})
-	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	visitSvc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{}, nil)
 	authSvc := newTestAuthService()
 	addressSvc := addresssvc.NewService(&mockAddressRepo{})
@@ -1382,7 +1454,7 @@ func TestSetupRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	patientSvc := patientsvc.NewService(&mockPatientRepo{}, &mockVisitRepo{})
-	visitSvc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	visitSvc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	wbSvc := newWorkbenchServiceForTest(&mockVisitRepo{}, &mockTimelineRepo{}, nil)
 	authSvc := newTestAuthService()
 	addressSvc := addresssvc.NewService(&mockAddressRepo{})
@@ -1576,7 +1648,7 @@ func TestWorkbenchHandler_StreamAssistantMessage_SSESuccess(t *testing.T) {
 		timelineRepo,
 		&mockFlowCardRepo{},
 		&mockAddressRepo{},
-		visitsvc.NewService(visitRepo, &mockTimelineRepo{}),
+		newVisitService(visitRepo, &mockTimelineRepo{}),
 		maClient,
 		"test",
 		nil, // llmClient
@@ -1963,7 +2035,7 @@ func TestBillingHandler_ListBillingRecords_WithData(t *testing.T) {
 
 func TestVisitHandler_CreateSession_InvalidBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	svc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -1981,7 +2053,7 @@ func TestVisitHandler_GetSession_ValidWithPatient(t *testing.T) {
 	visitRepo := &mockVisitRepo{findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
 		return &model.VisitSession{ID: id, PatientID: "p001", Status: "active"}, nil
 	}}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2147,7 +2219,7 @@ func TestWorkbenchHandler_ListTimeline_RepoError(t *testing.T) {
 			return nil, nil, false, errors.New("db error")
 		},
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, timelineRepo), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, timelineRepo), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2266,7 +2338,7 @@ func newWorkbenchServiceWithLLM(
 	return wbsvc.NewService(
 		&mockPatientRepo{}, visitRepo, timelineRepo,
 		&mockFlowCardRepo{}, &mockAddressRepo{},
-		visitsvc.NewService(visitRepo, &mockTimelineRepo{}),
+		newVisitService(visitRepo, &mockTimelineRepo{}),
 		maClient, "test", llm,
 	)
 }
@@ -2476,7 +2548,7 @@ func TestWorkbenchHandler_StreamConsultationReply_Success(t *testing.T) {
 	timelineRepo := &mockTimelineRepo{
 		appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, timelineRepo), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, timelineRepo), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2504,7 +2576,7 @@ func TestWorkbenchHandler_StreamConsultationReply_NoDiagnosis(t *testing.T) {
 	timelineRepo := &mockTimelineRepo{
 		appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, timelineRepo), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, timelineRepo), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2533,7 +2605,7 @@ func TestWorkbenchHandler_AskLockedQuestion_Success(t *testing.T) {
 	timelineRepo := &mockTimelineRepo{
 		appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, timelineRepo), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, timelineRepo), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2724,7 +2796,7 @@ func TestWorkbenchHandler_SubmitLabDecision_ValidSkip(t *testing.T) {
 		},
 		updateFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2746,7 +2818,7 @@ func TestWorkbenchHandler_ExitVisit_Valid(t *testing.T) {
 		},
 		updateFunc: func(ctx context.Context, v *model.VisitSession) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, &mockFlowCardRepo{listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) { return nil, nil }}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, &mockFlowCardRepo{listBySessionFunc: func(ctx context.Context, sid string) ([]model.FlowCard, error) { return nil, nil }}, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2815,7 +2887,7 @@ func TestWorkbenchHandler_SendMessage_Valid(t *testing.T) {
 		appendFunc:             func(ctx context.Context, item *model.TimelineItem) error { return nil },
 		findLastPatientMsgFunc: func(ctx context.Context, sid string) (string, error) { return "", nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, timelineRepo), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, timelineRepo), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2852,7 +2924,7 @@ func TestWorkbenchHandler_StreamAssistantMessage_ServiceError(t *testing.T) {
 			return "ma-sess", nil
 		},
 	}
-	svc := wbsvc.NewService(patientRepo, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, timelineRepo), maClient, "test", nil)
+	svc := wbsvc.NewService(patientRepo, visitRepo, timelineRepo, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, timelineRepo), maClient, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2915,7 +2987,7 @@ func TestWorkbenchHandler_SubmitFulfillment_Valid(t *testing.T) {
 		},
 		updateFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2943,7 +3015,7 @@ func TestWorkbenchHandler_SubmitTreatmentExecution_Valid(t *testing.T) {
 		},
 		updateFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2971,7 +3043,7 @@ func TestWorkbenchHandler_AckAdvice_Valid(t *testing.T) {
 		},
 		updateFunc: func(ctx context.Context, card *model.FlowCard) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -2993,7 +3065,7 @@ func TestWorkbenchHandler_ReportVitals_Valid(t *testing.T) {
 		},
 		updateFunc: func(ctx context.Context, v *model.VisitSession) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -3023,7 +3095,7 @@ func TestWorkbenchHandler_SubmitPayment_Valid(t *testing.T) {
 		updateFunc:       func(ctx context.Context, card *model.FlowCard) error { return nil },
 		updateStatusFunc: func(ctx context.Context, id, status string) error { return nil },
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil }}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -3069,7 +3141,7 @@ func TestVisitHandler_ListSessions_Valid(t *testing.T) {
 			return []model.VisitSessionSummary{}, nil, false, nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -3089,7 +3161,7 @@ func TestVisitHandler_CreateSession_Valid(t *testing.T) {
 	timelineRepo := &mockTimelineRepo{
 		appendFunc: func(ctx context.Context, item *model.TimelineItem) error { return nil },
 	}
-	svc := visitsvc.NewService(visitRepo, timelineRepo)
+	svc := newVisitService(visitRepo, timelineRepo)
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -3342,7 +3414,7 @@ func TestWorkbenchHandler_SubmitLabDecision_ServiceError(t *testing.T) {
 			return nil, model.ErrCardNotFound
 		},
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -3368,7 +3440,7 @@ func TestWorkbenchHandler_AckAdvice_CardNotFound(t *testing.T) {
 			return nil, model.ErrCardNotFound
 		},
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -3389,7 +3461,7 @@ func TestWorkbenchHandler_ExitVisit_ServiceError(t *testing.T) {
 			return nil, model.ErrSessionNotFound
 		},
 	}
-	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, &mockFlowCardRepo{}, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
+	svc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, &mockFlowCardRepo{}, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), nil, "test", nil)
 	h := handler.NewWorkbenchHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4051,7 +4123,7 @@ func TestVisitHandler_CreateFollowUp_SessionNotFound(t *testing.T) {
 			return nil, model.ErrSessionNotFound
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4067,7 +4139,7 @@ func TestVisitHandler_CreateFollowUp_SessionNotFound(t *testing.T) {
 
 func TestVisitHandler_CreateFollowUp_InvalidBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	svc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4083,7 +4155,7 @@ func TestVisitHandler_CreateFollowUp_InvalidBody(t *testing.T) {
 
 func TestVisitHandler_ListSessions_MissingPatientID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	svc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4103,7 +4175,7 @@ func TestVisitHandler_GetSnapshot_SessionNotFound(t *testing.T) {
 			return nil, model.ErrSessionNotFound
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4119,7 +4191,7 @@ func TestVisitHandler_GetSnapshot_SessionNotFound(t *testing.T) {
 
 func TestVisitHandler_CreateSession_MissingPatientID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	svc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4413,7 +4485,7 @@ func TestVisitHandler_GetSession_RepoError(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4528,7 +4600,7 @@ func TestWorkbenchHandler_SubmitFulfillment_CardNotFound(t *testing.T) {
 			return nil, model.ErrCardNotFound
 		},
 	}
-	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
+	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
 	h := handler.NewWorkbenchHandler(wbSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4557,7 +4629,7 @@ func TestWorkbenchHandler_SubmitFulfillment_InternalError(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
+	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
 	h := handler.NewWorkbenchHandler(wbSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4586,7 +4658,7 @@ func TestWorkbenchHandler_SubmitPayment_CardNotFound(t *testing.T) {
 			return nil, model.ErrCardNotFound
 		},
 	}
-	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
+	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
 	h := handler.NewWorkbenchHandler(wbSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4615,7 +4687,7 @@ func TestWorkbenchHandler_SubmitTreatmentExecution_CardNotFound(t *testing.T) {
 			return nil, model.ErrCardNotFound
 		},
 	}
-	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
+	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
 	h := handler.NewWorkbenchHandler(wbSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4730,7 +4802,7 @@ func TestVisitHandler_GetSnapshot_RepoError(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4809,7 +4881,7 @@ func TestVisitHandler_ListSessions_RepoError(t *testing.T) {
 			return nil, nil, false, errors.New("db error")
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4828,7 +4900,7 @@ func TestVisitHandler_GetSession_PatientMismatch(t *testing.T) {
 			return &model.VisitSession{ID: id, PatientID: "p002"}, nil
 		},
 	}
-	svc := visitsvc.NewService(visitRepo, &mockTimelineRepo{})
+	svc := newVisitService(visitRepo, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -4963,7 +5035,7 @@ func TestWorkbenchHandler_SubmitLabDecision_InternalError(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, visitsvc.NewService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
+	wbSvc := wbsvc.NewService(&mockPatientRepo{}, visitRepo, &mockTimelineRepo{}, flowCardRepo, &mockAddressRepo{}, newVisitService(visitRepo, &mockTimelineRepo{}), &mockMedAgentClient{}, "test", nil)
 	h := handler.NewWorkbenchHandler(wbSvc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -5252,7 +5324,7 @@ func TestAdminHandler_GetDashboardStats_Success(t *testing.T) {
 
 func TestVisitHandler_ListSessions_PatientMismatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := visitsvc.NewService(&mockVisitRepo{}, &mockTimelineRepo{})
+	svc := newVisitService(&mockVisitRepo{}, &mockTimelineRepo{})
 	h := handler.NewVisitHandler(svc)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)

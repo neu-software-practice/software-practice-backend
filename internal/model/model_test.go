@@ -13,6 +13,7 @@ func TestVisitSessionJSON(t *testing.T) {
 	s := model.VisitSession{
 		ID:            "v001",
 		PatientID:     "p001",
+		PatientName:   "Test Patient",
 		EntryType:     "new",
 		Status:        "chatting",
 		StartedAt:     now,
@@ -40,6 +41,9 @@ func TestVisitSessionJSON(t *testing.T) {
 	}
 	if parsed["patientId"] != "p001" {
 		t.Errorf("patientId: got %v, want p001", parsed["patientId"])
+	}
+	if parsed["patientName"] != "Test Patient" {
+		t.Errorf("patientName: got %v, want Test Patient", parsed["patientName"])
 	}
 	if parsed["entryType"] != "new" {
 		t.Errorf("entryType: got %v, want new", parsed["entryType"])

@@ -244,7 +244,7 @@ func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mo
 }
 
 func newSvc(p *mockPatientRepo, v *mockVisitRepo, t *mockTimelineRepo, f *mockFlowCardRepo, a *mockAddressRepo) *wbsvc.Service {
-	visitSvc := visitsvc.NewService(v, t)
+	visitSvc := visitsvc.NewService(v, t, p)
 	return wbsvc.NewService(p, v, t, f, a, visitSvc, nil, "http", nil)
 }
 
@@ -1516,7 +1516,7 @@ func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path stri
 		updateFunc: func(ctx context.Context, addr *model.Address) error { return nil },
 		deleteFunc: func(ctx context.Context, id string) error { return nil },
 	}
-	visitSvc := visitsvc.NewService(mv, mt)
+	visitSvc := visitsvc.NewService(mv, mt, mp)
 	return wbsvc.NewService(mp, mv, mt, mf, ma, visitSvc, client, "http", nil), mp, mv, mt, mf, ma
 }
 

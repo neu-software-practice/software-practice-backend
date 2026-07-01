@@ -29,12 +29,12 @@ func (r *visitMySQLRepo) Create(ctx context.Context, visit *model.VisitSession) 
 	visit.UpdatedAt = now
 
 	_, err = r.db.ExecContext(ctx,
-		`INSERT INTO visits (id, patient_id, entry_type, status, machine_state,
+		`INSERT INTO visits (id, patient_id, patient_name, entry_type, status, machine_state,
 		started_at, updated_at, ended_at, timeout_at, paused_at, last_activity_at,
 		ask_round, ask_round_limit, lab_round, lab_round_limit,
 		parent_session_id, terminal_reason, active_card_id, medagent_session_id, timer_paused, summary)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		visit.ID, visit.PatientID, visit.EntryType, visit.Status,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		visit.ID, visit.PatientID, visit.PatientName, visit.EntryType, visit.Status,
 		visit.MachineState, // machine_state
 		visit.StartedAt, visit.UpdatedAt, visit.EndedAt, visit.TimeoutAt, visit.PausedAt,
 		visit.LastActivityAt,
@@ -54,12 +54,12 @@ func (r *visitMySQLRepo) FindByID(ctx context.Context, id string) (*model.VisitS
 	var machineState string
 
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, patient_id, entry_type, status, machine_state,
+		`SELECT id, patient_id, patient_name, entry_type, status, machine_state,
 		started_at, updated_at, ended_at, timeout_at, paused_at, last_activity_at,
 		ask_round, ask_round_limit, lab_round, lab_round_limit,
 		parent_session_id, terminal_reason, active_card_id, medagent_session_id, timer_paused, summary
 		FROM visits WHERE id = ?`, id,
-	).Scan(&v.ID, &v.PatientID, &v.EntryType, &v.Status,
+	).Scan(&v.ID, &v.PatientID, &v.PatientName, &v.EntryType, &v.Status,
 		&machineState, // machine_state
 		&v.StartedAt, &v.UpdatedAt, &v.EndedAt, &v.TimeoutAt, &v.PausedAt,
 		&v.LastActivityAt,
@@ -86,7 +86,7 @@ func scanVisitSummary(scanner rowScanner) (*model.VisitSessionSummary, error) {
 	var summaryJSON string
 
 	err := scanner.Scan(
-		&s.ID, &s.PatientID, &s.EntryType, &s.Status,
+		&s.ID, &s.PatientID, &s.PatientName, &s.EntryType, &s.Status,
 		&s.StartedAt, &s.UpdatedAt, &s.LastActivityAt, &s.EndedAt,
 		&s.ParentSessionID, &s.TerminalReason,
 		&summaryJSON,
@@ -109,14 +109,14 @@ func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, st
 	if cursor != nil && *cursor != "" {
 		if status != "" {
 			rows, err = r.db.QueryContext(ctx,
-				`SELECT id, patient_id, entry_type, status,
+				`SELECT id, patient_id, patient_name, entry_type, status,
 				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
 				FROM visits WHERE patient_id = ? AND status = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?`,
 				patientID, status, *cursor, pageSize+1,
 			)
 		} else {
 			rows, err = r.db.QueryContext(ctx,
-				`SELECT id, patient_id, entry_type, status,
+				`SELECT id, patient_id, patient_name, entry_type, status,
 				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
 				FROM visits WHERE patient_id = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?`,
 				patientID, *cursor, pageSize+1,
@@ -125,14 +125,14 @@ func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, st
 	} else {
 		if status != "" {
 			rows, err = r.db.QueryContext(ctx,
-				`SELECT id, patient_id, entry_type, status,
+				`SELECT id, patient_id, patient_name, entry_type, status,
 				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
 				FROM visits WHERE patient_id = ? AND status = ? ORDER BY started_at DESC LIMIT ?`,
 				patientID, status, pageSize+1,
 			)
 		} else {
 			rows, err = r.db.QueryContext(ctx,
-				`SELECT id, patient_id, entry_type, status,
+				`SELECT id, patient_id, patient_name, entry_type, status,
 				started_at, updated_at, last_activity_at, ended_at, parent_session_id, terminal_reason, summary
 				FROM visits WHERE patient_id = ? ORDER BY started_at DESC LIMIT ?`,
 				patientID, pageSize+1,
