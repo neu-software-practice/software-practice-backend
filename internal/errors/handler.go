@@ -7,7 +7,7 @@ import (
 
 // WriteError sends the ApiError as a JSON response using the standard API envelope.
 func WriteError(c *gin.Context, err *ApiError) {
-	c.JSON(err.Status, api.ErrorResponse(err))
+	c.AbortWithStatusJSON(err.Status, api.ErrorResponse(err))
 }
 
 // WriteValidationError sends a 422 VALIDATION_ERROR response.
