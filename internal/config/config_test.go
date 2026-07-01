@@ -114,6 +114,26 @@ func TestLoadErrors(t *testing.T) {
 			},
 			wantErr: "CORS_ALLOWED_ORIGINS cannot be '*' in release mode",
 		},
+		{
+			name: "ReleaseModeWithDefaultCORS",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("SERVER_MODE", "release")
+				// CORS_ALLOWED_ORIGINS not set — uses default http://localhost:5173
+			},
+			wantErr: "CORS_ALLOWED_ORIGINS must be explicitly set in release mode (default localhost not allowed)",
+		},
+		{
+			name: "MissingMedAgentAPIKey",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
+				// MEDAGENT_API_KEY not set
+			},
+			wantErr: "MEDAGENT_API_KEY is required",
+		},
 	}
 
 	for _, tt := range tests {
@@ -128,6 +148,83 @@ func TestLoadErrors(t *testing.T) {
 			}
 			if err.Error() != tt.wantErr {
 				t.Errorf("unexpected error message:\ngot:  %q\nwant: %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetEnvInt(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(*testing.T)
+		wantRPS   int
+		wantBurst int
+	}{
+		{
+			name: "Defaults",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
+				t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
+			},
+			wantRPS:   10, // default
+			wantBurst: 20, // default
+		},
+		{
+			name: "ValidIntegerValues",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
+				t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
+				t.Setenv("RATE_LIMIT_RPS", "15")
+				t.Setenv("RATE_LIMIT_BURST", "50")
+			},
+			wantRPS:   15,
+			wantBurst: 50,
+		},
+		{
+			name: "InvalidIntegerFallbackToDefault",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
+				t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
+				t.Setenv("RATE_LIMIT_RPS", "abc")
+				t.Setenv("RATE_LIMIT_BURST", "not-a-number")
+			},
+			wantRPS:   10, // fallback to default
+			wantBurst: 20, // fallback to default
+		},
+		{
+			name: "ZeroValue",
+			setup: func(t *testing.T) {
+				t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
+				t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
+				t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
+				t.Setenv("MEDAGENT_API_KEY", "test-medagent-api-key")
+				t.Setenv("RATE_LIMIT_RPS", "0")
+			},
+			wantRPS:   0,
+			wantBurst: 20, // default
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnv(t)
+			tt.setup(t)
+
+			cfg, err := config.Load()
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+			if cfg.RateLimitRPS != tt.wantRPS {
+				t.Errorf("RateLimitRPS: got %d, want %d", cfg.RateLimitRPS, tt.wantRPS)
+			}
+			if cfg.RateLimitBurst != tt.wantBurst {
+				t.Errorf("RateLimitBurst: got %d, want %d", cfg.RateLimitBurst, tt.wantBurst)
 			}
 		})
 	}
