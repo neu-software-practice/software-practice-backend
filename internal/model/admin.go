@@ -3,6 +3,7 @@ package model
 import "time"
 
 // AdminRole represents the role of an admin user.
+// Used in tests only.
 type AdminRole string
 
 const (
@@ -10,13 +11,6 @@ const (
 	AdminRoleAdmin      AdminRole = "admin"
 	AdminRoleOperator   AdminRole = "operator"
 )
-
-// ValidAdminRoles is the set of valid admin roles.
-var ValidAdminRoles = map[AdminRole]bool{
-	AdminRoleSuperAdmin: true,
-	AdminRoleAdmin:      true,
-	AdminRoleOperator:   true,
-}
 
 // AdminUser represents an administrator account stored in the database.
 type AdminUser struct {

@@ -206,12 +206,12 @@ func (h *WorkbenchHandler) SubmitFulfillment(c *gin.Context) {
 
 	result, err := h.svc.SubmitFulfillment(c.Request.Context(), input)
 	if err != nil {
-		switch err {
-		case model.ErrCardNotFound:
+		switch {
+		case errors.Is(err, model.ErrCardNotFound):
 			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeCardNotFound, err.Error(), http.StatusNotFound))
-		case model.ErrAddressRequired:
+		case errors.Is(err, model.ErrAddressRequired):
 			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeAddressRequired, err.Error(), http.StatusBadRequest))
-		case model.ErrAddressNotFound:
+		case errors.Is(err, model.ErrAddressNotFound):
 			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeAddressNotFound, err.Error(), http.StatusNotFound))
 		default:
 			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))

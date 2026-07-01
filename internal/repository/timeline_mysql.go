@@ -129,7 +129,10 @@ func (r *timelineMySQLRepo) UpdateStatus(ctx context.Context, id string, status 
 		`UPDATE timeline_items SET status=? WHERE id=?`,
 		status, id,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("update timeline status %s: %w", status, err)
+	}
+	return nil
 }
 
 // FindLastPatientMessage finds the most recent patient message in a session.

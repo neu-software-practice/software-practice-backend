@@ -82,10 +82,6 @@ func NewFromProvider(provider, apiKey, model, baseURL string) *Client {
 // ChatComplete sends a simple system+user message pair to the chat completions endpoint
 // and returns the assistant's text response.
 func (c *Client) ChatComplete(ctx context.Context, system, user string) (string, error) {
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-
 	msgs := []wireMessage{
 		{Role: "system", Content: system},
 		{Role: "user", Content: user},
@@ -129,7 +125,7 @@ func (c *Client) post(ctx context.Context, body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("llm: request failed (%v): %w", err, ErrLLMUnavailable)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

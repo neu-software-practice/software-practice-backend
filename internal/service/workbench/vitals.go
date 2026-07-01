@@ -97,6 +97,7 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 				session.MachineState = string(model.VisitMachineStateEmergencyPending)
 				session.EndedAt = &now
 				session.TerminalReason = &reason
+				session.UpdatedAt = now
 				_ = s.visitRepo.Update(ctx, session)
 
 				termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
@@ -136,6 +137,7 @@ func (s *Service) DismissEmergency(ctx context.Context, input DismissEmergencyIn
 	session.Status = string(model.VisitStatusChatting)
 	session.MachineState = string(model.VisitMachineStateChatting)
 	session.TerminalReason = nil
+	session.UpdatedAt = time.Now()
 	session.EndedAt = nil
 	_ = s.visitRepo.Update(ctx, session)
 

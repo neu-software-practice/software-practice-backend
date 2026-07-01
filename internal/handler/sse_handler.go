@@ -94,7 +94,7 @@ func (w *SSEWriter) Close() {
 func StreamEvents(c *gin.Context, events []model.AssistantStreamEvent) {
 	writer, err := NewSSEWriter(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "streaming not supported"})
+		apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeInternalError, "streaming not supported", http.StatusInternalServerError))
 		return
 	}
 

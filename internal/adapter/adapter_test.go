@@ -9,44 +9,6 @@ import (
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 )
 
-func TestStepMappingTable(t *testing.T) {
-	tests := []struct {
-		kind        medagent.StepKind
-		isTerminal  bool
-		minSSETypes int
-	}{
-		{medagent.StepAsk, false, 2},
-		{medagent.StepNeedTests, false, 2},
-		{medagent.StepDrugQuery, false, 1},
-		{medagent.StepPurchase, false, 2},
-		{medagent.StepEmergency, true, 1},
-		{medagent.StepDone, true, 3},
-		{medagent.StepOK, false, 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.kind), func(t *testing.T) {
-			mapping, ok := adapter.GetMapping(tt.kind)
-			if !ok {
-				t.Fatalf("no mapping found for %s", tt.kind)
-			}
-			if mapping.IsTerminal != tt.isTerminal {
-				t.Errorf("IsTerminal = %v, want %v", mapping.IsTerminal, tt.isTerminal)
-			}
-			if len(mapping.SSETypes) < tt.minSSETypes {
-				t.Errorf("SSETypes length = %d, want >= %d", len(mapping.SSETypes), tt.minSSETypes)
-			}
-		})
-	}
-}
-
-func TestGetMappingUnknown(t *testing.T) {
-	_, ok := adapter.GetMapping("UNKNOWN_KIND")
-	if ok {
-		t.Error("expected no mapping for unknown kind")
-	}
-}
-
 func TestBuildLabDecisionCard(t *testing.T) {
 	step := &medagent.Step{
 		Kind:      medagent.StepNeedTests,

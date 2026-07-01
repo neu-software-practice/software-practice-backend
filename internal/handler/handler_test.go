@@ -873,8 +873,8 @@ type mockDashboardRepo struct {
 	countPatientsFunc       func(ctx context.Context) (int, error)
 	countSessionsFunc       func(ctx context.Context) (int, error)
 	countActiveSessionsFunc func(ctx context.Context) (int, error)
-	countPatientsSinceFunc  func(ctx context.Context, since string) (int, error)
-	countSessionsSinceFunc  func(ctx context.Context, since string) (int, error)
+	countPatientsSinceFunc  func(ctx context.Context, since time.Time) (int, error)
+	countSessionsSinceFunc  func(ctx context.Context, since time.Time) (int, error)
 	listPatientsFunc        func(ctx context.Context, query model.AdminPatientQuery) ([]model.AdminPatientItem, int, error)
 	listSessionsFunc        func(ctx context.Context, query model.AdminSessionQuery) ([]model.AdminSessionItem, int, error)
 }
@@ -897,13 +897,13 @@ func (m *mockDashboardRepo) CountActiveSessions(ctx context.Context) (int, error
 	}
 	return 0, nil
 }
-func (m *mockDashboardRepo) CountPatientsSince(ctx context.Context, since string) (int, error) {
+func (m *mockDashboardRepo) CountPatientsSince(ctx context.Context, since time.Time) (int, error) {
 	if m.countPatientsSinceFunc != nil {
 		return m.countPatientsSinceFunc(ctx, since)
 	}
 	return 0, nil
 }
-func (m *mockDashboardRepo) CountSessionsSince(ctx context.Context, since string) (int, error) {
+func (m *mockDashboardRepo) CountSessionsSince(ctx context.Context, since time.Time) (int, error) {
 	if m.countSessionsSinceFunc != nil {
 		return m.countSessionsSinceFunc(ctx, since)
 	}

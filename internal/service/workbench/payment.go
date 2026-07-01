@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
@@ -67,6 +68,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		status := string(model.VisitStatusDiagnosis)
 		session.Status = status
 		session.ActiveCardID = nil
+		session.UpdatedAt = now
 		_ = s.visitRepo.Update(ctx, session)
 
 		// Auto-generate lab results
@@ -74,10 +76,12 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 			Item  string
 			Value string
 		}{{Item: "血常规-白细胞", Value: "11.2×10⁹/L"}}
-		_ = s.SubmitLabResults(ctx, SubmitLabResultsInput{
+		if err := s.SubmitLabResults(ctx, SubmitLabResultsInput{
 			SessionID: input.SessionID,
 			Results:   labResults,
-		})
+		}); err != nil {
+			slog.Warn("failed to submit auto-generated lab results", "session_id", input.SessionID, "error", err)
+		}
 
 		result.Status = status
 		result.Message = "检验费支付成功，检验进行中"
@@ -86,6 +90,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		// After medication payment, go to medication fulfillment
 		session.MachineState = string(model.VisitMachineStateMedicationFulfillment)
 		status := string(model.VisitStatusBlocked)
+		session.UpdatedAt = now
 		session.Status = status
 		_ = s.visitRepo.Update(ctx, session)
 

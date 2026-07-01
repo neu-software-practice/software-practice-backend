@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -53,8 +54,8 @@ func (h *AddressHandler) CreateAddress(c *gin.Context) {
 
 	result, err := h.svc.CreateAddress(c.Request.Context(), patientID, input)
 	if err != nil {
-		switch err {
-		case model.ErrAddressLimitExceeded:
+		switch {
+		case errors.Is(err, model.ErrAddressLimitExceeded):
 			apperrors.WriteError(c, apperrors.NewApiError(
 				apperrors.CodeAddressLimitExceeded, err.Error(), http.StatusBadRequest))
 		default:
@@ -83,8 +84,8 @@ func (h *AddressHandler) UpdateAddress(c *gin.Context) {
 
 	result, err := h.svc.UpdateAddress(c.Request.Context(), patientID, addressID, input)
 	if err != nil {
-		switch err {
-		case model.ErrAddressNotFound:
+		switch {
+		case errors.Is(err, model.ErrAddressNotFound):
 			apperrors.WriteNotFound(c, apperrors.CodeAddressNotFound, "address not found")
 		default:
 			apperrors.WriteValidationError(c, err.Error())
@@ -106,8 +107,8 @@ func (h *AddressHandler) DeleteAddress(c *gin.Context) {
 
 	result, err := h.svc.DeleteAddress(c.Request.Context(), patientID, addressID)
 	if err != nil {
-		switch err {
-		case model.ErrAddressNotFound:
+		switch {
+		case errors.Is(err, model.ErrAddressNotFound):
 			apperrors.WriteNotFound(c, apperrors.CodeAddressNotFound, "address not found")
 		default:
 			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
@@ -129,8 +130,8 @@ func (h *AddressHandler) SetDefaultAddress(c *gin.Context) {
 
 	result, err := h.svc.SetDefaultAddress(c.Request.Context(), patientID, addressID)
 	if err != nil {
-		switch err {
-		case model.ErrAddressNotFound:
+		switch {
+		case errors.Is(err, model.ErrAddressNotFound):
 			apperrors.WriteNotFound(c, apperrors.CodeAddressNotFound, "address not found")
 		default:
 			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))

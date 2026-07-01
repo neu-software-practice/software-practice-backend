@@ -55,6 +55,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		session.Status = status
 		session.MachineState = string(model.VisitMachineStateLabPayment)
 		session.ActiveCardID = &cardID
+		session.UpdatedAt = now
 		_ = s.visitRepo.Update(ctx, session)
 
 		result.Status = status
@@ -82,6 +83,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		status := string(model.VisitStatusDiagnosis)
 		session.Status = status
 		session.MachineState = string(model.VisitMachineStateDiagnosis)
+		session.UpdatedAt = now
 		session.ActiveCardID = nil
 		_ = s.visitRepo.Update(ctx, session)
 
@@ -103,6 +105,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		// Return to chatting
 		status := string(model.VisitStatusChatting)
 		session.Status = status
+		session.UpdatedAt = now
 		session.MachineState = string(model.VisitMachineStateChatting)
 		session.ActiveCardID = nil
 		_ = s.visitRepo.Update(ctx, session)
@@ -153,6 +156,11 @@ func (s *Service) SubmitLabResults(ctx context.Context, input SubmitLabResultsIn
 		summary = fmt.Sprintf("%s: %s", input.Results[0].Item, input.Results[0].Value)
 	}
 	card.ResultSummary = &summary
+
+	// Persist the lab execution card
+	if err := s.flowCardRepo.Create(ctx, card); err != nil {
+		return fmt.Errorf("create lab execution card: %w", err)
+	}
 
 	// Create result timeline item
 	resultTL := adapter.BuildSystemEventTimelineItem(input.SessionID,

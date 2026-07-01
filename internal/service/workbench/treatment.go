@@ -76,6 +76,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		session.ActiveCardID = nil
 		ts := "治疗完成"
 		session.Summary.TreatmentSummary = &ts
+		session.UpdatedAt = now
 		_ = s.visitRepo.Update(ctx, session)
 
 		// Completed visit card
@@ -114,6 +115,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		session.Status = string(model.VisitStatusTreatment)
 		session.MachineState = string(model.VisitMachineStateTreatmentDecision)
 		session.ActiveCardID = nil
+		session.UpdatedAt = now
 		_ = s.visitRepo.Update(ctx, session)
 
 		result.Status = string(model.VisitStatusTreatment)
@@ -166,6 +168,7 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 	session.EndedAt = &now
 	session.TerminalReason = &reason
 	session.ActiveCardID = nil
+	session.UpdatedAt = now
 	_ = s.visitRepo.Update(ctx, session)
 
 	// Completed visit card

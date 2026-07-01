@@ -39,6 +39,7 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 	session.MachineState = string(model.VisitMachineStateExited)
 	session.EndedAt = &now
 	session.TerminalReason = &reason
+	session.UpdatedAt = now
 	_ = s.visitRepo.Update(ctx, session)
 
 	// Create exit settlement timeline item

@@ -1241,7 +1241,7 @@ func TestDashboardRepo_CountPatientsSince(t *testing.T) {
 	dRepo := repository.NewDashboardRepository(db)
 
 	// Initially 0
-	count, err := dRepo.CountPatientsSince(ctx, "2020-01-01")
+	count, err := dRepo.CountPatientsSince(ctx, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("CountPatientsSince: %v", err)
 	}
@@ -1252,7 +1252,7 @@ func TestDashboardRepo_CountPatientsSince(t *testing.T) {
 	createPatient(ctx, t, pRepo)
 
 	// Should find the newly created patient
-	count, err = dRepo.CountPatientsSince(ctx, "2020-01-01")
+	count, err = dRepo.CountPatientsSince(ctx, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("CountPatientsSince after create: %v", err)
 	}
@@ -1261,7 +1261,7 @@ func TestDashboardRepo_CountPatientsSince(t *testing.T) {
 	}
 
 	// Future date should return 0
-	count, err = dRepo.CountPatientsSince(ctx, "2099-12-31")
+	count, err = dRepo.CountPatientsSince(ctx, time.Date(2099, 12, 31, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("CountPatientsSince future: %v", err)
 	}
@@ -1285,7 +1285,7 @@ func TestDashboardRepo_CountSessionsSince(t *testing.T) {
 	patient := createPatient(ctx, t, pRepo)
 
 	// Initially 0
-	count, err := dRepo.CountSessionsSince(ctx, "2020-01-01")
+	count, err := dRepo.CountSessionsSince(ctx, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("CountSessionsSince: %v", err)
 	}
@@ -1296,7 +1296,7 @@ func TestDashboardRepo_CountSessionsSince(t *testing.T) {
 	createVisit(ctx, t, vRepo, patient.ID)
 
 	// Should find the newly created session
-	count, err = dRepo.CountSessionsSince(ctx, "2020-01-01")
+	count, err = dRepo.CountSessionsSince(ctx, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("CountSessionsSince after create: %v", err)
 	}
@@ -1305,7 +1305,7 @@ func TestDashboardRepo_CountSessionsSince(t *testing.T) {
 	}
 
 	// Future date should return 0
-	count, err = dRepo.CountSessionsSince(ctx, "2099-12-31")
+	count, err = dRepo.CountSessionsSince(ctx, time.Date(2099, 12, 31, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("CountSessionsSince future: %v", err)
 	}
@@ -2076,7 +2076,7 @@ func TestDashboardRepo_ListSessionsByStatus(t *testing.T) {
 		if err == nil {
 			t.Error("CountPatients: expected error")
 		}
-		_, err = dRepo.CountPatientsSince(ctx, "2020-01-01")
+		_, err = dRepo.CountPatientsSince(ctx, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 		if err == nil {
 			t.Error("CountPatientsSince: expected error")
 		}
@@ -2088,7 +2088,7 @@ func TestDashboardRepo_ListSessionsByStatus(t *testing.T) {
 		if err == nil {
 			t.Error("CountActiveSessions: expected error")
 		}
-		_, err = dRepo.CountSessionsSince(ctx, "2020-01-01")
+		_, err = dRepo.CountSessionsSince(ctx, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 		if err == nil {
 			t.Error("CountSessionsSince: expected error")
 		}

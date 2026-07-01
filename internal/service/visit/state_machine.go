@@ -77,6 +77,7 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateCompleted),
 	},
 	string(model.VisitMachineStateEmergencyPending): {
+		string(model.VisitMachineStateChatting),
 		string(model.VisitMachineStateTerminated),
 	},
 	string(model.VisitMachineStateExitSettlement): {

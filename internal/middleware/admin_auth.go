@@ -90,9 +90,3 @@ func RequireAdminRole(roles ...string) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// GenerateAdminAccessToken creates a JWT access token for an admin.
-// Maintained for backward compatibility; delegates to the shared auth package.
-func GenerateAdminAccessToken(adminID, role, secret string, ttlSeconds int) (string, error) {
-	return auth.GenerateAdminAccessToken(adminID, role, secret, ttlSeconds)
-}

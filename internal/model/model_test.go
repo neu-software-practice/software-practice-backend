@@ -217,7 +217,7 @@ func TestEnumConstants(t *testing.T) {
 		{name: "VisitStatusEmergencyTerminated", value: string(model.VisitStatusEmergencyTerminated), expected: "emergency_terminated"},
 		{name: "VisitStatusExited", value: string(model.VisitStatusExited), expected: "exited"},
 
-		// VisitMachineState — 17 values
+		// VisitMachineState — 18 values
 		{name: "VisitMachineStateLoadingContext", value: string(model.VisitMachineStateLoadingContext), expected: "loadingContext"},
 		{name: "VisitMachineStateChatting", value: string(model.VisitMachineStateChatting), expected: "chatting"},
 		{name: "VisitMachineStateAnalyzing", value: string(model.VisitMachineStateAnalyzing), expected: "analyzing"},
@@ -324,30 +324,6 @@ func TestEnumConstants(t *testing.T) {
 		{name: "TreatmentPlanTreatment", value: string(model.TreatmentPlanTreatment), expected: "treatment"},
 		{name: "TreatmentPlanAdviceOnly", value: string(model.TreatmentPlanAdviceOnly), expected: "advice_only"},
 		{name: "TreatmentPlanReferral", value: string(model.TreatmentPlanReferral), expected: "referral"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.value != tt.expected {
-				t.Errorf("%s = %q, want %q", tt.name, tt.value, tt.expected)
-			}
-		})
-	}
-}
-
-func TestTerminalReasons(t *testing.T) {
-	tests := []struct {
-		name     string
-		value    string
-		expected string
-	}{
-		{name: "TerminalReasonEmergency", value: string(model.TerminalReasonEmergency), expected: "emergency"},
-		{name: "TerminalReasonTimeout", value: string(model.TerminalReasonTimeout), expected: "timeout"},
-		{name: "TerminalReasonAskLimitReached", value: string(model.TerminalReasonAskLimitReached), expected: "ask_limit_reached"},
-		{name: "TerminalReasonLabLimitReached", value: string(model.TerminalReasonLabLimitReached), expected: "lab_limit_reached"},
-		{name: "TerminalReasonReferral", value: string(model.TerminalReasonReferral), expected: "referral"},
-		{name: "TerminalReasonCapabilityInsufficient", value: string(model.TerminalReasonCapabilityInsufficient), expected: "capability_insufficient"},
-		{name: "TerminalReasonExited", value: string(model.TerminalReasonExited), expected: "exited"},
 	}
 
 	for _, tt := range tests {

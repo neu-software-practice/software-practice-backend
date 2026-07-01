@@ -177,7 +177,8 @@ func (s *Service) Refresh(ctx context.Context, rawToken string) (*model.AdminTok
 
 // GetDashboardStats returns aggregated statistics for the admin dashboard.
 func (s *Service) GetDashboardStats(ctx context.Context) (*model.DashboardStats, error) {
-	todayStart := time.Now().Format("2006-01-02") + "T00:00:00Z"
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	totalPatients, err := s.dashboardRepo.CountPatients(ctx)
 	if err != nil {

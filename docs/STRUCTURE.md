@@ -256,10 +256,15 @@ software-practice-backend/
 │   │
 │   └── testutil/                    # 测试辅助工具
 │       ├── mocks.go                # 共享 Mock 仓库实现
-│       └── ...
-│       ├── response.go             # 统一 API 响应信封（success + data + error + metadata）
+│       └── mocks_test.go
+│
+├── pkg/                            # 可外部导入的共享库
+│   └── api/                        # API 响应类型与分页工具
+│       ├── doc.go                  # 包文档
+│       ├── response.go             # 统一 API 响应信封（success + data + error）
+│       ├── response_test.go
 │       ├── pagination.go           # PageResult[T] 游标分页
-│       └── response_test.go
+│       └── page_response.go        # PageResponse[T] 页号分页
 │
 ├── db/
 │   └── migrations/                  # golang-migrate SQL 迁移文件
@@ -447,13 +452,12 @@ type PatientRepository interface {
 ```json
 {
   "success": true,
-  "data": { ... },
-  "error": null,
-  "meta": { "total": 100, "pageSize": 20 }
+  "data": { "items": [...], "total": 100, "page": 1, "pageSize": 20 },
+  "error": null
 }
 ```
 
-流式响应（SSE）按 `AssistantStreamEvent` 格式逐事件下发，每个事件为一行 `data: <JSON>\n\n`。
+分页元数据（`total`、`page`、`pageSize` 或游标 `nextCursor`/`hasMore`）嵌入在 `data` 载荷内部，而非顶层 `meta` 字段。流式响应（SSE）按 `AssistantStreamEvent` 格式逐事件下发，每个事件为一行 `data: <JSON>\n\n`。
 
 ### 6.3 medAgent Step ↔ 前端映射
 
