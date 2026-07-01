@@ -20,24 +20,38 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # 清理旧的 token 配置，避免累积
-          git config --global --unset-all url."https://x-access-token:".insteadOf "https://github.com/" 2>/dev/null || true
+          # 清理所有旧 token（包括此前因 key 不匹配而残留的）
+          git config --global --list 2>/dev/null | grep "x-access-token" | cut -d= -f1 | while read key; do
+            git config --global --unset-all "$key" 2>/dev/null || true
+          done
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
-          # 中国访问 GitHub HTTP/2 不稳定，强制 HTTP/1.1
           git config --global http.version HTTP/1.1
           git config --global http.postBuffer 524288000
-          # 子模块 SSH URL 转 HTTPS，统一用 token 认证
           git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+          # 网络波动重试函数
+          retry() {
+            local desc="$1"; shift
+            for i in 1 2 3; do
+              echo "[attempt $i/3] $desc"
+              if "$@"; then return 0; fi
+              echo "  -> failed, retrying in $((i*5))s..."
+              sleep $((i*5))
+            done
+            echo "  -> all attempts failed"
+            return 1
+          }
+
           if [ -d "${APP_DIR}/.git" ]; then
             echo "Existing repo found, pulling latest main..."
             cd "${APP_DIR}"
-            git fetch origin main
+            retry "git fetch" git fetch origin main
             git reset --hard origin/main
             git submodule update --init --recursive
           else
             echo "First deployment, cloning repository..."
             mkdir -p "${APP_DIR}"
-            git clone --branch main --depth 1 \
+            retry "git clone" git clone --branch main --depth 1 \
               https://github.com/neu-software-practice/software-practice-backend.git \
               "${APP_DIR}"
             cd "${APP_DIR}"
