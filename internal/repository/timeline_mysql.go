@@ -164,3 +164,61 @@ func (r *timelineMySQLRepo) FindLastPatientMessage(ctx context.Context, sessionI
 	}
 	return "", nil
 }
+
+// FindLastStreamingMessage finds the most recent streaming assistant message in a session.
+// Used by the suspend flow to mark an in-progress message as idle-interrupted.
+func (r *timelineMySQLRepo) FindLastStreamingMessage(ctx context.Context, sessionID string) (*model.TimelineItem, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, session_id, kind, status, content, created_at FROM timeline_items
+		WHERE session_id = ? AND kind = 'message' AND status = 'streaming'
+		ORDER BY created_at DESC LIMIT 1`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find last streaming message: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	if !rows.Next() {
+		return nil, nil // no streaming message found; not an error
+	}
+
+	var contentJSON string
+	var item model.TimelineItem
+	if err := rows.Scan(&item.ID, &item.SessionID, &item.Kind, &item.Status, &contentJSON, &item.CreatedAt); err != nil {
+		return nil, fmt.Errorf("scan streaming message: %w", err)
+	}
+	if err := json.Unmarshal([]byte(contentJSON), &item); err != nil {
+		return nil, fmt.Errorf("unmarshal streaming message: %w", err)
+	}
+	return &item, nil
+}
+
+// UpdateContent updates the content JSON column of a timeline item.
+// This is used to update fields like InterruptedBy that are stored in the content JSON.
+func (r *timelineMySQLRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {
+	contentJSON, err := json.Marshal(model.TimelineContent{
+		Role:                item.Role,
+		Content:             item.Content,
+		LocalKey:            item.LocalKey,
+		InterruptedBy:       item.InterruptedBy,
+		Card:                item.Card,
+		EventType:           item.EventType,
+		Title:               item.Title,
+		Description:         item.Description,
+		Reason:              item.Reason,
+		SuggestedDepartment: item.SuggestedDepartment,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal timeline content: %w", err)
+	}
+
+	_, err = r.db.ExecContext(ctx,
+		`UPDATE timeline_items SET content=? WHERE id=?`,
+		string(contentJSON), id,
+	)
+	if err != nil {
+		return fmt.Errorf("update timeline content: %w", err)
+	}
+	return nil
+}

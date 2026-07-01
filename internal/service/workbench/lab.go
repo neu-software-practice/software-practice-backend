@@ -56,6 +56,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		session.MachineState = string(model.VisitMachineStateLabPayment)
 		session.ActiveCardID = &cardID
 		session.UpdatedAt = now
+		session.LastActivityAt = &now
 		_ = s.visitRepo.Update(ctx, session)
 
 		result.Status = status
@@ -84,6 +85,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		session.Status = status
 		session.MachineState = string(model.VisitMachineStateDiagnosis)
 		session.UpdatedAt = now
+		session.LastActivityAt = &now
 		session.ActiveCardID = nil
 		_ = s.visitRepo.Update(ctx, session)
 
@@ -106,6 +108,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		status := string(model.VisitStatusChatting)
 		session.Status = status
 		session.UpdatedAt = now
+		session.LastActivityAt = &now
 		session.MachineState = string(model.VisitMachineStateChatting)
 		session.ActiveCardID = nil
 		_ = s.visitRepo.Update(ctx, session)

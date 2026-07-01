@@ -46,7 +46,9 @@ func (s *Service) SendMessage(ctx context.Context, input SendMessageInput) (*Sen
 
 	// Update session
 	session.AskRound++
-	session.UpdatedAt = time.Now()
+	now := time.Now()
+	session.UpdatedAt = now
+	session.LastActivityAt = &now
 	lm := input.Content
 	session.Summary.LastMessage = &lm
 

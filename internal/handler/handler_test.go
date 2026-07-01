@@ -638,6 +638,12 @@ func (m *mockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID
 	}
 	return "", nil
 }
+func (m *mockTimelineRepo) FindLastStreamingMessage(ctx context.Context, sessionID string) (*model.TimelineItem, error) {
+	return nil, nil
+}
+func (m *mockTimelineRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {
+	return nil
+}
 
 type mockFlowCardRepo struct {
 	listBySessionFunc func(ctx context.Context, sid string) ([]model.FlowCard, error)

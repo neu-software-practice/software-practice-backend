@@ -25,35 +25,42 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateChatting),
 	},
 	string(model.VisitMachineStateChatting): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateAnalyzing),
 		string(model.VisitMachineStateLabDecision),
 		string(model.VisitMachineStateEmergencyPending),
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateAnalyzing): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateChatting),
 		string(model.VisitMachineStateLabDecision),
 		string(model.VisitMachineStateDiagnosis),
 		string(model.VisitMachineStateEmergencyPending),
 	},
 	string(model.VisitMachineStateLabDecision): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateChatting),   // vetoed
 		string(model.VisitMachineStateDiagnosis),  // skipped
 		string(model.VisitMachineStateLabPayment), // accepted
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateLabPayment): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateLabExecution),
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateLabExecution): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateAnalyzing), // result returned → continue
 		string(model.VisitMachineStateDiagnosis),
 	},
 	string(model.VisitMachineStateDiagnosis): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateTreatmentDecision),
 	},
 	string(model.VisitMachineStateTreatmentDecision): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateMedicationPayment),
 		string(model.VisitMachineStateMedicationFulfillment),
 		string(model.VisitMachineStateTreatmentExecution),
@@ -62,19 +69,26 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateTransferred), // transferred
 	},
 	string(model.VisitMachineStateMedicationPayment): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateMedicationFulfillment),
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateMedicationFulfillment): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateCompleted),
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateTreatmentExecution): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateCompleted),
 		string(model.VisitMachineStateExitSettlement),
 	},
 	string(model.VisitMachineStateAdviceOnly): {
+		string(model.VisitMachineStateSuspended),
 		string(model.VisitMachineStateCompleted),
+	},
+	string(model.VisitMachineStateSuspended): {
+		string(model.VisitMachineStateChatting),
 	},
 	string(model.VisitMachineStateEmergencyPending): {
 		string(model.VisitMachineStateChatting),
@@ -125,6 +139,7 @@ var MachineStateToStatus = map[string]string{
 	string(model.VisitMachineStateMedicationFulfillment): string(model.VisitStatusBlocked),
 	string(model.VisitMachineStateTreatmentExecution):    string(model.VisitStatusTreatment),
 	string(model.VisitMachineStateAdviceOnly):            string(model.VisitStatusBlocked),
+	string(model.VisitMachineStateSuspended):             string(model.VisitStatusSuspended),
 	string(model.VisitMachineStateCompleted):             string(model.VisitStatusCompleted),
 	string(model.VisitMachineStateEmergencyPending):      string(model.VisitStatusEmergencyTerminated),
 	string(model.VisitMachineStateTerminated):            string(model.VisitStatusEmergencyTerminated),

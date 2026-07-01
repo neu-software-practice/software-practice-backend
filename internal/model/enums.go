@@ -12,6 +12,7 @@ const (
 	VisitStatusDiagnosis           VisitStatus = "diagnosis"
 	VisitStatusTreatment           VisitStatus = "treatment"
 	VisitStatusCompleted           VisitStatus = "completed"
+	VisitStatusSuspended           VisitStatus = "suspended"
 	VisitStatusTransferred         VisitStatus = "transferred"
 	VisitStatusEmergencyTerminated VisitStatus = "emergency_terminated"
 	VisitStatusExited              VisitStatus = "exited"
@@ -34,6 +35,7 @@ const (
 	VisitMachineStateTreatmentExecution    VisitMachineState = "treatmentExecution"
 	VisitMachineStateAdviceOnly            VisitMachineState = "adviceOnly"
 	VisitMachineStateCompleted             VisitMachineState = "completed"
+	VisitMachineStateSuspended             VisitMachineState = "suspended"
 	VisitMachineStateEmergencyPending      VisitMachineState = "emergencyPending"
 	VisitMachineStateTerminated            VisitMachineState = "terminated"
 	VisitMachineStateExitSettlement        VisitMachineState = "exitSettlement"
@@ -136,6 +138,7 @@ const (
 	SystemEventTypeFollowUpStarted    SystemEventType = "follow_up_started"
 	SystemEventTypeEmergencyDismissed SystemEventType = "emergency_dismissed"
 	SystemEventTypeExitSettled        SystemEventType = "exit_settled"
+	SystemEventTypeSessionSuspended   SystemEventType = "session_suspended"
 )
 
 // SSEEventType identifies the type of a server-sent event in the assistant stream.
@@ -336,4 +339,14 @@ const (
 	EvidenceSourceHistory   EvidenceSource = "history"
 	EvidenceSourceAnswer    EvidenceSource = "answer"
 	EvidenceSourceLabResult EvidenceSource = "lab_result"
+)
+
+// InterruptedBy represents the reason an assistant message was interrupted.
+type InterruptedBy string
+
+const (
+	InterruptedByIdle      InterruptedBy = "idle"
+	InterruptedByEmergency InterruptedBy = "emergency"
+	InterruptedByTimeout   InterruptedBy = "timeout"
+	InterruptedByExit      InterruptedBy = "exit"
 )

@@ -61,6 +61,12 @@ func (m *mockTimelineRepo) UpdateStatus(ctx context.Context, id string, status s
 func (m *mockTimelineRepo) FindLastPatientMessage(ctx context.Context, sessionID string) (string, error) {
 	return "", nil
 }
+func (m *mockTimelineRepo) FindLastStreamingMessage(ctx context.Context, sessionID string) (*model.TimelineItem, error) {
+	return nil, nil
+}
+func (m *mockTimelineRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {
+	return nil
+}
 
 var allMachineStates = []string{
 	string(model.VisitMachineStateLoadingContext),
@@ -75,6 +81,7 @@ var allMachineStates = []string{
 	string(model.VisitMachineStateMedicationFulfillment),
 	string(model.VisitMachineStateTreatmentExecution),
 	string(model.VisitMachineStateAdviceOnly),
+	string(model.VisitMachineStateSuspended),
 	string(model.VisitMachineStateEmergencyPending),
 	string(model.VisitMachineStateCompleted),
 	string(model.VisitMachineStateTerminated),
@@ -740,11 +747,13 @@ func TestUpdateStatus_MultipleTransitions(t *testing.T) {
 		{name: "analyzing→emergencyPending", fromState: string(model.VisitMachineStateAnalyzing), toState: string(model.VisitMachineStateEmergencyPending), wantStatus: "emergency_terminated"},
 		{name: "chatting→exitSettlement", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateExitSettlement), wantStatus: "exited"},
 		{name: "treatmentDecision→adviceOnly", fromState: string(model.VisitMachineStateTreatmentDecision), toState: string(model.VisitMachineStateAdviceOnly), wantStatus: "blocked"},
+		{name: "treatmentDecision→suspended", fromState: string(model.VisitMachineStateTreatmentDecision), toState: string(model.VisitMachineStateSuspended), wantStatus: "suspended"},
 		// Invalid transitions
 		{name: "chatting→completed (invalid)", fromState: string(model.VisitMachineStateChatting), toState: string(model.VisitMachineStateCompleted), wantErr: true},
 		{name: "completed→chatting (invalid)", fromState: string(model.VisitMachineStateCompleted), toState: string(model.VisitMachineStateChatting), wantErr: true},
 		{name: "exited→chatting (invalid)", fromState: string(model.VisitMachineStateExited), toState: string(model.VisitMachineStateChatting), wantErr: true},
 		{name: "analyzing→adviceOnly (invalid)", fromState: string(model.VisitMachineStateAnalyzing), toState: string(model.VisitMachineStateAdviceOnly), wantErr: true},
+		{name: "suspended→exited (invalid)", fromState: string(model.VisitMachineStateSuspended), toState: string(model.VisitMachineStateExited), wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -871,6 +880,7 @@ func TestIsTerminal(t *testing.T) {
 		{string(model.VisitMachineStateMedicationFulfillment), false},
 		{string(model.VisitMachineStateTreatmentExecution), false},
 		{string(model.VisitMachineStateAdviceOnly), false},
+		{string(model.VisitMachineStateSuspended), false},
 		{string(model.VisitMachineStateEmergencyPending), false},
 		{string(model.VisitMachineStateExitSettlement), false},
 	}
@@ -903,6 +913,7 @@ func TestGetStatusForState(t *testing.T) {
 		{string(model.VisitMachineStateMedicationFulfillment), string(model.VisitStatusBlocked)},
 		{string(model.VisitMachineStateTreatmentExecution), string(model.VisitStatusTreatment)},
 		{string(model.VisitMachineStateAdviceOnly), string(model.VisitStatusBlocked)},
+		{string(model.VisitMachineStateSuspended), string(model.VisitStatusSuspended)},
 		{string(model.VisitMachineStateCompleted), string(model.VisitStatusCompleted)},
 		{string(model.VisitMachineStateEmergencyPending), string(model.VisitStatusEmergencyTerminated)},
 		{string(model.VisitMachineStateTerminated), string(model.VisitStatusEmergencyTerminated)},

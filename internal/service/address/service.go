@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -210,6 +211,12 @@ func validateCreateAddressInput(input model.CreateAddressInput) error {
 	if input.Province == "" || input.City == "" || input.District == "" {
 		return fmt.Errorf("%w: province, city, and district are required", model.ErrValidation)
 	}
+	if input.Tag != "" {
+		trimmed := strings.TrimSpace(input.Tag)
+		if len(trimmed) < 1 || len(trimmed) > 20 {
+			return fmt.Errorf("%w: tag must be 1-20 characters when provided", model.ErrValidation)
+		}
+	}
 	return nil
 }
 
@@ -222,6 +229,12 @@ func validateUpdateAddressInput(input model.UpdateAddressInput) error {
 	}
 	if input.Detail != nil && (len(*input.Detail) < 1 || len(*input.Detail) > 200) {
 		return fmt.Errorf("%w: detail must be 1-200 characters", model.ErrValidation)
+	}
+	if input.Tag != nil {
+		trimmed := strings.TrimSpace(*input.Tag)
+		if len(trimmed) < 1 || len(trimmed) > 20 {
+			return fmt.Errorf("%w: tag must be 1-20 characters when provided", model.ErrValidation)
+		}
 	}
 	return nil
 }

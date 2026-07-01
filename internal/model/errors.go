@@ -20,6 +20,8 @@ var (
 	ErrRefreshTokenExpired = errors.New("refresh token expired")
 	ErrRefreshTokenReuse   = errors.New("refresh token reuse detected")
 
+	ErrInvalidState = errors.New("invalid state")
+
 	ErrAddressNotFound      = errors.New("address not found")
 	ErrAddressLimitExceeded = errors.New("address limit exceeded (max 10)")
 	ErrAddressRequired      = errors.New("addressId is required for delivery mode")

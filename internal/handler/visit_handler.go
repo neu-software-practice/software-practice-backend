@@ -135,3 +135,39 @@ func (h *VisitHandler) GetSnapshot(c *gin.Context) {
 
 	WriteSuccess(c, http.StatusOK, snapshot)
 }
+
+// SuspendVisit handles POST /visits/:sessionId/suspend
+func (h *VisitHandler) SuspendVisit(c *gin.Context) {
+	sessionID := ParseSessionID(c)
+
+	// Verify session exists and patient has access
+	session, err := h.svc.GetSession(c.Request.Context(), sessionID)
+	if errors.Is(err, model.ErrSessionNotFound) {
+		apperrors.WriteNotFound(c, apperrors.CodeSessionNotFound, "session not found")
+		return
+	}
+	if err != nil {
+		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
+		return
+	}
+
+	if !RequirePatientID(c, session.PatientID) {
+		return
+	}
+
+	result, err := h.svc.SuspendVisit(c.Request.Context(), sessionID)
+	if errors.Is(err, model.ErrInvalidState) {
+		apperrors.WriteError(c, apperrors.NewApiError(
+			apperrors.CodeInvalidState,
+			err.Error(),
+			http.StatusUnprocessableEntity,
+		))
+		return
+	}
+	if err != nil {
+		apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
+		return
+	}
+
+	WriteSuccess(c, http.StatusOK, result)
+}
