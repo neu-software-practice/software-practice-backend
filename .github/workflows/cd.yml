@@ -21,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           # 清理所有旧 token（包括此前因 key 不匹配而残留的）
-          git config --global --list 2>/dev/null | grep "x-access-token" | cut -d= -f1 | while read key; do
+          git config --global --list 2>/dev/null | { grep "x-access-token" || true; } | cut -d= -f1 | while read key; do
             git config --global --unset-all "$key" 2>/dev/null || true
           done
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
