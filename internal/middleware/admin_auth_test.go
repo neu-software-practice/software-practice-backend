@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/neuhis/software-practice-backend/internal/auth"
 )
 
 const testJWTSecret = "this-is-a-32-byte-secret-key-for-testing!!"
@@ -66,7 +67,7 @@ func TestAdminAuthMiddleware_InvalidToken(t *testing.T) {
 }
 
 func TestAdminAuthMiddleware_ValidToken(t *testing.T) {
-	token, err := GenerateAdminAccessToken("admin-1", "super_admin", testJWTSecret, 900)
+	token, err := auth.GenerateAdminAccessToken("admin-1", "super_admin", testJWTSecret, 900)
 	if err != nil {
 		t.Fatalf("GenerateAdminAccessToken: %v", err)
 	}
@@ -97,7 +98,7 @@ func TestAdminAuthMiddleware_ValidToken(t *testing.T) {
 
 func TestAdminAuthMiddleware_PatientTokenRejected(t *testing.T) {
 	// Create a patient-style token (no role claim)
-	patientToken, err := GenerateAccessToken("u1", "p1", "13800001111", testJWTSecret)
+	patientToken, err := auth.GenerateAccessToken("u1", "p1", "13800001111", testJWTSecret)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken: %v", err)
 	}
@@ -119,7 +120,7 @@ func TestAdminAuthMiddleware_PatientTokenRejected(t *testing.T) {
 }
 
 func TestAdminAuthMiddleware_WrongSigningKey(t *testing.T) {
-	token, err := GenerateAdminAccessToken("admin-1", "admin", "a-different-secret-key-that-is-32-bytes!!", 900)
+	token, err := auth.GenerateAdminAccessToken("admin-1", "admin", "a-different-secret-key-that-is-32-bytes!!", 900)
 	if err != nil {
 		t.Fatalf("GenerateAdminAccessToken: %v", err)
 	}
@@ -141,7 +142,7 @@ func TestAdminAuthMiddleware_WrongSigningKey(t *testing.T) {
 }
 
 func TestRequireAdminRole_Success(t *testing.T) {
-	token, err := GenerateAdminAccessToken("admin-1", "super_admin", testJWTSecret, 900)
+	token, err := auth.GenerateAdminAccessToken("admin-1", "super_admin", testJWTSecret, 900)
 	if err != nil {
 		t.Fatalf("GenerateAdminAccessToken: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestRequireAdminRole_Success(t *testing.T) {
 }
 
 func TestRequireAdminRole_InsufficientRole(t *testing.T) {
-	token, err := GenerateAdminAccessToken("admin-1", "operator", testJWTSecret, 900)
+	token, err := auth.GenerateAdminAccessToken("admin-1", "operator", testJWTSecret, 900)
 	if err != nil {
 		t.Fatalf("GenerateAdminAccessToken: %v", err)
 	}
@@ -187,7 +188,7 @@ func TestRequireAdminRole_InsufficientRole(t *testing.T) {
 }
 
 func TestGenerateAdminAccessToken_Expiration(t *testing.T) {
-	token, err := GenerateAdminAccessToken("admin-1", "admin", testJWTSecret, 900)
+	token, err := auth.GenerateAdminAccessToken("admin-1", "admin", testJWTSecret, 900)
 	if err != nil {
 		t.Fatalf("GenerateAdminAccessToken: %v", err)
 	}

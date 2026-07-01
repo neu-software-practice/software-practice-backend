@@ -79,6 +79,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	session.ActiveCardID = nil
 	ts := "药物治疗完成"
 	session.Summary.TreatmentSummary = &ts
+	session.UpdatedAt = now
 	_ = s.visitRepo.Update(ctx, session)
 
 	// Create completed visit card

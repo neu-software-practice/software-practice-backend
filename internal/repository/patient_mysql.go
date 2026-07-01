@@ -19,12 +19,8 @@ func NewPatientRepository(db *sql.DB) PatientRepository {
 	return &patientMySQLRepo{db: db}
 }
 
-type patientScanner interface {
-	Scan(dest ...interface{}) error
-}
-
 // scanPatient scans a patient row from the given scanner and parses JSON array columns.
-func scanPatient(scanner patientScanner) (*model.PatientProfile, error) {
+func scanPatient(scanner rowScanner) (*model.PatientProfile, error) {
 	var p model.PatientProfile
 	var allergiesJSON, chronicJSON, medsJSON, medHistJSON string
 

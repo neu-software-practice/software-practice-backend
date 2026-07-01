@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/neuhis/software-practice-backend/internal/llm"
@@ -54,6 +55,7 @@ func (s *Service) GenerateTitle(ctx context.Context, sessionID string) (string, 
 	title = sanitizeTitle(title)
 
 	// Persist title to session summary
+	session.UpdatedAt = time.Now()
 	session.Summary.Title = &title
 	if err := s.visitRepo.Update(ctx, session); err != nil {
 		return "", fmt.Errorf("update session title: %w", err)

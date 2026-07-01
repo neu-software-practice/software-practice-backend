@@ -53,10 +53,10 @@ func (m *mockAdminTokenRepo) RevokeAllByAdminID(ctx context.Context, adminID str
 
 type mockDashboardRepo struct {
 	countPatientsFunc       func(ctx context.Context) (int, error)
-	countPatientsSinceFunc  func(ctx context.Context, since string) (int, error)
+	countPatientsSinceFunc  func(ctx context.Context, since time.Time) (int, error)
 	countSessionsFunc       func(ctx context.Context) (int, error)
 	countActiveSessionsFunc func(ctx context.Context) (int, error)
-	countSessionsSinceFunc  func(ctx context.Context, since string) (int, error)
+	countSessionsSinceFunc  func(ctx context.Context, since time.Time) (int, error)
 	listPatientsFunc        func(ctx context.Context, query model.AdminPatientQuery) ([]model.AdminPatientItem, int, error)
 	listSessionsFunc        func(ctx context.Context, query model.AdminSessionQuery) ([]model.AdminSessionItem, int, error)
 }
@@ -64,7 +64,7 @@ type mockDashboardRepo struct {
 func (m *mockDashboardRepo) CountPatients(ctx context.Context) (int, error) {
 	return m.countPatientsFunc(ctx)
 }
-func (m *mockDashboardRepo) CountPatientsSince(ctx context.Context, since string) (int, error) {
+func (m *mockDashboardRepo) CountPatientsSince(ctx context.Context, since time.Time) (int, error) {
 	return m.countPatientsSinceFunc(ctx, since)
 }
 func (m *mockDashboardRepo) CountSessions(ctx context.Context) (int, error) {
@@ -73,7 +73,7 @@ func (m *mockDashboardRepo) CountSessions(ctx context.Context) (int, error) {
 func (m *mockDashboardRepo) CountActiveSessions(ctx context.Context) (int, error) {
 	return m.countActiveSessionsFunc(ctx)
 }
-func (m *mockDashboardRepo) CountSessionsSince(ctx context.Context, since string) (int, error) {
+func (m *mockDashboardRepo) CountSessionsSince(ctx context.Context, since time.Time) (int, error) {
 	return m.countSessionsSinceFunc(ctx, since)
 }
 func (m *mockDashboardRepo) ListPatients(ctx context.Context, query model.AdminPatientQuery) ([]model.AdminPatientItem, int, error) {
@@ -503,8 +503,8 @@ func TestGetDashboardStats_Success(t *testing.T) {
 		countPatientsFunc:       func(ctx context.Context) (int, error) { return 100, nil },
 		countSessionsFunc:       func(ctx context.Context) (int, error) { return 500, nil },
 		countActiveSessionsFunc: func(ctx context.Context) (int, error) { return 12, nil },
-		countPatientsSinceFunc:  func(ctx context.Context, since string) (int, error) { return 5, nil },
-		countSessionsSinceFunc:  func(ctx context.Context, since string) (int, error) { return 8, nil },
+		countPatientsSinceFunc:  func(ctx context.Context, since time.Time) (int, error) { return 5, nil },
+		countSessionsSinceFunc:  func(ctx context.Context, since time.Time) (int, error) { return 8, nil },
 	}
 	aRepo, tRepo, _, settingsRepo, patRepo, visitRepo := defaultMocks()
 

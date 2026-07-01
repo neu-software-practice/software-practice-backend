@@ -6,6 +6,7 @@ repos:
         entry: bash scripts/precommit-check.sh
         language: system
         pass_filenames: false
+        timeout: 600
         types: [go]
 
       - id: golangci-lint

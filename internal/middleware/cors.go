@@ -10,7 +10,6 @@ import (
 // CORSConfig holds CORS configuration.
 type CORSConfig struct {
 	AllowedOrigins string
-	ServerMode     string
 }
 
 // CORSMiddleware creates a CORS middleware from the given config.

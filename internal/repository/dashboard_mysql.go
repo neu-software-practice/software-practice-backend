@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
@@ -27,7 +28,7 @@ func (r *dashboardMySQLRepo) CountPatients(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (r *dashboardMySQLRepo) CountPatientsSince(ctx context.Context, since string) (int, error) {
+func (r *dashboardMySQLRepo) CountPatientsSince(ctx context.Context, since time.Time) (int, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM patients WHERE created_at >= ?`, since,
@@ -59,7 +60,7 @@ func (r *dashboardMySQLRepo) CountActiveSessions(ctx context.Context) (int, erro
 	return count, nil
 }
 
-func (r *dashboardMySQLRepo) CountSessionsSince(ctx context.Context, since string) (int, error) {
+func (r *dashboardMySQLRepo) CountSessionsSince(ctx context.Context, since time.Time) (int, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM visits WHERE started_at >= ?`, since,
@@ -93,7 +94,7 @@ func (r *dashboardMySQLRepo) ListPatients(ctx context.Context, query model.Admin
 	//nolint:gosec // whereClause built from controlled conditions, user inputs use parameterized args
 	listQuery := fmt.Sprintf(
 		`SELECT p.id, p.name, p.phone_masked, p.gender,
-			'' as birth_date,
+			'' as birth_date, -- patients table has no birth_date column; kept as placeholder
 			p.created_at,
 			(SELECT COUNT(*) FROM visits v WHERE v.patient_id = p.id) as session_count
 		FROM patients p %s
@@ -146,10 +147,7 @@ func (r *dashboardMySQLRepo) ListSessions(ctx context.Context, query model.Admin
 
 	whereClause := ""
 	if len(whereParts) > 0 {
-		whereClause = "WHERE " + whereParts[0]
-		for i := 1; i < len(whereParts); i++ {
-			whereClause += " AND " + whereParts[i]
-		}
+		whereClause = "WHERE " + strings.Join(whereParts, " AND ")
 	}
 
 	// Count total

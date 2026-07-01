@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -20,6 +21,8 @@ type Config struct {
 	MedAgentAPIKey     string
 	MedAgentProvider   string
 	MedAgentModel      string
+	RateLimitRPS       int    // requests per second for rate limiting
+	RateLimitBurst     int    // burst size for rate limiting
 	LogLevel           string // debug, info, warn, error
 }
 
@@ -52,6 +55,8 @@ func Load() (*Config, error) {
 		MedAgentAPIKey:     os.Getenv("MEDAGENT_API_KEY"),
 		MedAgentProvider:   getEnv("MEDAGENT_PROVIDER", "deepseek"),
 		MedAgentModel:      getEnv("MEDAGENT_MODEL", "deepseek-chat"),
+		RateLimitRPS:       getEnvInt("RATE_LIMIT_RPS", 10),
+		RateLimitBurst:     getEnvInt("RATE_LIMIT_BURST", 20),
 		LogLevel:           getEnv("LOG_LEVEL", "info"),
 	}
 
@@ -65,6 +70,16 @@ func Load() (*Config, error) {
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
+	}
+	return defaultVal
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		n, err := strconv.Atoi(val)
+		if err == nil {
+			return n
+		}
 	}
 	return defaultVal
 }

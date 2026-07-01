@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
@@ -10,10 +11,10 @@ import (
 type DashboardRepository interface {
 	// Dashboard statistics
 	CountPatients(ctx context.Context) (int, error)
-	CountPatientsSince(ctx context.Context, since string) (int, error)
+	CountPatientsSince(ctx context.Context, since time.Time) (int, error)
 	CountSessions(ctx context.Context) (int, error)
 	CountActiveSessions(ctx context.Context) (int, error)
-	CountSessionsSince(ctx context.Context, since string) (int, error)
+	CountSessionsSince(ctx context.Context, since time.Time) (int, error)
 
 	// Patient listing
 	ListPatients(ctx context.Context, query model.AdminPatientQuery) ([]model.AdminPatientItem, int, error)

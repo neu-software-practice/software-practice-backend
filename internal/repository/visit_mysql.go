@@ -20,12 +20,15 @@ func NewVisitRepository(db *sql.DB) VisitRepository {
 }
 
 func (r *visitMySQLRepo) Create(ctx context.Context, visit *model.VisitSession) error {
-	summaryJSON, _ := json.Marshal(visit.Summary)
+	summaryJSON, err := json.Marshal(visit.Summary)
+	if err != nil {
+		return fmt.Errorf("marshal visit summary: %w", err)
+	}
 	now := time.Now()
 	visit.StartedAt = now
 	visit.UpdatedAt = now
 
-	_, err := r.db.ExecContext(ctx,
+	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO visits (id, patient_id, entry_type, status, machine_state,
 		started_at, updated_at, ended_at, timeout_at, paused_at,
 		ask_round, ask_round_limit, lab_round, lab_round_limit,
@@ -76,16 +79,12 @@ func (r *visitMySQLRepo) FindByID(ctx context.Context, id string) (*model.VisitS
 }
 
 // scanVisitSummary scans a single VisitSessionSummary row.
-func scanVisitSummary(scanner interface {
-	Scan(dest ...interface{}) error
-}) (*model.VisitSessionSummary, error) {
+func scanVisitSummary(scanner rowScanner) (*model.VisitSessionSummary, error) {
 	var s model.VisitSessionSummary
 	var summaryJSON string
-	var machineState sql.NullString
 
 	err := scanner.Scan(
 		&s.ID, &s.PatientID, &s.EntryType, &s.Status,
-		&machineState,
 		&s.StartedAt, &s.UpdatedAt, &s.EndedAt,
 		&s.ParentSessionID, &s.TerminalReason,
 		&summaryJSON,
@@ -93,7 +92,6 @@ func scanVisitSummary(scanner interface {
 	if err != nil {
 		return nil, err
 	}
-	_ = machineState
 	_ = json.Unmarshal([]byte(summaryJSON), &s.Summary)
 	return &s, nil
 }
@@ -108,14 +106,14 @@ func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, cu
 
 	if cursor != nil && *cursor != "" {
 		rows, err = r.db.QueryContext(ctx,
-			`SELECT id, patient_id, entry_type, status, machine_state,
+			`SELECT id, patient_id, entry_type, status,
 			started_at, updated_at, ended_at, parent_session_id, terminal_reason, summary
 			FROM visits WHERE patient_id = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?`,
 			patientID, *cursor, pageSize+1,
 		)
 	} else {
 		rows, err = r.db.QueryContext(ctx,
-			`SELECT id, patient_id, entry_type, status, machine_state,
+			`SELECT id, patient_id, entry_type, status,
 			started_at, updated_at, ended_at, parent_session_id, terminal_reason, summary
 			FROM visits WHERE patient_id = ? ORDER BY started_at DESC LIMIT ?`,
 			patientID, pageSize+1,
@@ -154,10 +152,13 @@ func (r *visitMySQLRepo) UpdateStatus(ctx context.Context, id string, status str
 }
 
 func (r *visitMySQLRepo) Update(ctx context.Context, visit *model.VisitSession) error {
-	summaryJSON, _ := json.Marshal(visit.Summary)
+	summaryJSON, err := json.Marshal(visit.Summary)
+	if err != nil {
+		return fmt.Errorf("marshal visit summary: %w", err)
+	}
 	visit.UpdatedAt = time.Now()
 
-	_, err := r.db.ExecContext(ctx,
+	_, err = r.db.ExecContext(ctx,
 		`UPDATE visits SET status=?, machine_state=?, updated_at=?, ended_at=?,
 		timeout_at=?, paused_at=?, ask_round=?, lab_round=?,
 		terminal_reason=?, active_card_id=?, medagent_session_id=?, timer_paused=?, summary=?

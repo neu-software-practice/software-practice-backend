@@ -124,6 +124,7 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 
 		// Persist the medAgent session ID for subsequent calls
 		session.MedAgentSessionID = &maSessionID
+		session.UpdatedAt = time.Now()
 		if err := s.visitRepo.Update(ctx, session); err != nil {
 			return fmt.Errorf("persist medagent session id: %w", err)
 		}
@@ -486,15 +487,13 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 		session.TerminalReason = &reason
 		session.Status = string(model.VisitStatusTransferred)
 
-		diag := result.Diagnosis.Name
-		session.Summary.Diagnosis = &diag
 		ts := result.Plan
 		session.Summary.TreatmentSummary = &ts
 
 		_ = callback(model.AssistantStreamEvent{
 			Type:      "state",
 			SessionID: sessionID,
-			State:     string(model.VisitMachineStateCompleted),
+			State:     string(model.VisitMachineStateTransferred),
 			Status:    string(model.VisitStatusTransferred),
 		})
 	}

@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -83,6 +83,7 @@ func RunMigrations(t *testing.T, dsn, migrationsDir string) {
 	if err != nil {
 		t.Fatalf("failed to glob migration files: %v", err)
 	}
+	sort.Strings(files)
 
 	for _, f := range files {
 		content, err := os.ReadFile(f) // #nosec G304
@@ -92,30 +93,5 @@ func RunMigrations(t *testing.T, dsn, migrationsDir string) {
 		if _, err := db.Exec(string(content)); err != nil {
 			t.Fatalf("failed to execute migration %s: %v", f, err)
 		}
-	}
-}
-
-// RunMigrationsWithGolangMigrate runs migrations using the golang-migrate CLI.
-func RunMigrationsWithGolangMigrate(t *testing.T, dsn, migrationsDir string) {
-	t.Helper()
-
-	absPath, err := filepath.Abs(migrationsDir)
-	if err != nil {
-		t.Fatalf("failed to get absolute path: %v", err)
-	}
-
-	// Try using golang-migrate CLI
-	migrateDSN := "mysql://" + dsn
-	cmd := exec.Command("migrate", // #nosec G204
-		"-path", absPath,
-		"-database", migrateDSN,
-		"up",
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Fall back to executing SQL files directly
-		t.Logf("golang-migrate CLI failed: %v, falling back to direct SQL execution", err)
-		t.Logf("migrate output: %s", string(output))
-		RunMigrations(t, dsn, migrationsDir)
 	}
 }

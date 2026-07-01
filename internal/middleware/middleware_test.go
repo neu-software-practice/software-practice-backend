@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/neuhis/software-practice-backend/internal/auth"
 	"github.com/neuhis/software-practice-backend/internal/middleware"
 )
 
@@ -371,26 +373,18 @@ func TestTokenExpired(t *testing.T) {
 	})
 
 	t.Run("expired error", func(t *testing.T) {
-		err := &mockError{msg: "token is expired by 5 minutes"}
+		err := fmt.Errorf("token is expired: %w", jwt.ErrTokenExpired)
 		if !middleware.TokenExpired(err) {
 			t.Error("expired error should be detected")
 		}
 	})
 
 	t.Run("other error", func(t *testing.T) {
-		err := &mockError{msg: "invalid signature"}
+		err := fmt.Errorf("invalid signature")
 		if middleware.TokenExpired(err) {
 			t.Error("other error should not be expired")
 		}
 	})
-}
-
-type mockError struct {
-	msg string
-}
-
-func (e *mockError) Error() string {
-	return e.msg
 }
 
 func TestGetPatientIDNone(t *testing.T) {
@@ -405,7 +399,7 @@ func TestGetPatientIDNone(t *testing.T) {
 
 func TestGenerateAccessToken(t *testing.T) {
 	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
-	token, err := middleware.GenerateAccessToken("u001", "p001", "13800001111", secret)
+	token, err := auth.GenerateAccessToken("u001", "p001", "13800001111", secret)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken: %v", err)
 	}
@@ -417,7 +411,7 @@ func TestGenerateAccessToken(t *testing.T) {
 func TestAuthMiddleware_NewTokenFormat(t *testing.T) {
 	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
 
-	token, err := middleware.GenerateAccessToken("u001", "p001", "13800001111", secret)
+	token, err := auth.GenerateAccessToken("u001", "p001", "13800001111", secret)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken: %v", err)
 	}

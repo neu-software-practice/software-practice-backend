@@ -7,6 +7,22 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/config"
 )
 
+// clearEnv unsets all env vars that config.Load() reads, ensuring test isolation.
+func clearEnv(t *testing.T) {
+	t.Helper()
+	_ = os.Unsetenv("DATABASE_DSN")
+	_ = os.Unsetenv("JWT_SECRET")
+	_ = os.Unsetenv("SERVER_MODE")
+	_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
+	_ = os.Unsetenv("SERVER_ADDR")
+	_ = os.Unsetenv("MEDAGENT_MODE")
+	_ = os.Unsetenv("MEDAGENT_BASE_URL")
+	_ = os.Unsetenv("MEDAGENT_API_KEY")
+	_ = os.Unsetenv("MEDAGENT_PROVIDER")
+	_ = os.Unsetenv("MEDAGENT_MODEL")
+	_ = os.Unsetenv("LOG_LEVEL")
+}
+
 func TestLoadValidConfig(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "user:pass@tcp(localhost:3306)/testdb")
 	t.Setenv("JWT_SECRET", "this-is-a-32-byte-secret-key-here!!")
@@ -102,18 +118,7 @@ func TestLoadErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear all env vars Load() reads for full isolation
-			_ = os.Unsetenv("DATABASE_DSN")
-			_ = os.Unsetenv("JWT_SECRET")
-			_ = os.Unsetenv("SERVER_MODE")
-			_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
-			_ = os.Unsetenv("SERVER_ADDR")
-			_ = os.Unsetenv("MEDAGENT_MODE")
-			_ = os.Unsetenv("MEDAGENT_BASE_URL")
-			_ = os.Unsetenv("MEDAGENT_API_KEY")
-			_ = os.Unsetenv("MEDAGENT_PROVIDER")
-			_ = os.Unsetenv("MEDAGENT_MODEL")
-			_ = os.Unsetenv("LOG_LEVEL")
+			clearEnv(t)
 
 			tt.setup(t)
 

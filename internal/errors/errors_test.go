@@ -207,6 +207,20 @@ func TestErrorCodes(t *testing.T) {
 		apperrors.CodeNotFound,
 		apperrors.CodeTimeout,
 		apperrors.CodeInternalError,
+		apperrors.CodeAuthPhoneExists,
+		apperrors.CodeAuthInvalidCredentials,
+		apperrors.CodeAuthTokenExpired,
+		apperrors.CodeAuthRefreshInvalid,
+		apperrors.CodeAuthRefreshExpired,
+		apperrors.CodeRateLimited,
+		apperrors.CodeTitleAlreadyExists,
+		apperrors.CodeLLMUnavailable,
+		apperrors.CodeAddressNotFound,
+		apperrors.CodeAddressLimitExceeded,
+		apperrors.CodeAddressRequired,
+		apperrors.CodeAdminInvalidCredentials,
+		apperrors.CodeAdminInvalidRefreshToken,
+		apperrors.CodeAdminInvalidSettings,
 	}
 	for _, c := range codes {
 		if c == "" {

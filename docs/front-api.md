@@ -138,7 +138,7 @@ UI 文案命中的 HTTP 状态（`MESSAGE_BY_HTTP_STATUS`）：`401`（登录失
 
 ### 3.2 `VisitMachineState`（`visitMachineStateSchema`）
 
-前端状态机内部态（17 值）：`loadingContext`、`chatting`、`analyzing`、`labDecision`、`labPayment`、`labExecution`、`diagnosis`、`treatmentDecision`、`medicationPayment`、`medicationFulfillment`、`treatmentExecution`、`adviceOnly`、`completed`、`emergencyPending`、`terminated`、`exitSettlement`、`exited`。
+前端状态机内部态（18 值）：`loadingContext`、`chatting`、`analyzing`、`labDecision`、`labPayment`、`labExecution`、`diagnosis`、`treatmentDecision`、`medicationPayment`、`medicationFulfillment`、`treatmentExecution`、`adviceOnly`、`completed`、`emergencyPending`、`terminated`、`exitSettlement`、`exited`、`transferred`。`transferred` 为后端内部过渡态（转诊流程），前端不会直接触发此状态。
 
 ### 3.3 `TerminalReason`（`terminalReasonSchema`）
 
