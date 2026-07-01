@@ -135,17 +135,9 @@ func (r *visitMySQLRepo) ListByPatient(ctx context.Context, patientID string, cu
 		summaries = append(summaries, *s)
 	}
 
-	hasMore := len(summaries) > pageSize
-	if hasMore {
-		summaries = summaries[:pageSize]
-	}
-
-	var nextCursor *string
-	if hasMore && len(summaries) > 0 {
-		last := summaries[len(summaries)-1]
-		c := last.StartedAt.Format("2006-01-02 15:04:05.999999999")
-		nextCursor = &c
-	}
+	summaries, nextCursor, hasMore := PaginateCursor(summaries, pageSize, func(s model.VisitSessionSummary) time.Time {
+		return s.StartedAt
+	})
 
 	return summaries, nextCursor, hasMore, nil
 }

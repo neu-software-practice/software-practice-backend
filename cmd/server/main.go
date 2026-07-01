@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"log"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
@@ -79,7 +78,7 @@ func main() {
 	visitSvc := visitsvc.NewService(visitRepo, timelineRepo)
 	workbenchSvc := wbsvc.NewService(
 		patientRepo, visitRepo, timelineRepo, flowCardRepo, addressRepo,
-		medAgentClient, cfg.MedAgentMode, llmClient,
+		visitSvc, medAgentClient, cfg.MedAgentMode, llmClient,
 	)
 	authSvc := authsvc.NewService(userRepo, refreshTokenRepo, patientRepo, cfg.JWTSecret)
 	addressSvc := addresssvc.NewService(addressRepo)
@@ -110,6 +109,5 @@ func main() {
 	log.Printf("Server starting on %s (mode: %s)", addr, cfg.ServerMode)
 	if err := engine.Run(addr); err != nil {
 		log.Fatalf("Server failed: %v", err)
-		os.Exit(1)
 	}
 }

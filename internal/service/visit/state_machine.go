@@ -8,9 +8,10 @@ import (
 
 // TerminalStates are states from which no further transitions are allowed.
 var TerminalStates = map[string]bool{
-	string(model.VisitMachineStateCompleted):  true,
-	string(model.VisitMachineStateTerminated): true,
-	string(model.VisitMachineStateExited):     true,
+	string(model.VisitMachineStateCompleted):   true,
+	string(model.VisitMachineStateTerminated):  true,
+	string(model.VisitMachineStateExited):      true,
+	string(model.VisitMachineStateTransferred): true,
 }
 
 // IsTerminal checks if a machine state is terminal.
@@ -57,7 +58,8 @@ var AllowedTransitions = map[string][]string{
 		string(model.VisitMachineStateMedicationFulfillment),
 		string(model.VisitMachineStateTreatmentExecution),
 		string(model.VisitMachineStateAdviceOnly),
-		string(model.VisitMachineStateCompleted), // referral
+		string(model.VisitMachineStateCompleted),   // referral
+		string(model.VisitMachineStateTransferred), // transferred
 	},
 	string(model.VisitMachineStateMedicationPayment): {
 		string(model.VisitMachineStateMedicationFulfillment),
@@ -127,6 +129,7 @@ var MachineStateToStatus = map[string]string{
 	string(model.VisitMachineStateTerminated):            string(model.VisitStatusEmergencyTerminated),
 	string(model.VisitMachineStateExitSettlement):        string(model.VisitStatusExited),
 	string(model.VisitMachineStateExited):                string(model.VisitStatusExited),
+	string(model.VisitMachineStateTransferred):           string(model.VisitStatusTransferred),
 }
 
 // GetStatusForState returns the external VisitStatus for a given machine state.

@@ -1,13 +1,11 @@
 package middleware
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/neuhis/software-practice-backend/internal/auth"
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 )
 
@@ -27,16 +25,8 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		tokenString := parts[1]
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-			return []byte(jwtSecret), nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := auth.ParseJWT(parts[1], jwtSecret)
+		if err != nil {
 			if TokenExpired(err) {
 				apperrors.WriteError(c, apperrors.NewApiError(
 					apperrors.CodeAuthTokenExpired,
@@ -46,12 +36,6 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			} else {
 				apperrors.WriteUnauthorized(c, "invalid or expired token")
 			}
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			apperrors.WriteUnauthorized(c, "invalid token claims")
 			return
 		}
 
@@ -97,26 +81,14 @@ func RequirePatientID() gin.HandlerFunc {
 }
 
 // GenerateAccessToken creates a JWT access token with full claims.
+// Maintained for backward compatibility; delegates to the shared auth package.
 func GenerateAccessToken(userID, patientID, phone, secret string) (string, error) {
-	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":       userID,
-		"patientId": patientID,
-		"phone":     phone,
-		"iat":       now.Unix(),
-		"exp":       now.Add(900 * time.Second).Unix(),
-	})
-
-	tokenString, err := token.SignedString([]byte(secret))
-	if err != nil {
-		return "", fmt.Errorf("generate token: %w", err)
-	}
-	return tokenString, nil
+	return auth.GenerateAccessToken(userID, patientID, phone, secret)
 }
 
 // GenerateToken creates a JWT token for a patient (legacy, used in tests).
 func GenerateToken(patientID, secret string) (string, error) {
-	return GenerateAccessToken(patientID, patientID, "", secret)
+	return auth.GenerateAccessToken(patientID, patientID, "", secret)
 }
 
 // GetUserID extracts the user ID from the Gin context.
@@ -134,48 +106,4 @@ func TokenExpired(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), "token is expired")
-}
-
-// IsAuthenticated checks if the request has a valid patient context.
-func IsAuthenticated(c *gin.Context) bool {
-	return GetPatientID(c) != ""
-}
-
-// SetPatientID sets the patient ID in the Gin context (for testing).
-func SetPatientID(c *gin.Context, patientID string) {
-	c.Set("patientId", patientID)
-}
-
-// CurrentPatient returns a middleware that adds the patient ID to c.Request.Context()
-// as a value. This allows downstream code to use request-scoped values.
-func CurrentPatient() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Forward any patientId set by auth middleware
-		c.Next()
-	}
-}
-
-// RespondWithJSON is a helper to respond with standard JSON format.
-func RespondWithJSON(c *gin.Context, status int, data interface{}) {
-	c.JSON(status, gin.H{
-		"success": status >= 200 && status < 300,
-		"data":    data,
-	})
-}
-
-// ErrorResponse represents a standard error in JSON response.
-type ErrorResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-// WriteJSONError writes a JSON error response with the given status code.
-func WriteJSONError(c *gin.Context, status int, code, message string) {
-	c.JSON(status, gin.H{
-		"success": false,
-		"error": ErrorResponse{
-			Code:    code,
-			Message: message,
-		},
-	})
 }

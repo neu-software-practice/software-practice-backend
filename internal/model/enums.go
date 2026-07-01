@@ -38,6 +38,7 @@ const (
 	VisitMachineStateTerminated            VisitMachineState = "terminated"
 	VisitMachineStateExitSettlement        VisitMachineState = "exitSettlement"
 	VisitMachineStateExited                VisitMachineState = "exited"
+	VisitMachineStateTransferred           VisitMachineState = "transferred"
 )
 
 // TerminalReason describes why a visit was terminated.

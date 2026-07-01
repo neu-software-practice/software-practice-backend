@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/model"
+	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
 )
 
@@ -25,12 +25,14 @@ func newTestServiceWithLLM(
 	timelineRepo *mockTimelineRepo,
 	llmClient wbsvc.LLMClient,
 ) *wbsvc.Service {
+	visitSvc := visitsvc.NewService(visitRepo, timelineRepo)
 	return wbsvc.NewService(
 		&mockPatientRepo{},
 		visitRepo,
 		timelineRepo,
 		&mockFlowCardRepo{},
 		&mockAddressRepo{},
+		visitSvc,
 		nil,
 		"http",
 		llmClient,
@@ -50,12 +52,8 @@ func TestGenerateTitle_SessionNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	var apiErr *apperrors.ApiError
-	if !errors.As(err, &apiErr) {
-		t.Fatalf("expected *ApiError, got %T: %v", err, err)
-	}
-	if apiErr.Code != apperrors.CodeSessionNotFound {
-		t.Errorf("expected code %s, got %s", apperrors.CodeSessionNotFound, apiErr.Code)
+	if !errors.Is(err, model.ErrSessionNotFound) {
+		t.Fatalf("expected error wrapping %v, got %T: %v", model.ErrSessionNotFound, err, err)
 	}
 }
 

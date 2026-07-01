@@ -71,10 +71,7 @@ func (s *Service) GetContext(ctx context.Context, patientID string) (*model.Pati
 	}
 
 	ctx2 := &model.PatientContext{
-		Patient:             *patient,
-		MedicalHistory:      patient.MedicalHistory,
-		Allergies:           patient.Allergies,
-		LongTermMedications: patient.LongTermMedications,
+		Patient: *patient,
 	}
 
 	// Get last completed visit for prior visit summary

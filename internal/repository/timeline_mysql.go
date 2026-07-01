@@ -21,9 +21,7 @@ func NewTimelineRepository(db *sql.DB) TimelineRepository {
 }
 
 func (r *timelineMySQLRepo) Append(ctx context.Context, item *model.TimelineItem) error {
-	if item.CreatedAt.IsZero() {
-		item.CreatedAt = time.Now()
-	}
+	touchTimestamps(&item.CreatedAt, nil)
 	if item.Status == "" {
 		item.Status = "done"
 	}
@@ -35,14 +33,11 @@ func (r *timelineMySQLRepo) AppendBatch(ctx context.Context, items []model.Timel
 		return nil
 	}
 
-	now := time.Now()
 	valueStrings := make([]string, 0, len(items))
 	valueArgs := make([]interface{}, 0, len(items)*6)
 
 	for i := range items {
-		if items[i].CreatedAt.IsZero() {
-			items[i].CreatedAt = now
-		}
+		touchTimestamps(&items[i].CreatedAt, nil)
 		if items[i].Status == "" {
 			items[i].Status = "done"
 		}
@@ -122,17 +117,9 @@ func (r *timelineMySQLRepo) ListBySession(ctx context.Context, sessionID string,
 		items = append(items, item)
 	}
 
-	hasMore := len(items) > pageSize
-	if hasMore {
-		items = items[:pageSize]
-	}
-
-	var nextCursor *string
-	if hasMore && len(items) > 0 {
-		last := items[len(items)-1]
-		c := last.CreatedAt.Format("2006-01-02 15:04:05.999999999")
-		nextCursor = &c
-	}
+	items, nextCursor, hasMore := PaginateCursor(items, pageSize, func(item model.TimelineItem) time.Time {
+		return item.CreatedAt
+	})
 
 	return items, nextCursor, hasMore, nil
 }

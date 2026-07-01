@@ -4,10 +4,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+)
+
+var (
+	// ErrMedAgentSessionNotFound indicates the medAgent session does not exist.
+	ErrMedAgentSessionNotFound = errors.New("medagent session not found")
+	// ErrMedAgentSessionClosed indicates the session is closed or the step is wrong.
+	ErrMedAgentSessionClosed = errors.New("medagent session closed or wrong step")
+	// ErrMedAgentUnavailable indicates medAgent is unreachable or returned a server error.
+	ErrMedAgentUnavailable = errors.New("medagent unavailable")
 )
 
 // Client is an HTTP client for the medAgent independent process.
@@ -40,7 +50,7 @@ func (c *Client) post(ctx context.Context, path string, body interface{}, result
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("http request: %w", err)
+		return fmt.Errorf("%w: %w", ErrMedAgentUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -50,10 +60,10 @@ func (c *Client) post(ctx context.Context, path string, body interface{}, result
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("medagent session not found")
+		return fmt.Errorf("%w", ErrMedAgentSessionNotFound)
 	}
 	if resp.StatusCode == http.StatusConflict {
-		return fmt.Errorf("medagent session closed or wrong step: %s", string(respBody))
+		return fmt.Errorf("%w: %s", ErrMedAgentSessionClosed, string(respBody))
 	}
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("medagent error (status %d): %s", resp.StatusCode, string(respBody))
@@ -75,7 +85,7 @@ func (c *Client) get(ctx context.Context, path string, result interface{}) error
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("http request: %w", err)
+		return fmt.Errorf("%w: %w", ErrMedAgentUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -180,7 +190,7 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) error {
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("http request: %w", err)
+		return fmt.Errorf("%w: %w", ErrMedAgentUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusNoContent {

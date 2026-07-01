@@ -1,13 +1,11 @@
 package middleware
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/neuhis/software-practice-backend/internal/auth"
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 )
 
@@ -27,16 +25,8 @@ func AdminAuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		tokenString := parts[1]
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-			return []byte(jwtSecret), nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := auth.ParseJWT(parts[1], jwtSecret)
+		if err != nil {
 			if TokenExpired(err) {
 				apperrors.WriteError(c, apperrors.NewApiError(
 					apperrors.CodeAuthTokenExpired,
@@ -46,12 +36,6 @@ func AdminAuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			} else {
 				apperrors.WriteUnauthorized(c, "invalid or expired token")
 			}
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			apperrors.WriteUnauthorized(c, "invalid token claims")
 			return
 		}
 
@@ -108,18 +92,7 @@ func RequireAdminRole(roles ...string) gin.HandlerFunc {
 }
 
 // GenerateAdminAccessToken creates a JWT access token for an admin.
+// Maintained for backward compatibility; delegates to the shared auth package.
 func GenerateAdminAccessToken(adminID, role, secret string, ttlSeconds int) (string, error) {
-	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":  adminID,
-		"role": role,
-		"iat":  now.Unix(),
-		"exp":  now.Add(time.Duration(ttlSeconds) * time.Second).Unix(),
-	})
-
-	tokenString, err := token.SignedString([]byte(secret))
-	if err != nil {
-		return "", fmt.Errorf("generate admin access token: %w", err)
-	}
-	return tokenString, nil
+	return auth.GenerateAdminAccessToken(adminID, role, secret, ttlSeconds)
 }

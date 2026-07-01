@@ -25,10 +25,7 @@ func (r *flowCardMySQLRepo) Create(ctx context.Context, card *model.FlowCard) er
 		return fmt.Errorf("marshal flow card: %w", err)
 	}
 
-	now := time.Now()
-	if card.CreatedAt.IsZero() {
-		card.CreatedAt = now
-	}
+	touchTimestamps(&card.CreatedAt, nil)
 
 	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO flow_cards (id, session_id, kind, status, blocking, title, content, lock_reason, created_at, handled_at)

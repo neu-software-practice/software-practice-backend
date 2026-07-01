@@ -9,7 +9,6 @@ import (
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/model"
 	adminsvc "github.com/neuhis/software-practice-backend/internal/service/admin"
-	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
 // AdminHandler handles admin panel HTTP endpoints.
@@ -111,7 +110,7 @@ func (h *AdminHandler) ListPatients(c *gin.Context) {
 		return
 	}
 
-	WritePageResponse(c, result)
+	WriteSuccess(c, http.StatusOK, result)
 }
 
 // GetPatientDetail handles GET /admin/patients/:id
@@ -150,7 +149,7 @@ func (h *AdminHandler) ListSessions(c *gin.Context) {
 		return
 	}
 
-	WritePageResponse(c, result)
+	WriteSuccess(c, http.StatusOK, result)
 }
 
 // GetSessionDetail handles GET /admin/sessions/:id
@@ -208,11 +207,4 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	WriteSuccess(c, http.StatusOK, settings)
-}
-
-// WritePageResponse writes a page-based paginated response.
-func WritePageResponse[T any](c *gin.Context, pageData *T) {
-	// Directly write success with the page response containing items/total/page/pageSize
-	// Use type switch to extract fields
-	c.JSON(http.StatusOK, api.SuccessResponse(pageData))
 }

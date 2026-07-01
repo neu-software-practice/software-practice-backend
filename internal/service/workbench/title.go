@@ -7,7 +7,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
 	"github.com/neuhis/software-practice-backend/internal/llm"
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
@@ -26,9 +25,9 @@ func (s *Service) GenerateTitle(ctx context.Context, sessionID string) (string, 
 	session, err := s.visitRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		if err == model.ErrSessionNotFound {
-			return "", apperrors.NewNotFoundError(apperrors.CodeSessionNotFound, "session not found")
+			return "", fmt.Errorf("%w: session not found", model.ErrSessionNotFound)
 		}
-		return "", apperrors.NewInternalError(fmt.Sprintf("find session: %v", err))
+		return "", fmt.Errorf("find session: %w", err)
 	}
 
 	// Idempotent: return existing title
@@ -57,7 +56,7 @@ func (s *Service) GenerateTitle(ctx context.Context, sessionID string) (string, 
 	// Persist title to session summary
 	session.Summary.Title = &title
 	if err := s.visitRepo.Update(ctx, session); err != nil {
-		return "", apperrors.NewInternalError(fmt.Sprintf("update session title: %v", err))
+		return "", fmt.Errorf("update session title: %w", err)
 	}
 
 	return title, nil

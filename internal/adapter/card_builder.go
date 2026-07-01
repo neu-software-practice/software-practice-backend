@@ -1,3 +1,12 @@
+// Package adapter provides mapping functions from medAgent domain types to
+// frontend-facing model types (SSE events, FlowCards, TimelineItems).
+//
+// DESIGN NOTE: This package imports internal/service/medagent for the medAgent
+// domain types (Step, Result, StepKind, etc.). This creates a dependency
+// adapter → service/medagent. The workbench service depends on both adapter
+// and service/medagent, so there is no true circular dependency. However,
+// for ideal clean architecture, the shared medAgent types could be moved to
+// internal/model/medagent/ in the future.
 package adapter
 
 import (

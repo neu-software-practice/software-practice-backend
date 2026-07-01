@@ -13,6 +13,7 @@ import (
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
+	visitsvc "github.com/neuhis/software-practice-backend/internal/service/visit"
 	wbsvc "github.com/neuhis/software-practice-backend/internal/service/workbench"
 )
 
@@ -237,7 +238,8 @@ func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mo
 }
 
 func newSvc(p *mockPatientRepo, v *mockVisitRepo, t *mockTimelineRepo, f *mockFlowCardRepo, a *mockAddressRepo) *wbsvc.Service {
-	return wbsvc.NewService(p, v, t, f, a, nil, "http", nil)
+	visitSvc := visitsvc.NewService(v, t)
+	return wbsvc.NewService(p, v, t, f, a, visitSvc, nil, "http", nil)
 }
 
 // eventCollector collects SSE events for callback-based tests.
@@ -1501,7 +1503,8 @@ func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path stri
 		updateFunc: func(ctx context.Context, addr *model.Address) error { return nil },
 		deleteFunc: func(ctx context.Context, id string) error { return nil },
 	}
-	return wbsvc.NewService(mp, mv, mt, mf, ma, client, "http", nil), mp, mv, mt, mf, ma
+	visitSvc := visitsvc.NewService(mv, mt)
+	return wbsvc.NewService(mp, mv, mt, mf, ma, visitSvc, client, "http", nil), mp, mv, mt, mf, ma
 }
 
 func TestStreamAssistantMessage_Ask(t *testing.T) {
@@ -1783,5 +1786,79 @@ func TestStreamAssistantMessage_OK(t *testing.T) {
 	}
 	if !foundDone {
 		t.Error("OK step should emit done event")
+	}
+}
+
+func TestSubmitPayment_SessionNotFound(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		return nil, model.ErrSessionNotFound
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+		SessionID: "bad-id", CardID: "f1", Purpose: "lab",
+	})
+	if err != model.ErrSessionNotFound {
+		t.Errorf("expected ErrSessionNotFound, got %v", err)
+	}
+}
+
+func TestSubmitTreatmentExecution_SessionNotFound(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		return nil, model.ErrSessionNotFound
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "bad-id", CardID: "f1", Action: "schedule",
+	})
+	if err != model.ErrSessionNotFound {
+		t.Errorf("expected ErrSessionNotFound, got %v", err)
+	}
+}
+
+func TestAckAdvice_SessionNotFound(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		return nil, model.ErrSessionNotFound
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
+		SessionID: "bad-id", CardID: "f1",
+	})
+	if err != model.ErrSessionNotFound {
+		t.Errorf("expected ErrSessionNotFound, got %v", err)
+	}
+}
+
+func TestExitVisit_InvalidReason(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.ExitVisit(ctx, model.ExitVisitInput{
+		SessionID: "s1", Reason: "invalid_reason",
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid exit reason")
+	}
+}
+
+func TestSubmitFulfillment_Delivery_EmptyAddress(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
+		SessionID: "s1", CardID: "f1", Mode: "delivery", AddressID: "",
+	})
+	if err != model.ErrAddressRequired {
+		t.Errorf("expected ErrAddressRequired, got %v", err)
 	}
 }

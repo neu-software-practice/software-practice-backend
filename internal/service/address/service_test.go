@@ -2,6 +2,7 @@ package address_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
@@ -452,6 +453,69 @@ func TestDeleteAddress_WrongPatient(t *testing.T) {
 	_, err := svc.DeleteAddress(context.Background(), "p001", addr.ID)
 	if err != model.ErrAddressNotFound {
 		t.Errorf("expected ErrAddressNotFound, got %v", err)
+	}
+}
+
+func TestListAddresses_RepoError(t *testing.T) {
+	repo := &mockAddressRepo{
+		listByPatientFunc: func(ctx context.Context, patientID string) ([]model.Address, error) {
+			return nil, fmt.Errorf("db error")
+		},
+	}
+	svc := addresssvc.NewService(repo)
+
+	_, err := svc.ListAddresses(context.Background(), "p001")
+	if err == nil {
+		t.Fatal("expected error when repo fails")
+	}
+}
+
+func TestCreateAddress_RepoCreateError(t *testing.T) {
+	repo := &mockAddressRepo{
+		countByPatientFunc: func(ctx context.Context, patientID string) (int, error) { return 1, nil },
+		createFunc:         func(ctx context.Context, addr *model.Address) error { return fmt.Errorf("db error") },
+	}
+	svc := addresssvc.NewService(repo)
+
+	_, err := svc.CreateAddress(context.Background(), "p001", model.CreateAddressInput{
+		Name: "李明", Phone: "13800002468",
+		Province: "辽宁", City: "沈阳", District: "浑南", Detail: "测试地址",
+	})
+	if err == nil {
+		t.Fatal("expected error when repo.Create fails")
+	}
+}
+
+func TestCreateAddress_MissingProvince(t *testing.T) {
+	repo := &mockAddressRepo{
+		countByPatientFunc: func(ctx context.Context, patientID string) (int, error) { return 0, nil },
+	}
+	svc := addresssvc.NewService(repo)
+
+	_, err := svc.CreateAddress(context.Background(), "p001", model.CreateAddressInput{
+		Name: "李明", Phone: "13800002468",
+		City: "沈阳", District: "浑南", Detail: "测试地址",
+	})
+	if err == nil {
+		t.Fatal("expected validation error for missing province")
+	}
+}
+
+func TestSetDefaultAddress_RepoError(t *testing.T) {
+	addr := makeTestAddress("p001")
+	repo := &mockAddressRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.Address, error) {
+			return addr, nil
+		},
+		setDefaultFunc: func(ctx context.Context, id, patientID string) error {
+			return fmt.Errorf("db error")
+		},
+	}
+	svc := addresssvc.NewService(repo)
+
+	_, err := svc.SetDefaultAddress(context.Background(), "p001", addr.ID)
+	if err == nil {
+		t.Fatal("expected error when repo.SetDefault fails")
 	}
 }
 

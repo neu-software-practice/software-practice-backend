@@ -101,27 +101,28 @@ func (s *Service) UpdateAddress(ctx context.Context, patientID, addressID string
 		return nil, err
 	}
 
-	// Apply non-nil fields
+	// Build updated address by copying and applying changes (immutable pattern)
+	updatedAddr := *addr
 	if input.Name != nil {
-		addr.Name = *input.Name
+		updatedAddr.Name = *input.Name
 	}
 	if input.Phone != nil {
-		addr.Phone = *input.Phone
+		updatedAddr.Phone = *input.Phone
 	}
 	if input.Province != nil {
-		addr.Province = *input.Province
+		updatedAddr.Province = *input.Province
 	}
 	if input.City != nil {
-		addr.City = *input.City
+		updatedAddr.City = *input.City
 	}
 	if input.District != nil {
-		addr.District = *input.District
+		updatedAddr.District = *input.District
 	}
 	if input.Detail != nil {
-		addr.Detail = *input.Detail
+		updatedAddr.Detail = *input.Detail
 	}
 	if input.Tag != nil {
-		addr.Tag = *input.Tag
+		updatedAddr.Tag = *input.Tag
 	}
 
 	// Handle IsDefault
@@ -131,14 +132,14 @@ func (s *Service) UpdateAddress(ctx context.Context, patientID, addressID string
 				return nil, fmt.Errorf("clear defaults: %w", err)
 			}
 		}
-		addr.IsDefault = *input.IsDefault
+		updatedAddr.IsDefault = *input.IsDefault
 	}
 
-	if err := s.addressRepo.Update(ctx, addr); err != nil {
+	if err := s.addressRepo.Update(ctx, &updatedAddr); err != nil {
 		return nil, fmt.Errorf("update address: %w", err)
 	}
 
-	return addr, nil
+	return &updatedAddr, nil
 }
 
 // DeleteAddress deletes an address. If the deleted address was the default,

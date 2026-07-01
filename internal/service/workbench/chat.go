@@ -11,7 +11,12 @@ import (
 	medagent "github.com/neuhis/software-practice-backend/internal/service/medagent"
 )
 
-// SendMessageInput represents a patient message submission.
+// NOTE: Methods in this file load a *model.VisitSession via FindByID, mutate its fields
+// (e.g. AskRound, Status, MachineState, Summary, etc.), then persist via visitRepo.Update.
+// These mutations are intentional per-request modifications on a session loaded for that
+// specific request and are safe from goroutine sharing. Each request obtains its own pointer
+// from the database. The pattern is pragmatic — the session is a write-model aggregate loaded
+// per-request, not a shared value.
 type SendMessageInput struct {
 	SessionID       string
 	Content         string
@@ -112,7 +117,7 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 		}
 
 		// Create medAgent session only on first invocation
-		maSessionID, err = s.medAgentClient.CreateSession(ctx, profile, session.EntryType == "new", nil)
+		maSessionID, err = s.maClient.CreateSession(ctx, profile, session.EntryType == "new", nil)
 		if err != nil {
 			return fmt.Errorf("create medagent session: %w", err)
 		}
@@ -125,7 +130,7 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 	}
 
 	// Send patient message to medAgent
-	step, err := s.medAgentClient.PatientSay(ctx, maSessionID, lastMessage)
+	step, err := s.maClient.PatientSay(ctx, maSessionID, lastMessage)
 	if err != nil {
 		return fmt.Errorf("patient say: %w", err)
 	}
@@ -307,7 +312,7 @@ func (s *Service) handleDrugQuery(ctx context.Context, sessionID, requestID, maS
 	}
 
 	// Send drug info to medAgent
-	nextStep, err := s.medAgentClient.DrugInfo(ctx, maSessionID, infos)
+	nextStep, err := s.maClient.DrugInfo(ctx, maSessionID, infos)
 	if err != nil {
 		return fmt.Errorf("drug info: %w", err)
 	}

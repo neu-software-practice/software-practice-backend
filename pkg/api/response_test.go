@@ -61,38 +61,6 @@ func TestSuccessResponse(t *testing.T) {
 	}
 }
 
-func TestSuccessResponseWithMeta(t *testing.T) {
-	type Meta struct {
-		Page int `json:"page"`
-	}
-	resp := api.SuccessResponseWithMeta("data", Meta{Page: 1})
-
-	if !resp.Success {
-		t.Errorf("SuccessResponseWithMeta.Success = false, want true")
-	}
-	if resp.Data == nil || *resp.Data != "data" {
-		t.Errorf("SuccessResponseWithMeta.Data = %v, want &data", resp.Data)
-	}
-	if resp.Meta == nil {
-		t.Fatal("SuccessResponseWithMeta.Meta = nil, want non-nil")
-	}
-
-	b, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatalf("json.Marshal: %v", err)
-	}
-
-	var parsed map[string]json.RawMessage
-	if err := json.Unmarshal(b, &parsed); err != nil {
-		t.Fatalf("json.Unmarshal: %v", err)
-	}
-
-	// meta should be present in JSON
-	if _, ok := parsed["meta"]; !ok {
-		t.Error("JSON meta field missing, want present")
-	}
-}
-
 func TestErrorResponse(t *testing.T) {
 	resp := api.ErrorResponse("something went wrong")
 
@@ -235,6 +203,138 @@ func TestPageResultEmpty(t *testing.T) {
 	}
 	if hasMore {
 		t.Error("JSON hasMore = true, want false")
+	}
+}
+
+func TestNewPageResponse(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	resp := api.NewPageResponse(items, 10, 1, 20)
+
+	if len(resp.Items) != 3 {
+		t.Errorf("Items length = %d, want 3", len(resp.Items))
+	}
+	if resp.Items[0] != "a" {
+		t.Errorf("Items[0] = %q, want %q", resp.Items[0], "a")
+	}
+	if resp.Total != 10 {
+		t.Errorf("Total = %d, want 10", resp.Total)
+	}
+	if resp.Page != 1 {
+		t.Errorf("Page = %d, want 1", resp.Page)
+	}
+	if resp.PageSize != 20 {
+		t.Errorf("PageSize = %d, want 20", resp.PageSize)
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("json.Marshal(PageResponse) failed: %v", err)
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal(PageResponse) failed: %v", err)
+	}
+
+	if _, ok := parsed["items"]; !ok {
+		t.Error("JSON items field missing")
+	}
+	if _, ok := parsed["total"]; !ok {
+		t.Error("JSON total field missing")
+	}
+	if _, ok := parsed["page"]; !ok {
+		t.Error("JSON page field missing")
+	}
+	if _, ok := parsed["pageSize"]; !ok {
+		t.Error("JSON pageSize field missing")
+	}
+}
+
+func TestNewPageResponse_Empty(t *testing.T) {
+	resp := api.NewPageResponse([]int{}, 0, 1, 10)
+
+	if len(resp.Items) != 0 {
+		t.Errorf("Items length = %d, want 0", len(resp.Items))
+	}
+	if resp.Items == nil {
+		t.Error("Items should be non-nil empty slice")
+	}
+	if resp.Total != 0 {
+		t.Errorf("Total = %d, want 0", resp.Total)
+	}
+}
+
+func TestErrorResponse_WithStruct(t *testing.T) {
+	type errDetail struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	errResp := api.ErrorResponse(errDetail{Code: "NOT_FOUND", Message: "资源不存在"})
+
+	if errResp.Success {
+		t.Error("ErrorResponse.Success = true, want false")
+	}
+	if errResp.Data != nil {
+		t.Errorf("ErrorResponse.Data = %v, want nil", errResp.Data)
+	}
+	if errResp.Error == nil {
+		t.Fatal("ErrorResponse.Error = nil, want non-nil")
+	}
+
+	b, err := json.Marshal(errResp)
+	if err != nil {
+		t.Fatalf("json.Marshal(ErrorResponse with struct) failed: %v", err)
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	// Verify the error field is a JSON object
+	var errObj map[string]string
+	if err := json.Unmarshal(parsed["error"], &errObj); err != nil {
+		t.Fatalf("error field is not a JSON object: %v", err)
+	}
+	if errObj["code"] != "NOT_FOUND" {
+		t.Errorf("error.code = %q, want %q", errObj["code"], "NOT_FOUND")
+	}
+}
+
+func TestSuccessResponse_WithStruct(t *testing.T) {
+	type user struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	u := user{ID: "u1", Name: "测试"}
+	resp := api.SuccessResponse(u)
+
+	if !resp.Success {
+		t.Error("SuccessResponse.Success = false, want true")
+	}
+	if resp.Data == nil {
+		t.Fatal("SuccessResponse.Data = nil, want non-nil")
+	}
+	if resp.Data.ID != "u1" {
+		t.Errorf("Data.ID = %q, want %q", resp.Data.ID, "u1")
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("json.Marshal(SuccessResponse with struct) failed: %v", err)
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	var dataObj map[string]string
+	if err := json.Unmarshal(parsed["data"], &dataObj); err != nil {
+		t.Fatalf("data field is not a JSON object: %v", err)
+	}
+	if dataObj["id"] != "u1" {
+		t.Errorf("data.id = %q, want %q", dataObj["id"], "u1")
 	}
 }
 
