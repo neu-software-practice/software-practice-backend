@@ -621,3 +621,13 @@ docker compose up -d
 | [`docs/front-api.md`](./docs/front-api.md) | 前端 REST/SSE API 合约 (权威基线) |
 | [`medAgent/docs/后端接入指南.md`](./medAgent/docs/后端接入指南.md) | medAgent 接入指南 |
 | [`CLAUDE.md`](./CLAUDE.md) | Claude Code AI 助手指令 |
+
+---
+
+## 关联仓库
+
+| 组件 | 仓库地址 |
+|------|----------|
+| **前端** | [neuhis-agent-front](https://github.com/neu-software-practice/neuhis-agent-front) |
+| **后端** | [software-practice-backend](https://github.com/neu-software-practice/software-practice-backend)（本仓库） |
+| **AI 智能体** | [medAgent](https://github.com/neu-software-practice/medAgent) |
