@@ -2,6 +2,8 @@ package workbench_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -198,6 +200,8 @@ func makePatient() *model.PatientProfile {
 		UpdatedAt: time.Now(),
 	}
 }
+
+func strPtr(s string) *string { return &s }
 
 func makeCard(cardID, sessionID, kind string, blocking bool) *model.FlowCard {
 	return &model.FlowCard{
@@ -2465,6 +2469,194 @@ func TestStreamAssistantMessage_Ask(t *testing.T) {
 		if !types[want] {
 			t.Errorf("missing event type: %s", want)
 		}
+	}
+}
+
+func TestStreamAssistantMessage_FollowUpInjectsLLMSummaryPrior(t *testing.T) {
+	var createBody map[string]interface{}
+	srv := newMedAgentTestServer(func(method, path string, body []byte) (int, string) {
+		switch {
+		case path == "/sessions":
+			if err := json.Unmarshal(body, &createBody); err != nil {
+				t.Fatalf("unmarshal medAgent create body: %v", err)
+			}
+			return 200, `{"session_id":"ma-follow"}`
+		case containsStr(path, "/patient-say"):
+			return 200, `{"kind":"ASK","doctor_say":"现在还有哪些不适？"}`
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+	t.Cleanup(srv.Close)
+
+	parentID := "parent-visit"
+	current := makeSession("p001")
+	current.ID = "follow-visit"
+	current.EntryType = string(model.VisitEntryTypeFollowUp)
+	current.ParentSessionID = &parentID
+
+	parent := makeSession("p001")
+	parent.ID = parentID
+	parent.EntryType = string(model.VisitEntryTypeNew)
+	parent.Status = string(model.VisitStatusCompleted)
+	parent.Summary.ChiefComplaint = strPtr("头痛三天")
+	parent.Summary.Diagnosis = strPtr("偏头痛")
+	parent.Summary.TreatmentSummary = strPtr("布洛芬止痛，注意休息")
+
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		switch id {
+		case current.ID:
+			return current, nil
+		case parentID:
+			return parent, nil
+		default:
+			return nil, model.ErrSessionNotFound
+		}
+	}
+	mt.listFunc = func(ctx context.Context, sid string, c *string, ps int) ([]model.TimelineItem, *string, bool, error) {
+		if sid == parentID {
+			return []model.TimelineItem{
+				{ID: "p1", SessionID: parentID, Kind: "message", Role: "patient", Content: "我头痛三天，怕光", CreatedAt: time.Now().Add(-2 * time.Hour)},
+				{ID: "d1", SessionID: parentID, Kind: "message", Role: "assistant", Content: "考虑偏头痛，先休息观察", CreatedAt: time.Now().Add(-time.Hour)},
+			}, nil, false, nil
+		}
+		return []model.TimelineItem{{ID: "m1", SessionID: current.ID, Kind: "message", Role: "patient", Content: "复诊，仍头痛", CreatedAt: time.Now()}}, nil, false, nil
+	}
+
+	visitSvc := visitsvc.NewService(mv, mt, mp)
+	svc := wbsvc.NewService(
+		mp, mv, mt, mf, ma, visitSvc,
+		medagent.NewClient(srv.URL),
+		"http",
+		&mockLLMClient{response: "LLM 上次摘要：偏头痛，已用布洛芬，需关注头痛是否缓解。"},
+		newDefaultMockDrugRepo(),
+	)
+
+	ec := &eventCollector{}
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: current.ID, RequestID: "r1",
+	}, ec.callback)
+	if err != nil {
+		t.Fatalf("StreamAssistantMessage: %v", err)
+	}
+
+	prior, ok := createBody["prior"].([]interface{})
+	if !ok || len(prior) != 1 {
+		t.Fatalf("prior = %#v, want one prior record", createBody["prior"])
+	}
+	record, ok := prior[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("prior[0] = %#v", prior[0])
+	}
+	turns, ok := record["turns"].([]interface{})
+	if !ok || len(turns) != 1 {
+		t.Fatalf("turns = %#v, want one summary turn", record["turns"])
+	}
+	turn, ok := turns[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("turns[0] = %#v", turns[0])
+	}
+	text, _ := turn["text"].(string)
+	if !containsStr(text, "【上次问诊摘要】") || !containsStr(text, "LLM 上次摘要") {
+		t.Fatalf("summary turn text = %q", text)
+	}
+	if initial, _ := record["initial"].(bool); !initial {
+		t.Fatalf("prior initial = %v, want true", record["initial"])
+	}
+}
+
+func TestStreamAssistantMessage_FollowUpPriorFallsBackWhenLLMFails(t *testing.T) {
+	var createBody map[string]interface{}
+	srv := newMedAgentTestServer(func(method, path string, body []byte) (int, string) {
+		switch {
+		case path == "/sessions":
+			if err := json.Unmarshal(body, &createBody); err != nil {
+				t.Fatalf("unmarshal medAgent create body: %v", err)
+			}
+			return 200, `{"session_id":"ma-follow"}`
+		case containsStr(path, "/patient-say"):
+			return 200, `{"kind":"ASK","doctor_say":"请继续描述。"}`
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+	t.Cleanup(srv.Close)
+
+	parentID := "parent-visit"
+	current := makeSession("p001")
+	current.ID = "follow-visit"
+	current.EntryType = string(model.VisitEntryTypeFollowUp)
+	current.ParentSessionID = &parentID
+
+	parent := makeSession("p001")
+	parent.ID = parentID
+	parent.Summary.ChiefComplaint = strPtr("咳嗽一周")
+	parent.Summary.Diagnosis = strPtr("急性支气管炎")
+
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		if id == current.ID {
+			return current, nil
+		}
+		if id == parentID {
+			return parent, nil
+		}
+		return nil, model.ErrSessionNotFound
+	}
+	mt.listFunc = func(ctx context.Context, sid string, c *string, ps int) ([]model.TimelineItem, *string, bool, error) {
+		return []model.TimelineItem{{ID: "m1", SessionID: sid, Kind: "message", Role: "patient", Content: "还有点咳嗽", CreatedAt: time.Now()}}, nil, false, nil
+	}
+
+	visitSvc := visitsvc.NewService(mv, mt, mp)
+	svc := wbsvc.NewService(
+		mp, mv, mt, mf, ma, visitSvc,
+		medagent.NewClient(srv.URL),
+		"http",
+		&mockLLMClient{err: errors.New("llm unavailable")},
+		newDefaultMockDrugRepo(),
+	)
+
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: current.ID, RequestID: "r1",
+	}, (&eventCollector{}).callback)
+	if err != nil {
+		t.Fatalf("StreamAssistantMessage: %v", err)
+	}
+
+	prior := createBody["prior"].([]interface{})
+	record := prior[0].(map[string]interface{})
+	turn := record["turns"].([]interface{})[0].(map[string]interface{})
+	text, _ := turn["text"].(string)
+	if !containsStr(text, "主诉：咳嗽一周") || !containsStr(text, "诊断：急性支气管炎") {
+		t.Fatalf("fallback summary text = %q", text)
+	}
+}
+
+func TestStreamAssistantMessage_NewSessionPriorIsNil(t *testing.T) {
+	var createBody map[string]interface{}
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		switch {
+		case path == "/sessions":
+			if err := json.Unmarshal(body, &createBody); err != nil {
+				t.Fatalf("unmarshal medAgent create body: %v", err)
+			}
+			return 200, `{"session_id":"ma-001"}`
+		case containsStr(path, "/patient-say"):
+			return 200, `{"kind":"ASK","doctor_say":"请描述您的症状"}`
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: "s1", RequestID: "r1",
+	}, (&eventCollector{}).callback)
+	if err != nil {
+		t.Fatalf("StreamAssistantMessage: %v", err)
+	}
+	if createBody["prior"] != nil {
+		t.Fatalf("prior = %#v, want nil for new session", createBody["prior"])
 	}
 }
 

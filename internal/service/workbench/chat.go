@@ -134,8 +134,13 @@ func (s *Service) StreamAssistantMessage(ctx context.Context, input StreamAssist
 			"allergies": patient.Allergies,
 		}
 
+		prior, err := s.buildPriorRecordsForFollowUp(ctx, session)
+		if err != nil {
+			return fmt.Errorf("build follow-up context: %w", err)
+		}
+
 		// Create medAgent session only on first invocation
-		maSessionID, err = s.maClient.CreateSession(ctx, profile, session.EntryType == "new", nil)
+		maSessionID, err = s.maClient.CreateSession(ctx, profile, session.EntryType == "new", prior)
 		if err != nil {
 			return fmt.Errorf("create medagent session: %w", err)
 		}

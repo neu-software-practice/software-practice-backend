@@ -529,6 +529,36 @@ func TestCreateFollowUp_ParentNotFound(t *testing.T) {
 	}
 }
 
+func TestCreateFollowUp_ParentPatientMismatch(t *testing.T) {
+	ctx := context.Background()
+
+	parentSession := &model.VisitSession{
+		ID:        "v001",
+		PatientID: "other-patient",
+		EntryType: "new",
+		Status:    "completed",
+		StartedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	visitRepo := &mockVisitRepo{
+		findByIDFunc: func(ctx context.Context, id string) (*model.VisitSession, error) {
+			return parentSession, nil
+		},
+	}
+	timelineRepo := &mockTimelineRepo{}
+
+	svc := visit.NewService(visitRepo, timelineRepo, newMockPatientRepo())
+
+	_, err := svc.CreateFollowUp(ctx, model.CreateFollowUpInput{
+		PatientID:       "p001",
+		ParentSessionID: "v001",
+	})
+	if !errors.Is(err, model.ErrSessionNotFound) {
+		t.Fatalf("err = %v, want ErrSessionNotFound", err)
+	}
+}
+
 func TestCreateFollowUp_TimelineError(t *testing.T) {
 	ctx := context.Background()
 

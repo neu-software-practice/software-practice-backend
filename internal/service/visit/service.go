@@ -121,6 +121,9 @@ func (s *Service) CreateFollowUp(ctx context.Context, input model.CreateFollowUp
 	if err != nil {
 		return nil, fmt.Errorf("parent session: %w", err)
 	}
+	if parent.PatientID != input.PatientID {
+		return nil, model.ErrSessionNotFound
+	}
 
 	result, err := s.createSession(ctx, createSessionParams{
 		PatientID:       input.PatientID,
