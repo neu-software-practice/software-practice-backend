@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
 
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4@sha256:d36d39a64cd12a5c1cc9e6aa2bfb5f8d4c81a2f6586e0a04a9ae13939db02209
     container_name: neuhis-mysql
     environment:
       MYSQL_ROOT_PASSWORD: password
@@ -43,7 +43,7 @@ services:
     restart: unless-stopped
 
   medagent:
-    image: golang:1.22-alpine
+    image: golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2
     container_name: neuhis-medagent
     working_dir: /app
     volumes:

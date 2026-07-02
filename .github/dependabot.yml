@@ -1,0 +1,50 @@
+version: 2
+updates:
+  # Docker 镜像依赖 — 跟踪 Digest 更新
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    labels:
+      - dependencies
+      - docker
+    open-pull-requests-limit: 5
+
+  # Go 模块依赖
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    labels:
+      - dependencies
+      - go
+    open-pull-requests-limit: 5
+
+  # medAgent Go 模块依赖
+  - package-ecosystem: gomod
+    directory: "/medAgent"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    labels:
+      - dependencies
+      - go
+      - medagent
+    open-pull-requests-limit: 5
