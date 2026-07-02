@@ -440,6 +440,38 @@ func TestAuthMiddleware_NewTokenFormat(t *testing.T) {
 	}
 }
 
+func TestAuthMiddleware_PatientIDClaimAliases(t *testing.T) {
+	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
+	now := time.Now()
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":        "u001",
+		"patient_id": "p001",
+		"iat":        now.Unix(),
+		"exp":        now.Add(time.Hour).Unix(),
+	}).SignedString([]byte(secret))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+
+	r := setupRouter()
+	r.Use(middleware.AuthMiddleware(secret))
+	r.GET("/test", func(c *gin.Context) {
+		if got := middleware.GetPatientID(c); got != "p001" {
+			t.Errorf("patientId = %s, want p001", got)
+		}
+		c.String(200, "ok")
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("status = %d, want 200", w.Code)
+	}
+}
+
 func TestAuthMiddleware_LegacyTokenBackwardCompat(t *testing.T) {
 	secret := "this-is-a-32-byte-secret-key-for-testing!!" // #nosec G101
 

@@ -62,7 +62,7 @@
           "                url: baseUrl + '/api/auth/register',",
           "                method: 'POST',",
           "                header: { 'Content-Type': 'application/json' },",
-          "                body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: pw, realName: '黑盒测试' }) }",
+          "                body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: pw, realName: '黑盒测试', gender: 'unknown', birthDate: '1990-01-01' }) }",
           "            }, function(e2, r2) {",
           "                if (!e2 && r2 && (r2.code === 201 || r2.code === 200)) {",
           "                    var d = r2.json().data;",
@@ -182,7 +182,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\",\"realName\":\"黑盒测试用户\"}"
+              "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\",\"realName\":\"黑盒测试用户\",\"gender\":\"unknown\",\"birthDate\":\"1990-01-01\"}"
             }
           }
         },
@@ -305,7 +305,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"phone\":\"13999999999\",\"password\":\"TestPass123!\",\"realName\":\"新用户\"}"
+              "raw": "{\"phone\":\"13999999999\",\"password\":\"TestPass123!\",\"realName\":\"新用户\",\"gender\":\"unknown\",\"birthDate\":\"1990-01-01\"}"
             }
           }
         },
@@ -342,7 +342,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"TestPass123!\",\"realName\":\"重复用户\"}"
+              "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"TestPass123!\",\"realName\":\"重复用户\",\"gender\":\"unknown\",\"birthDate\":\"1990-01-01\"}"
             }
           }
         },
@@ -3230,7 +3230,7 @@
                   "    url: baseUrl + '/api/auth/register',",
                   "    method: 'POST',",
                   "    header: { 'Content-Type': 'application/json' },",
-                  "    body: { mode: 'raw', raw: JSON.stringify({ phone: testPhone, password: testPw, realName: '流程测试' }) }",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ phone: testPhone, password: testPw, realName: '流程测试', gender: 'unknown', birthDate: '1990-01-01' }) }",
                   "}, function(err1, res1) {",
                   "    if (err1) { pm.expect.fail('Register failed: ' + err1); return; }",
                   "    var ok = res1.code === 201 || res1.code === 409;",
@@ -4098,7 +4098,7 @@
                   "    url: baseUrl + '/api/auth/register',",
                   "    method: 'POST',",
                   "    header: { 'Content-Type': 'application/json' },",
-                  "    body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: 'TestPass123!', realName: '临时空用户' }) }",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ phone: phone, password: 'TestPass123!', realName: '临时空用户', gender: 'unknown', birthDate: '1990-01-01' }) }",
                   "}, function(err, res) {",
                   "    if (!err && res && (res.code === 201 || res.code === 200)) {",
                   "        var d = res.json().data;",

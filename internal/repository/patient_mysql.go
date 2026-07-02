@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
@@ -52,7 +53,13 @@ func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, crede
 	case "id_card":
 		query += `id_card_masked = ?`
 	case "phone":
-		query += `phone_masked = ?`
+		query += `phone_masked IN (?, ?)`
+		credential = strings.TrimSpace(credential)
+		p, err := scanPatient(r.db.QueryRowContext(ctx, query, credential, maskPhoneCredential(credential)))
+		if err != nil {
+			return nil, fmt.Errorf("find patient by credential: %w", err)
+		}
+		return p, nil
 	default:
 		return nil, fmt.Errorf("unknown credential type: %s", credType)
 	}
@@ -62,6 +69,13 @@ func (r *patientMySQLRepo) FindByCredential(ctx context.Context, credType, crede
 		return nil, fmt.Errorf("find patient by credential: %w", err)
 	}
 	return p, nil
+}
+
+func maskPhoneCredential(phone string) string {
+	if len(phone) != 11 {
+		return phone
+	}
+	return phone[:3] + "****" + phone[7:]
 }
 
 func (r *patientMySQLRepo) FindByID(ctx context.Context, id string) (*model.PatientProfile, error) {

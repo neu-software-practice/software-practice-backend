@@ -177,6 +177,13 @@ func TestPatientRepo_CRUD(t *testing.T) {
 		if len(byPhone.Allergies) != 1 || byPhone.Allergies[0] != "磺胺" {
 			t.Errorf("phone lookup: allergies = %v", byPhone.Allergies)
 		}
+		byFullPhone, err := repo.FindByCredential(ctx, "phone", "13600001111")
+		if err != nil {
+			t.Fatalf("FindByCredential(full phone) failed: %v", err)
+		}
+		if byFullPhone.ID != patient.ID {
+			t.Errorf("full phone lookup: id = %q, want %q", byFullPhone.ID, patient.ID)
+		}
 
 		// Find by id_card
 		byCard, err := repo.FindByCredential(ctx, "id_card", "440****2222")

@@ -43,7 +43,13 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		userID, _ := claims["sub"].(string)
 
-		patientID, _ := claims["patientId"].(string)
+		patientID := claimString(claims, "patientId")
+		if patientID == "" {
+			patientID = claimString(claims, "patient_id")
+		}
+		if patientID == "" {
+			patientID = claimString(claims, "patientID")
+		}
 		if patientID == "" {
 			patientID = userID
 		}
@@ -60,6 +66,11 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func claimString(claims jwt.MapClaims, key string) string {
+	value, _ := claims[key].(string)
+	return value
 }
 
 // GetPatientID extracts the patient ID from the Gin context.

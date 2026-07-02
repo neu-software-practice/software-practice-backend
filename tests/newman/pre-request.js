@@ -95,7 +95,9 @@ if (!isTokenValid()) {
                 raw: JSON.stringify({
                     phone: loginPhone,
                     password: loginPassword,
-                    realName: '黑盒测试用户'
+                    realName: '黑盒测试用户',
+                    gender: 'unknown',
+                    birthDate: '1990-01-01'
                 })
             }
         }, function (err2, res2) {

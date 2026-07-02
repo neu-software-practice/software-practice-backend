@@ -82,7 +82,7 @@ smoke-test-quick: ## 快速冒烟测试 (仅运行基础端点)
 	@curl -sf http://localhost:8080/api/health && echo "✅ Health OK" || echo "❌ Health FAIL"
 	@curl -sf -X POST http://localhost:8080/api/auth/register \
 		-H "Content-Type: application/json" \
-		-d '{"phone":"13800000001","password":"TestPass123!","realName":"测试"}' > /dev/null && echo "✅ Auth OK" || echo "⚠️ Auth (may already exist)"
+		-d '{"phone":"13800000001","password":"TestPass123!","realName":"测试","gender":"unknown","birthDate":"1990-01-01"}' > /dev/null && echo "✅ Auth OK" || echo "⚠️ Auth (may already exist)"
 
 # ==========================
 # Admin Smoke Test (Newman Black-Box)

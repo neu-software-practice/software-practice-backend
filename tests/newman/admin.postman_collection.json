@@ -207,7 +207,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\",\"realName\":\"管理员黑盒测试\"}"
+              "raw": "{\"phone\":\"{{testPhone}}\",\"password\":\"{{testPassword}}\",\"realName\":\"管理员黑盒测试\",\"gender\":\"unknown\",\"birthDate\":\"1990-01-01\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/register",

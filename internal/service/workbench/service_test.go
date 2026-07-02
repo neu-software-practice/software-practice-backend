@@ -1245,6 +1245,14 @@ func TestSubmitPayment_Defer_FlowCardUpdateFails(t *testing.T) {
 
 func TestSubmitFulfillment_Pickup(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
+	var createdCompletedCard *model.FlowCard
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		if card.Kind == string(model.FlowCardKindCompletedVisit) {
+			copied := *card
+			createdCompletedCard = &copied
+		}
+		return nil
+	}
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
@@ -1259,6 +1267,12 @@ func TestSubmitFulfillment_Pickup(t *testing.T) {
 	}
 	if len(result.TimelineItems) != 3 {
 		t.Errorf("expected 3 timeline items, got %d", len(result.TimelineItems))
+	}
+	if createdCompletedCard == nil {
+		t.Fatal("expected completed visit card to be created")
+	}
+	if createdCompletedCard.ID == "" {
+		t.Fatal("completed visit card ID should not be empty")
 	}
 }
 

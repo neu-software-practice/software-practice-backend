@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/neuhis/software-practice-backend/internal/adapter"
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
@@ -97,7 +98,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 
 	// Create completed visit card
 	completedCard := &model.FlowCard{
-		ID:               "",
+		ID:               uuid.New().String(),
 		SessionID:        input.SessionID,
 		Kind:             string(model.FlowCardKindCompletedVisit),
 		Status:           string(model.FlowCardStatusCompleted),
