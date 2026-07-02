@@ -4,7 +4,7 @@
 #
 # 1. Extract frontend Zod fields
 # 2. Extract backend Go fields
-# 3. Compare → drift report
+# 3. Compare: field-level drift + request drift
 # 4. If drift found: report for manual/agent fix
 # 5. Verify: go test + golangci-lint
 # 6. Git commit
@@ -32,72 +32,85 @@ while [ $DRY -lt 2 ] && [ $ROUND -lt $MAX_ROUNDS ]; do
   echo "=========================================="
 
   # ── Step 1: Extract ──
-  echo "[1/6] Extracting frontend Zod fields..."
+  echo "[1/7] Extracting frontend Zod fields..."
   (cd "$FRONTEND_DIR" && node scripts/extract-zod-fields.mjs 2>&1 | grep "\[DONE\]") || {
     echo "ERROR: Frontend extraction failed"
     exit 1
   }
 
-  echo "[2/6] Extracting backend Go fields..."
+  echo "[2/7] Extracting backend Go fields..."
   (cd "$BACKEND_DIR" && node scripts/extract-go-fields.mjs 2>&1 | grep "\[DONE\]") || {
     echo "ERROR: Backend extraction failed"
     exit 1
   }
 
   # ── Step 2: Compare ──
-  echo "[3/6] Comparing fields..."
+  echo "[3/7] Comparing response fields (field-level drift)..."
   (cd "$BACKEND_DIR" && node scripts/compare-fields.mjs 2>&1) || true
 
-  DRIFT_COUNT=$(node -e "
+  echo "[4/7] Comparing request bodies & query params (request drift)..."
+  (cd "$BACKEND_DIR" && node scripts/compare-request.mjs 2>&1) || true
+
+  # ── Step 3: Aggregate drift counts ──
+  FIELD_DRIFT=$(node -e "
     try {
       const r = JSON.parse(require('fs').readFileSync('$BACKEND_DIR/drift-report-fields.json', 'utf-8'));
       console.log(r.totalDriftItems || 0);
     } catch(e) { console.log(0); }
   ")
+  REQUEST_DRIFT=$(node -e "
+    try {
+      const r = JSON.parse(require('fs').readFileSync('$BACKEND_DIR/drift-report-request.json', 'utf-8'));
+      console.log(r.totalDriftItems || 0);
+    } catch(e) { console.log(0); }
+  ")
+  TOTAL_DRIFT=$((FIELD_DRIFT + REQUEST_DRIFT))
 
-  if [ "$DRIFT_COUNT" -eq 0 ]; then
+  if [ "$TOTAL_DRIFT" -eq 0 ]; then
     DRY=$((DRY + 1))
     echo ""
-    echo "✅ No drift detected. Dry round $DRY/2"
+    echo "✅ No drift detected (fields: $FIELD_DRIFT, requests: $REQUEST_DRIFT). Dry round $DRY/2"
     echo ""
     continue
   fi
 
   DRY=0
   echo ""
-  echo "⚠️  $DRIFT_COUNT drift items found."
+  echo "⚠️  Drift found: $FIELD_DRIFT field-level + $REQUEST_DRIFT request-level = $TOTAL_DRIFT total"
   echo ""
 
-  # ── Step 3: Report ──
-  echo "[4/6] Drift report written to drift-report-fields.json"
+  # ── Step 4: Report ──
+  echo "[5/7] Drift reports:"
+  echo "       - drift-report-fields.json  ($FIELD_DRIFT items)"
+  echo "       - drift-report-request.json ($REQUEST_DRIFT items)"
   echo "       Review and fix drift items manually or via agent."
   echo ""
   echo "       Breaking out of loop for manual fix."
   echo "       After fixing, re-run: bash scripts/fix-drift-loop.sh"
   break
 
-  # NOTE: The automated fix (Step 3b) is done by an agent outside this script.
-  # The agent reads drift-report-fields.json, modifies Go source files,
-  # then continues with steps 4-6 below.
+  # NOTE: The automated fix (Step 5) is done by an agent outside this script.
+  # The agent reads drift reports, modifies Go/TS source files,
+  # then continues with steps 6-7 below.
 
-  # ── Step 4: Verify ──
-  echo "[5/6] Running tests..."
+  # ── Step 6: Verify ──
+  echo "[6/7] Running tests..."
   (cd "$BACKEND_DIR" && go test -count=1 -short ./... -race) || {
     echo "ERROR: Tests failed. Fix issues before continuing."
     exit 1
   }
 
-  echo "[5/6] Running linter..."
+  echo "[6/7] Running linter..."
   (cd "$BACKEND_DIR" && golangci-lint run ./...) || {
     echo "ERROR: Lint failed. Fix issues before continuing."
     exit 1
   }
 
-  # ── Step 5: Commit ──
-  echo "[6/6] Committing fixes..."
-  (cd "$BACKEND_DIR" && git add -A && git commit -m "fix: 修复 API 字段级漂移 (round $ROUND)
+  # ── Step 7: Commit ──
+  echo "[7/7] Committing fixes..."
+  (cd "$BACKEND_DIR" && git add -A && git commit -m "fix: 修复 API 漂移 (round $ROUND)
 
-  Co-Authored-By: Claude <noreply@anthropic.com>") || {
+Co-Authored-By: Claude <noreply@anthropic.com>") || {
     echo "WARN: Nothing to commit or commit failed."
   }
 done
@@ -109,12 +122,12 @@ echo "=== Rounds: $ROUND, Dry: $DRY ==="
 echo "=========================================="
 
 if [ $DRY -ge 2 ]; then
-  echo "✅ SUCCESS: API is fully aligned at field level!"
+  echo "✅ SUCCESS: API is fully aligned!"
   exit 0
 elif [ $ROUND -ge $MAX_ROUNDS ]; then
   echo "⚠️  Max rounds reached. Some drift may remain."
   exit 1
 else
-  echo "⏸️  Paused for manual fix. See drift-report-fields.json"
+  echo "⏸️  Paused for manual fix. See drift-report-fields.json and drift-report-request.json"
   exit 2
 fi
