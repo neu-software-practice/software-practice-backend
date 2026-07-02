@@ -1388,6 +1388,12 @@ func TestSubmitTreatmentExecution_Start(t *testing.T) {
 
 func TestSubmitTreatmentExecution_Complete(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
+	var completedCard *model.FlowCard
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		copy := *card
+		completedCard = &copy
+		return nil
+	}
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
@@ -1399,6 +1405,15 @@ func TestSubmitTreatmentExecution_Complete(t *testing.T) {
 	}
 	if result.Message != "治疗完成，就诊结束" {
 		t.Errorf("message = %s, want 治疗完成，就诊结束", result.Message)
+	}
+	if completedCard == nil {
+		t.Fatal("expected completed visit card to be created")
+	}
+	if completedCard.ID == "" {
+		t.Fatal("completed visit card ID is empty")
+	}
+	if completedCard.Kind != string(model.FlowCardKindCompletedVisit) {
+		t.Errorf("completed card kind = %s, want %s", completedCard.Kind, model.FlowCardKindCompletedVisit)
 	}
 }
 
@@ -1545,6 +1560,12 @@ func TestSubmitTreatmentExecution_Cancel_VisitUpdateFails(t *testing.T) {
 
 func TestAckAdvice(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
+	var completedCard *model.FlowCard
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		copy := *card
+		completedCard = &copy
+		return nil
+	}
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
@@ -1559,6 +1580,15 @@ func TestAckAdvice(t *testing.T) {
 	}
 	if result.Message != "医嘱已确认，就诊完成" {
 		t.Errorf("message = %s, want 医嘱已确认，就诊完成", result.Message)
+	}
+	if completedCard == nil {
+		t.Fatal("expected completed visit card to be created")
+	}
+	if completedCard.ID == "" {
+		t.Fatal("completed visit card ID is empty")
+	}
+	if completedCard.Kind != string(model.FlowCardKindCompletedVisit) {
+		t.Errorf("completed card kind = %s, want %s", completedCard.Kind, model.FlowCardKindCompletedVisit)
 	}
 }
 

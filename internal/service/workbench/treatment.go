@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/neuhis/software-practice-backend/internal/adapter"
 	"github.com/neuhis/software-practice-backend/internal/model"
 )
@@ -100,7 +101,7 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 		// Completed visit card
 		completedCard := &model.FlowCard{
-			ID:               "",
+			ID:               uuid.New().String(),
 			SessionID:        input.SessionID,
 			Kind:             string(model.FlowCardKindCompletedVisit),
 			Status:           string(model.FlowCardStatusCompleted),
@@ -210,7 +211,7 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 
 	// Completed visit card
 	completedCard := &model.FlowCard{
-		ID:               "",
+		ID:               uuid.New().String(),
 		SessionID:        input.SessionID,
 		Kind:             string(model.FlowCardKindCompletedVisit),
 		Status:           string(model.FlowCardStatusCompleted),
