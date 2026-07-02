@@ -175,6 +175,51 @@ func TestRequirePatientID(t *testing.T) {
 	})
 }
 
+func TestResolveOwnPatientID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("matching id", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("patientId", "p001")
+
+		got, ok := handler.ResolveOwnPatientID(c, "p001")
+		if !ok {
+			t.Fatal("should allow matching id")
+		}
+		if got != "p001" {
+			t.Errorf("got %s, want p001", got)
+		}
+	})
+
+	t.Run("non ascii alias maps to authenticated id", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("patientId", "p001")
+
+		got, ok := handler.ResolveOwnPatientID(c, "李博韬")
+		if !ok {
+			t.Fatal("should allow non-ascii alias")
+		}
+		if got != "p001" {
+			t.Errorf("got %s, want p001", got)
+		}
+	})
+
+	t.Run("ascii mismatch denied", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Set("patientId", "p001")
+
+		if _, ok := handler.ResolveOwnPatientID(c, "wrong-patient-id"); ok {
+			t.Fatal("should deny ascii mismatch")
+		}
+		if w.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", w.Code)
+		}
+	})
+}
+
 func TestSSEWriter(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -3265,6 +3310,49 @@ func TestAddressHandler_CreateAddress_ValidFull(t *testing.T) {
 	h.CreateAddress(c)
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Errorf("status = %d, want 200/201, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddressHandler_ListAddresses_NonASCIIPathAliasUsesAuthenticatedPatient(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var queriedPatientID string
+	addrRepo := &mockAddressRepo{
+		listByPatientFunc: func(ctx context.Context, patientID string) ([]model.Address, error) {
+			queriedPatientID = patientID
+			return []model.Address{{
+				ID:        "addr-1",
+				PatientID: patientID,
+				Name:      "李博韬",
+				Phone:     "13800002468",
+				Province:  "辽宁省",
+				City:      "沈阳市",
+				District:  "浑南区",
+				Detail:    "创新路195号",
+			}}, nil
+		},
+	}
+	svc := addresssvc.NewService(addrRepo)
+	h := handler.NewAddressHandler(svc)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "patientId", Value: "李博韬"}}
+	c.Request = httptest.NewRequest("GET", "/patients/%E6%9D%8E%E5%8D%9A%E9%9F%AC/addresses", nil)
+	c.Set("patientId", "4158adae-c418-4ea2-ba5e-4dfd5931f689")
+
+	h.ListAddresses(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+	if queriedPatientID != "4158adae-c418-4ea2-ba5e-4dfd5931f689" {
+		t.Fatalf("queried patientID = %s, want authenticated patient id", queriedPatientID)
+	}
+	var resp model.AddressListResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(resp.Addresses) != 1 || resp.Addresses[0].PatientID != queriedPatientID {
+		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
 

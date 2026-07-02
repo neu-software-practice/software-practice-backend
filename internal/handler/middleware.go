@@ -3,6 +3,8 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	apperrors "github.com/neuhis/software-practice-backend/internal/errors"
@@ -74,4 +76,41 @@ func RequirePatientID(c *gin.Context, requestPatientID string) bool {
 		return false
 	}
 	return true
+}
+
+// ResolveOwnPatientID checks access to patient-scoped resources and returns the
+// canonical patient ID from the JWT. Some frontends have historically passed a
+// display name in the patientId path slot; allow that compatibility form only
+// for non-ASCII aliases and still scope data access to the authenticated patient.
+func ResolveOwnPatientID(c *gin.Context, requestPatientID string) (string, bool) {
+	authID := GetPatientIDFromContext(c)
+	if authID == "" {
+		apperrors.WriteForbidden(c, "access denied: patient ID mismatch")
+		return "", false
+	}
+	if authID == requestPatientID {
+		return authID, true
+	}
+	if isNonASCIIAlias(requestPatientID) {
+		return authID, true
+	}
+
+	apperrors.WriteForbidden(c, "access denied: patient ID mismatch")
+	return "", false
+}
+
+func isNonASCIIAlias(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r == utf8.RuneError {
+			return false
+		}
+		if r > 127 {
+			return true
+		}
+	}
+	return false
 }

@@ -22,9 +22,8 @@ func NewAddressHandler(svc *addresssvc.Service) *AddressHandler {
 
 // ListAddresses handles GET /patients/:patientId/addresses
 func (h *AddressHandler) ListAddresses(c *gin.Context) {
-	patientID := ParsePatientID(c)
-
-	if !RequirePatientID(c, patientID) {
+	patientID, ok := ResolveOwnPatientID(c, ParsePatientID(c))
+	if !ok {
 		return
 	}
 
@@ -39,9 +38,8 @@ func (h *AddressHandler) ListAddresses(c *gin.Context) {
 
 // CreateAddress handles POST /patients/:patientId/addresses
 func (h *AddressHandler) CreateAddress(c *gin.Context) {
-	patientID := ParsePatientID(c)
-
-	if !RequirePatientID(c, patientID) {
+	patientID, ok := ResolveOwnPatientID(c, ParsePatientID(c))
+	if !ok {
 		return
 	}
 
@@ -69,10 +67,9 @@ func (h *AddressHandler) CreateAddress(c *gin.Context) {
 
 // UpdateAddress handles PATCH /patients/:patientId/addresses/:addressId
 func (h *AddressHandler) UpdateAddress(c *gin.Context) {
-	patientID := ParsePatientID(c)
+	patientID, ok := ResolveOwnPatientID(c, ParsePatientID(c))
 	addressID := ParseAddressID(c)
-
-	if !RequirePatientID(c, patientID) {
+	if !ok {
 		return
 	}
 
@@ -98,10 +95,9 @@ func (h *AddressHandler) UpdateAddress(c *gin.Context) {
 
 // DeleteAddress handles DELETE /patients/:patientId/addresses/:addressId
 func (h *AddressHandler) DeleteAddress(c *gin.Context) {
-	patientID := ParsePatientID(c)
+	patientID, ok := ResolveOwnPatientID(c, ParsePatientID(c))
 	addressID := ParseAddressID(c)
-
-	if !RequirePatientID(c, patientID) {
+	if !ok {
 		return
 	}
 
@@ -121,10 +117,9 @@ func (h *AddressHandler) DeleteAddress(c *gin.Context) {
 
 // SetDefaultAddress handles PUT /patients/:patientId/addresses/:addressId/default
 func (h *AddressHandler) SetDefaultAddress(c *gin.Context) {
-	patientID := ParsePatientID(c)
+	patientID, ok := ResolveOwnPatientID(c, ParsePatientID(c))
 	addressID := ParseAddressID(c)
-
-	if !RequirePatientID(c, patientID) {
+	if !ok {
 		return
 	}
 
