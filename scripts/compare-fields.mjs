@@ -28,6 +28,10 @@ const apiContract = loadJSON(resolve(FE_DIR, 'api-contract.json'));
 const frontendFields = loadJSON(resolve(FE_DIR, 'frontend-fields.json'));
 const backendFields = loadJSON(resolve(ROOT, 'backend-fields.json'));
 
+// Load doc-snapshot.json (hand-maintained API contract truth source)
+const docSnapshot = loadJSON(resolve(ROOT, 'doc-snapshot.json'));
+const DOC_ENDPOINTS = docSnapshot.endpoints || {};
+
 const ZOD_SCHEMAS = frontendFields.schemas || {};
 const ZOD_UNIONS = frontendFields.unions || {};
 const ZOD_ENUMS = frontendFields.enums || {};
@@ -306,6 +310,61 @@ function compareField(fieldName, zodField, goField, context) {
   }
 
   return null; // OK
+}
+
+// ====== NEW: Requiredness Comparison ======
+
+/**
+ * Compare Zod required/optional status against Go binding:"required" tag.
+ *
+ * Data sources (already extracted):
+ *   zodField.required = !isOptional && !hasDefault  (extract-zod-fields.mjs)
+ *   goField.constraints.required === true            (extract-go-fields.mjs binding:"required")
+ *
+ * Detects:
+ *   - Frontend REQUIRED but backend has no binding:"required" → validation gap
+ *   - Frontend OPTIONAL but backend has binding:"required" → spurious validation failure
+ */
+function compareRequiredness(fieldName, zodField, goField, context) {
+  if (!zodField || !goField) return null;
+
+  const zodRequired = zodField.required;
+  const goRequired = goField.constraints && goField.constraints.required === true;
+
+  // Both agree → OK
+  if (zodRequired === goRequired) return null;
+
+  // Direction 1: Zod REQUIRED but Go has no binding:"required"
+  if (zodRequired && !goRequired) {
+    return {
+      severity: 'HIGH',
+      category: 'required_missing_in_backend',
+      endpoint: context.endpoint,
+      field: fieldName,
+      expected: `Zod: REQUIRED field`,
+      actual: `Go: ${goField.goType} json:"${goField.jsonName}" — no binding:"required"`,
+      description: `Field "${fieldName}" is REQUIRED in frontend schema but Go struct "${context.structName}" has no binding:"required" tag. Backend does not enforce this field.`,
+      file: context.goFile,
+      fixHint: `Add binding:"required" to Go struct field "${fieldName}" in ${context.structName}.`,
+    };
+  }
+
+  // Direction 2: Zod OPTIONAL but Go has binding:"required"
+  if (!zodRequired && goRequired) {
+    return {
+      severity: 'HIGH',
+      category: 'required_unexpected_in_backend',
+      endpoint: context.endpoint,
+      field: fieldName,
+      expected: `Zod: OPTIONAL field (may be undefined)`,
+      actual: `Go: ${goField.goType} json:"${goField.jsonName}" binding:"required"`,
+      description: `Field "${fieldName}" is OPTIONAL in frontend schema but Go struct "${context.structName}" has binding:"required". Frontend may omit this field, causing 422 validation errors.`,
+      file: context.goFile,
+      fixHint: `Remove binding:"required" from Go struct field "${fieldName}" in ${context.structName}, or add it to frontend Zod schema.`,
+    };
+  }
+
+  return null;
 }
 
 // ====== NEW: Constraint Comparison ======
@@ -608,6 +667,16 @@ function compareRequestFields() {
           });
         }
       }
+
+      // Requiredness comparison for request fields
+      if (zodF && goF) {
+        const reqReqDrift = compareRequiredness(fieldName, zodF, goF, {
+          endpoint: sig,
+          structName: beEp.requestType || 'unknown',
+          goFile: 'internal/handler/ or internal/model/',
+        });
+        if (reqReqDrift) driftItems.push(reqReqDrift);
+      }
     }
   }
 
@@ -768,8 +837,9 @@ function compareErrorFormats() {
 
 function checkResponseEnvelope() {
   const driftItems = [];
+  const beEndpoints = backendFields.endpoints || [];
 
-  // ApiResponse[T] wraps all responses: { success, data, error }
+  // Verify ApiResponse struct exists globally (structural check)
   const envelope = GO_STRUCTS['ApiResponse'];
   if (!envelope) {
     driftItems.push({
@@ -783,25 +853,49 @@ function checkResponseEnvelope() {
       file: 'pkg/api/response.go',
       fixHint: 'Define ApiResponse[T] struct with Success, Data, Error fields.',
     });
+    return driftItems; // Can't check further without the struct
   }
 
   // Verify envelope fields
-  if (envelope) {
-    const envFields = new Set(envelope.fields.map(f => f.jsonName));
-    for (const required of ['success', 'data', 'error']) {
-      if (!envFields.has(required)) {
-        driftItems.push({
-          severity: 'HIGH',
-          category: 'envelope_field_missing',
-          endpoint: 'all endpoints',
-          field: required,
-          expected: `ApiResponse must have "${required}" field`,
-          actual: `ApiResponse fields: [${[...envFields].join(', ')}]`,
-          description: `ApiResponse is missing the "${required}" field. Frontend expects { success, data, error } envelope.`,
-          file: 'pkg/api/response.go',
-          fixHint: `Ensure ApiResponse struct has "${required}" field.`,
-        });
-      }
+  const envFields = new Set(envelope.fields.map(f => f.jsonName));
+  for (const required of ['success', 'data', 'error']) {
+    if (!envFields.has(required)) {
+      driftItems.push({
+        severity: 'HIGH',
+        category: 'envelope_field_missing',
+        endpoint: 'all endpoints',
+        field: required,
+        expected: `ApiResponse must have "${required}" field`,
+        actual: `ApiResponse fields: [${[...envFields].join(', ')}]`,
+        description: `ApiResponse is missing the "${required}" field. Frontend expects { success, data, error } envelope.`,
+        file: 'pkg/api/response.go',
+        fixHint: `Ensure ApiResponse struct has "${required}" field.`,
+      });
+    }
+  }
+
+  // Per-endpoint envelope check
+  for (const ep of beEndpoints) {
+    const sig = `${ep.method} ${normPath(ep.path)}`;
+
+    // Skip endpoints where envelope is not applicable
+    if (ep.path === '/api/health') continue;       // Explicit raw gin.H — allowed
+    if (ep.isSSE) continue;                          // SSE streaming — no JSON envelope
+    if (ep.statusCode === 204) continue;             // 204 No Content — no body
+
+    // usesEnvelope === false means handler explicitly does NOT use envelope
+    if (ep.usesEnvelope === false) {
+      driftItems.push({
+        severity: 'MEDIUM',
+        category: 'envelope_missing',
+        endpoint: sig,
+        field: 'response format',
+        expected: 'ApiResponse envelope: { success, data, error }',
+        actual: `No ApiResponse wrapper detected (handler source analysis)`,
+        description: `Endpoint "${sig}" does not wrap response in standard ApiResponse envelope. This may cause frontend parsing failures.`,
+        file: 'internal/handler/',
+        fixHint: 'Use WriteSuccess() or api.SuccessResponse() to wrap the response body.',
+      });
     }
   }
 
@@ -878,6 +972,203 @@ function compareDiscriminatedUnions() {
           fixHint: `Add missing fields to ${goStructName}: ${missingVariantFields.join(', ')}.`,
         });
       }
+    }
+  }
+
+  return driftItems;
+}
+
+// ====== NEW: Doc Snapshot vs Code Comparison ======
+
+/**
+ * Compare doc-snapshot.json (hand-maintained API contract) against both backend
+ * and frontend extracted data. Expands the comparison from two-party (frontend↔backend)
+ * to three-party (frontend↔doc↔backend), catching cases where both codebases agree
+ * but both disagree with the documented contract.
+ *
+ * Comparison dimensions (Doc vs Backend):
+ *   - Response envelope usage
+ *   - HTTP status code
+ *   - Response/request schema existence
+ *   - Error format struct existence
+ *   - Pagination format
+ *
+ * Comparison dimensions (Doc vs Frontend):
+ *   - Response/request schema existence
+ *   - Endpoint existence in API facades
+ */
+function compareDocVsCode() {
+  const driftItems = [];
+  const beEndpoints = backendFields.endpoints || [];
+  const apiEpEndpoints = apiContract.endpoints || [];
+  const feSchemaEndpoints = frontendFields.endpoints || [];
+
+  // Index backend endpoints by normalized signature
+  const beBySig = {};
+  for (const ep of beEndpoints) {
+    beBySig[`${ep.method} ${normPath(ep.path)}`] = ep;
+  }
+
+  // Index apiContract endpoints (for existence checks)
+  const feBySig = {};
+  for (const ep of apiEpEndpoints) {
+    const feMethod = ep.method || ep.httpMethod;
+    feBySig[`${feMethod} ${normPath(ep.path)}`] = ep;
+  }
+
+  // Index frontendFields endpoints (for schema name checks)
+  const feSchemaBySig = {};
+  for (const ep of feSchemaEndpoints) {
+    const feMethod = ep.httpMethod || ep.method;
+    feSchemaBySig[`${feMethod} ${normPath(ep.path)}`] = ep;
+  }
+
+  for (const [sig, doc] of Object.entries(DOC_ENDPOINTS)) {
+    // ====== Doc vs Backend ======
+    const beEp = beBySig[sig];
+    if (beEp) {
+      // Envelope comparison
+      const docEnv = doc.envelope;
+      const beEnv = beEp.usesEnvelope === true ? 'ApiResponse' :
+                    beEp.usesEnvelope === false ? 'none' : null;
+      if (docEnv !== undefined && beEnv !== null && docEnv !== beEnv) {
+        driftItems.push({
+          severity: 'HIGH',
+          category: 'doc_vs_backend_envelope',
+          endpoint: sig,
+          field: 'response envelope',
+          expected: `Doc: ${docEnv}`,
+          actual: `Backend: ${beEnv}`,
+          description: `Doc says "${sig}" uses "${docEnv}" envelope but backend uses "${beEnv}".`,
+          file: 'internal/handler/',
+          fixHint: `Align backend response wrapper with doc: expected ${docEnv}.`,
+        });
+      }
+
+      // Status code comparison
+      if (doc.statusCode && beEp.statusCode && doc.statusCode !== beEp.statusCode) {
+        driftItems.push({
+          severity: 'MEDIUM',
+          category: 'doc_vs_backend_status',
+          endpoint: sig,
+          field: 'statusCode',
+          expected: `Doc: ${doc.statusCode}`,
+          actual: `Backend: ${beEp.statusCode}`,
+          description: `Doc expects status ${doc.statusCode} but backend returns ${beEp.statusCode}.`,
+          file: 'internal/handler/',
+          fixHint: `Change HTTP status code in handler to ${doc.statusCode}.`,
+        });
+      }
+
+      // Response schema existence
+      if (doc.responseSchema && !beEp.structFound) {
+        driftItems.push({
+          severity: 'HIGH',
+          category: 'doc_vs_backend_response_schema',
+          endpoint: sig,
+          field: doc.responseSchema,
+          expected: `Doc: response struct "${doc.responseSchema}"`,
+          actual: 'Backend: struct NOT FOUND in Go sources',
+          description: `Doc references response struct "${doc.responseSchema}" for "${sig}" but it is not found in Go sources.`,
+          file: 'internal/model/',
+          fixHint: `Define Go struct "${doc.responseSchema}" or update doc-snapshot.json.`,
+        });
+      }
+
+      // Error format struct existence
+      if (doc.errorFormat && doc.errorFormat !== 'none') {
+        const errorStruct = GO_STRUCTS[doc.errorFormat];
+        if (!errorStruct) {
+          driftItems.push({
+            severity: 'HIGH',
+            category: 'doc_vs_backend_error_struct',
+            endpoint: sig,
+            field: doc.errorFormat,
+            expected: `Doc: error struct "${doc.errorFormat}"`,
+            actual: 'NOT FOUND in Go structs',
+            description: `Doc expects error format "${doc.errorFormat}" for "${sig}" but struct not found in Go sources.`,
+            file: 'internal/errors/',
+            fixHint: `Define "${doc.errorFormat}" struct or update doc-snapshot.json.`,
+          });
+        }
+      }
+
+      // Pagination format
+      if (doc.pagination && beEp.paginationStyle !== doc.pagination) {
+        driftItems.push({
+          severity: 'HIGH',
+          category: 'doc_vs_backend_pagination',
+          endpoint: sig,
+          field: 'pagination',
+          expected: `Doc: ${doc.pagination} pagination`,
+          actual: `Backend: ${beEp.paginationStyle || 'none'}`,
+          description: `Doc specifies "${doc.pagination}" pagination for "${sig}" but backend uses "${beEp.paginationStyle || 'none'}".`,
+          file: 'internal/model/',
+          fixHint: 'Align pagination format with doc specification.',
+        });
+      }
+    } else {
+      // Endpoint documented but not found in backend routes
+      driftItems.push({
+        severity: 'HIGH',
+        category: 'doc_vs_backend_endpoint_missing',
+        endpoint: sig,
+        field: '(endpoint)',
+        expected: `Doc: endpoint "${sig}" exists`,
+        actual: 'NOT FOUND in backend routes',
+        description: `Endpoint "${sig}" is documented in doc-snapshot.json but not found in backend router.`,
+        file: 'internal/handler/router.go',
+        fixHint: `Add route for "${sig}" or remove from doc-snapshot.json.`,
+      });
+    }
+
+    // ====== Doc vs Frontend ======
+    const feEp = feBySig[sig];
+    const feSchEp = feSchemaBySig[sig];
+
+    if (feEp) {
+      // Response schema existence (check frontendFields data which has per-endpoint schemas)
+      if (doc.responseSchema && feSchEp && !feSchEp.responseSchema) {
+        driftItems.push({
+          severity: 'HIGH',
+          category: 'doc_vs_frontend_response_schema',
+          endpoint: sig,
+          field: doc.responseSchema,
+          expected: `Doc: frontend schema "${doc.responseSchema}"`,
+          actual: 'NOT FOUND in frontend Zod schema mapping',
+          description: `Doc references response schema for "${sig}" but frontend endpoint has no response schema mapped.`,
+          file: 'src/features/*/api/schemas.ts',
+          fixHint: `Add "${doc.responseSchema}" Zod schema or update doc-snapshot.json.`,
+        });
+      }
+
+      // Request schema existence
+      if (doc.requestSchema && feSchEp && !feSchEp.requestSchema) {
+        driftItems.push({
+          severity: 'MEDIUM',
+          category: 'doc_vs_frontend_request_schema',
+          endpoint: sig,
+          field: doc.requestSchema,
+          expected: `Doc: request schema "${doc.requestSchema}"`,
+          actual: 'NOT FOUND in frontend input schema mapping',
+          description: `Doc references request schema "${doc.requestSchema}" for "${sig}" but frontend endpoint has no request schema mapped.`,
+          file: 'src/features/*/api/schemas.ts',
+          fixHint: `Add "${doc.requestSchema}" input schema or update doc-snapshot.json.`,
+        });
+      }
+    } else {
+      // Endpoint documented but not found in frontend
+      driftItems.push({
+        severity: 'MEDIUM',
+        category: 'doc_vs_frontend_endpoint_missing',
+        endpoint: sig,
+        field: '(endpoint)',
+        expected: `Doc: endpoint "${sig}" exists`,
+        actual: 'NOT FOUND in frontend API facades',
+        description: `Endpoint "${sig}" is documented in doc-snapshot.json but not found in frontend API facades.`,
+        file: 'src/features/*/api/index.ts',
+        fixHint: `Add facade method for "${sig}" or remove from doc-snapshot.json.`,
+      });
     }
   }
 
@@ -969,7 +1260,11 @@ function main() {
   const unionDrifts = compareDiscriminatedUnions();
   driftItems.push(...unionDrifts);
 
-  // ======== 8. SSE Endpoint Verification ========
+  // ======== 8. Doc Snapshot Comparison ========
+  const docDrifts = compareDocVsCode();
+  driftItems.push(...docDrifts);
+
+  // ======== 9. SSE Endpoint Verification ========
   const sseEndpoints = feEndpoints.filter(e => e.isSSE);
   if (sseEndpoints.length > 0) {
     driftItems.push({

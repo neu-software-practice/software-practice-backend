@@ -357,6 +357,23 @@ function isSSE(handlerName) {
   return ['Workbench.StreamAssistantMessage', 'Workbench.AskLockedQuestion', 'Workbench.StreamConsultationReply'].includes(handlerName);
 }
 
+// ====== Handler Domain → File Mapping ======
+
+/**
+ * Maps handler domain prefix (from router.go group registration) to the source
+ * file containing the handler methods.
+ */
+const HANDLER_DOMAIN_FILES = {
+  'Auth': 'auth_handler.go',
+  'Patient': 'patient_handler.go',
+  'Visit': 'visit_handler.go',
+  'Workbench': 'workbench_handler.go',
+  'Address': 'address_handler.go',
+  'Billing': 'billing_handler.go',
+  'MedicalOrder': 'medical_order_handler.go',
+  'Admin': 'admin_handler.go',
+};
+
 // ====== Query Parameter Extraction ======
 
 /**
@@ -386,6 +403,134 @@ function parseQueryParams(source) {
   }
 
   return [...params].sort();
+}
+
+// ====== HTTP Status Code Extraction ======
+
+/**
+ * Map http.StatusXxx Go constants to numeric status codes.
+ */
+function extractStatusCode(expr) {
+  expr = expr.trim();
+  // Direct number literal
+  if (/^\d+$/.test(expr)) return parseInt(expr, 10);
+  // Named http constants
+  const statusMap = {
+    'http.StatusOK': 200,
+    'http.StatusCreated': 201,
+    'http.StatusAccepted': 202,
+    'http.StatusNoContent': 204,
+    'http.StatusMovedPermanently': 301,
+    'http.StatusBadRequest': 400,
+    'http.StatusUnauthorized': 401,
+    'http.StatusForbidden': 403,
+    'http.StatusNotFound': 404,
+    'http.StatusConflict': 409,
+    'http.StatusUnprocessableEntity': 422,
+    'http.StatusInternalServerError': 500,
+    'http.StatusServiceUnavailable': 503,
+  };
+  return statusMap[expr] || null;
+}
+
+// ====== Handler Response Wrapper Analysis ======
+
+/**
+ * Parse handler source code to determine response envelope usage and status code
+ * for each handler method in a given source file.
+ *
+ * Detects patterns:
+ *   WriteSuccess(c, status, data)           → ApiResponse envelope
+ *   WritePageResult(c, page)                → ApiResponse envelope, status=200
+ *   c.JSON(status, api.SuccessResponse(…))  → ApiResponse envelope
+ *   c.JSON(status, gin.H{…})                → no envelope (raw JSON)
+ *   c.Status(http.StatusNoContent)          → no body (204)
+ *   NewSSEWriter(c)                         → SSE protocol, no JSON envelope
+ *
+ * @param {string} source - Raw Go source of a handler file
+ * @param {string} domainPrefix - Domain prefix for handler names (e.g., "Auth", "Visit")
+ * @returns {Map<string, {usesEnvelope: boolean|null, statusCode: number|null, isSSE: boolean}>}
+ */
+function parseHandlerResponseWrapper(source, domainPrefix) {
+  const results = new Map();
+
+  // Match: func (h *XxxHandler) MethodName(c *gin.Context) {
+  const methodPattern = /func\s+\(h\s+\*(\w+)\)\s+\.?(\w+)\s*\([^)]*\)\s*\{/g;
+  let match;
+
+  while ((match = methodPattern.exec(source)) !== null) {
+    const methodName = match[2];
+    const fullHandlerName = `${domainPrefix}.${methodName}`;
+
+    // Extract function body via brace matching (skip Go string literals)
+    const bodyStart = match.index + match[0].length;
+    let depth = 1;
+    let i = bodyStart;
+    while (i < source.length && depth > 0) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}') depth--;
+      // Skip string/char literals to avoid false brace matches
+      if ((source[i] === '"' || source[i] === '`' || source[i] === "'") && (i === 0 || source[i - 1] !== '\\')) {
+        const quote = source[i];
+        i++;
+        while (i < source.length && (source[i] !== quote || source[i - 1] === '\\')) i++;
+        if (i >= source.length) break;
+      }
+      i++;
+    }
+    const body = source.slice(bodyStart, i - 1);
+
+    // Analyze body for response patterns (priority order)
+    let usesEnvelope = null;
+    let statusCode = null;
+    let isSSE = false;
+
+    // Priority 1: SSE detection — no JSON response at all
+    if (/NewSSEWriter\s*\(/.test(body)) {
+      isSSE = true;
+      usesEnvelope = false;
+      statusCode = 200;
+      results.set(fullHandlerName, { usesEnvelope, statusCode, isSSE });
+      continue;
+    }
+
+    // Priority 2: c.Status(http.StatusNoContent) → 204 no body
+    if (/c\.Status\(http\.StatusNoContent\)/.test(body) || /c\.Status\(204\)/.test(body)) {
+      usesEnvelope = false;
+      statusCode = 204;
+      results.set(fullHandlerName, { usesEnvelope, statusCode, isSSE });
+      continue;
+    }
+
+    // Priority 3: Scan for success response patterns
+    // Pattern A: WriteSuccess / WritePageResult (via middleware.go helpers)
+    const writeSuccessMatch = body.match(/WriteSuccess\s*\([^,]+,\s*([^,)]+)/);
+    const writePageMatch = body.match(/WritePageResult\s*\(/);
+
+    // Pattern B: c.JSON with explicit api.SuccessResponse → envelope
+    const explicitEnvMatch = body.match(/c\.JSON\s*\(\s*([^,]+),\s*api\.SuccessResponse\s*\(/);
+
+    // Pattern C: c.JSON with raw gin.H → no envelope
+    const rawJSONMatch = body.match(/c\.JSON\s*\(\s*([^,]+),\s*gin\.H\s*\{/);
+
+    if (writeSuccessMatch) {
+      usesEnvelope = true;
+      statusCode = extractStatusCode(writeSuccessMatch[1]);
+    } else if (writePageMatch) {
+      usesEnvelope = true;
+      statusCode = 200; // WritePageResult always uses http.StatusOK
+    } else if (explicitEnvMatch) {
+      usesEnvelope = true;
+      statusCode = extractStatusCode(explicitEnvMatch[1]);
+    } else if (rawJSONMatch) {
+      usesEnvelope = false;
+      statusCode = extractStatusCode(rawJSONMatch[1]);
+    }
+
+    results.set(fullHandlerName, { usesEnvelope, statusCode, isSSE });
+  }
+
+  return results;
 }
 
 // ====== Struct Reference Graph ======
@@ -516,6 +661,27 @@ function main() {
   }
   console.error(`[QUERY] Found ${Object.keys(handlerQueryParams).length} handler files with query params`);
 
+  // 6b. Parse handler response wrappers (envelope detection + status code)
+  const handlerResponseResults = {};
+  for (const dir of handlerDirs) {
+    let files;
+    try { files = readdirSync(dir).filter(f => f.endsWith('.go')); } catch { continue; }
+    for (const f of files) {
+      const fp = resolve(dir, f);
+      const source = readFileSync(fp, 'utf-8');
+      // Determine domain prefix from filename
+      const domain = Object.keys(HANDLER_DOMAIN_FILES).find(
+        d => HANDLER_DOMAIN_FILES[d] === f
+      );
+      if (!domain) continue;
+      const results = parseHandlerResponseWrapper(source, domain);
+      for (const [handlerName, info] of results) {
+        handlerResponseResults[handlerName] = info;
+      }
+    }
+  }
+  console.error(`[RESP] Parsed ${Object.keys(handlerResponseResults).length} handler response patterns`);
+
   // 7. Enrich endpoints with response types
   const enrichedEndpoints = routerEndpoints.map(ep => {
     const responseType = getResponseType(ep.handler);
@@ -547,15 +713,18 @@ function main() {
       paginationStyle = paginationStructs[responseType];
     }
 
-    // Check if response is wrapped in ApiResponse envelope
-    // All handlers use api.SuccessResponse() or api.ErrorResponse()
-    const usesEnvelope = ep.method !== 'GET' || ep.path === '/api/health' ? true : null; // null = not checked statically
+    // Check response wrapper from static source analysis (per-handler)
+    const handlerInfo = handlerResponseResults[ep.handler] || {};
+    const usesEnvelope = handlerInfo.usesEnvelope !== undefined ? handlerInfo.usesEnvelope : null;
+    const statusCode = handlerInfo.statusCode || null;
+    const resolvedIsSSE = handlerInfo.isSSE || sseFlag;
 
     return {
       ...ep,
       responseType,
       requestType,
-      isSSE: sseFlag,
+      isSSE: resolvedIsSSE,
+      statusCode,
       responseFields: respFields,
       responseFieldMap: respFieldMap,
       structFound: !!respStruct,
