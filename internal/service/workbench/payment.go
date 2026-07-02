@@ -97,6 +97,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 
 		// Feed test results back to medAgent to continue the agent loop.
 		// The agent has been waiting for test-results since the NEED_TESTS step.
+		medAgentDone := false
 		if s.maClient != nil && session.MedAgentSessionID != nil && *session.MedAgentSessionID != "" {
 			testResults := []medagent.TestResult{
 				{Item: "血常规-白细胞", Value: "11.2×10⁹/L"},
@@ -106,6 +107,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 				slog.Warn("failed to send test results to medAgent", "session_id", input.SessionID, "error", err)
 			} else if nextStep != nil {
 				s.applyMedAgentStep(ctx, session, nextStep)
+				medAgentDone = (nextStep.Kind == medagent.StepDone)
 				session.UpdatedAt = time.Now()
 				session.LastActivityAt = &now
 				if err := s.visitRepo.Update(ctx, session); err != nil {
@@ -115,7 +117,11 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		}
 
 		result.Status = session.Status
-		result.Message = "检验费支付成功，诊断结果已出"
+		if medAgentDone {
+			result.Message = "检验费支付成功，诊断结果已出"
+		} else {
+			result.Message = "检验费支付成功，AI医生正在分析结果，请继续对话"
+		}
 
 	case "medication":
 		// After medication payment, go to medication fulfillment
@@ -149,6 +155,16 @@ func (s *Service) applyMedAgentStep(ctx context.Context, session *model.VisitSes
 		session.Status = string(model.VisitStatusChatting)
 		session.MachineState = string(model.VisitMachineStateChatting)
 		session.ActiveCardID = nil
+
+		// Create assistant message timeline (mirrors chat.go handleAsk behavior)
+		content := step.DoctorSay
+		if content == "" {
+			content = "请继续描述您的症状。"
+		}
+		msgItem := adapter.BuildMessageTimelineItem(session.ID, "assistant", content)
+		if err := s.timelineRepo.Append(ctx, &msgItem); err != nil {
+			slog.Warn("failed to append assistant message timeline in payment flow", "session_id", session.ID, "error", err)
+		}
 
 	case medagent.StepNeedTests:
 		// Agent needs additional tests (uncommon after test results, but handle gracefully).

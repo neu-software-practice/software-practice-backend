@@ -959,7 +959,7 @@ func TestSubmitPayment_Lab_WithMedAgent_TestResultsFails(t *testing.T) {
 	if result.Status != "diagnosis" {
 		t.Errorf("status = %s, want diagnosis (fallback)", result.Status)
 	}
-	if result.Message != "检验费支付成功，诊断结果已出" {
+	if result.Message != "检验费支付成功，AI医生正在分析结果，请继续对话" {
 		t.Errorf("message = %s", result.Message)
 	}
 }
