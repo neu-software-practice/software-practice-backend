@@ -19,6 +19,7 @@ type medAgentClient interface {
 	CreateSession(ctx context.Context, profile map[string]interface{}, initial bool, prior []interface{}) (string, error)
 	PatientSay(ctx context.Context, sessionID string, message string) (*medagent.Step, error)
 	DrugInfo(ctx context.Context, sessionID string, infos []medagent.DrugInfo) (*medagent.Step, error)
+	TestResults(ctx context.Context, sessionID string, results []medagent.TestResult) (*medagent.Step, error)
 }
 
 // Service orchestrates all workbench operations (chat, lab, payment, etc.).

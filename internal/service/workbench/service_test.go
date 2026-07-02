@@ -659,6 +659,194 @@ func TestSubmitPayment_CardNotFound(t *testing.T) {
 	}
 }
 
+// TestSubmitPayment_Lab_WithMedAgent verifies that after lab payment,
+// test results are fed back to medAgent and the returned DONE step
+// produces diagnosis + treatment plan cards.
+func TestSubmitPayment_Lab_WithMedAgent(t *testing.T) {
+	medAgentCalled := false
+	svc, _, mv, mt, mf, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		switch {
+		case containsStr(path, "/test-results"):
+			medAgentCalled = true
+			j := `{"kind":"DONE","result":{"final":"ADVICE","plan":"ADVICE_ONLY","diagnosis":{"name":"感冒","basis":"血常规确认感染","confidence":0.9},"advice":"多休息，多喝水"}}`
+			return 200, j
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+
+	// Set up session with medAgent session ID
+	maSessID := "ma-test-001"
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		s := makeSession("p001")
+		s.ID = id
+		s.MedAgentSessionID = &maSessID
+		return s, nil
+	}
+
+	// Set up payment card
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "payment", true)
+		card.TotalAmount = model.Float64Ptr(50.0)
+		card.Purpose = "lab"
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error { return nil }
+
+	// Track created cards and timeline items
+	var createdCardKinds []string
+	var timelineKinds []string
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		createdCardKinds = append(createdCardKinds, card.Kind)
+		return nil
+	}
+	mt.appendFunc = func(ctx context.Context, item *model.TimelineItem) error {
+		timelineKinds = append(timelineKinds, item.Kind)
+		return nil
+	}
+
+	ctx := context.Background()
+	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+		SessionID: "s1", CardID: "f1", Purpose: "lab",
+	})
+	if err != nil {
+		t.Fatalf("SubmitPayment: %v", err)
+	}
+
+	if !medAgentCalled {
+		t.Error("medAgent TestResults was not called — agent loop is still broken")
+	}
+	if result.Message != "检验费支付成功，诊断结果已出" {
+		t.Errorf("message = %s, want 检验费支付成功，诊断结果已出", result.Message)
+	}
+
+	// ADVICE_ONLY plan should produce: lab_execution, diagnosis, treatment_plan, advice_only
+	foundLabExec := false
+	foundDiagnosis := false
+	foundTreatment := false
+	foundAdvice := false
+	for _, k := range createdCardKinds {
+		switch k {
+		case "lab_execution":
+			foundLabExec = true
+		case "diagnosis":
+			foundDiagnosis = true
+		case "treatment_plan":
+			foundTreatment = true
+		case "advice_only":
+			foundAdvice = true
+		}
+	}
+	if !foundLabExec {
+		t.Error("expected lab_execution card")
+	}
+	if !foundDiagnosis {
+		t.Error("expected diagnosis card")
+	}
+	if !foundTreatment {
+		t.Error("expected treatment_plan card")
+	}
+	if !foundAdvice {
+		t.Error("expected advice_only card")
+	}
+
+	// Should have lab_result_received timeline item
+	foundResult := false
+	for _, k := range timelineKinds {
+		if k == "system_event" {
+			foundResult = true
+		}
+	}
+	if !foundResult {
+		t.Error("expected system_event timeline items")
+	}
+
+	// Session should be in advice_only state (blocked with active card)
+	if result.Status != "blocked" {
+		t.Errorf("status = %s, want blocked (ADVICE_ONLY plan)", result.Status)
+	}
+}
+
+// TestSubmitPayment_Lab_WithMedAgent_Done_Medication verifies the MEDICATION plan path.
+func TestSubmitPayment_Lab_WithMedAgent_Medication(t *testing.T) {
+	svc, _, mv, _, mf, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		if containsStr(path, "/test-results") {
+			j := `{"kind":"DONE","result":{"final":"MEDICATION","plan":"MEDICATION","diagnosis":{"name":"细菌感染","basis":"血常规白细胞升高","confidence":0.85},"advice":"需要使用抗生素"}}`
+			return 200, j
+		}
+		return 404, `{"error":"not found"}`
+	})
+
+	maSessID := "ma-test-002"
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		s := makeSession("p001")
+		s.ID = id
+		s.MedAgentSessionID = &maSessID
+		return s, nil
+	}
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "payment", true)
+		card.TotalAmount = model.Float64Ptr(50.0)
+		card.Purpose = "lab"
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error { return nil }
+
+	ctx := context.Background()
+	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+		SessionID: "s1", CardID: "f1", Purpose: "lab",
+	})
+	if err != nil {
+		t.Fatalf("SubmitPayment: %v", err)
+	}
+
+	// MEDICATION plan → session should be in diagnosis state
+	if result.Status != "diagnosis" {
+		t.Errorf("status = %s, want diagnosis (MEDICATION plan)", result.Status)
+	}
+	if result.Message != "检验费支付成功，诊断结果已出" {
+		t.Errorf("message = %s", result.Message)
+	}
+}
+
+// TestSubmitPayment_Lab_WithMedAgent_TestResultsFails verifies graceful handling
+// when the medAgent TestResults call fails.
+func TestSubmitPayment_Lab_WithMedAgent_TestResultsFails(t *testing.T) {
+	svc, _, mv, _, mf, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		return 500, `{"error":"internal error"}`
+	})
+
+	maSessID := "ma-test-003"
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		s := makeSession("p001")
+		s.ID = id
+		s.MedAgentSessionID = &maSessID
+		return s, nil
+	}
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "payment", true)
+		card.TotalAmount = model.Float64Ptr(50.0)
+		card.Purpose = "lab"
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error { return nil }
+
+	ctx := context.Background()
+	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+		SessionID: "s1", CardID: "f1", Purpose: "lab",
+	})
+	if err != nil {
+		t.Fatalf("SubmitPayment should not fail when TestResults errors: %v", err)
+	}
+	// Should still complete payment successfully, falling back to diagnosis state.
+	if result.Status != "diagnosis" {
+		t.Errorf("status = %s, want diagnosis (fallback)", result.Status)
+	}
+	if result.Message != "检验费支付成功，诊断结果已出" {
+		t.Errorf("message = %s", result.Message)
+	}
+}
+
 func TestSubmitPayment_Lab_VisitUpdateFails(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {

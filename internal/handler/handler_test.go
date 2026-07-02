@@ -818,6 +818,7 @@ type mockMedAgentClient struct {
 	createSessionFunc func(ctx context.Context, profile map[string]interface{}, initial bool, prior []interface{}) (string, error)
 	patientSayFunc    func(ctx context.Context, sessionID string, message string) (*medagent.Step, error)
 	drugInfoFunc      func(ctx context.Context, sessionID string, infos []medagent.DrugInfo) (*medagent.Step, error)
+	testResultsFunc   func(ctx context.Context, sessionID string, results []medagent.TestResult) (*medagent.Step, error)
 }
 
 func (m *mockMedAgentClient) CreateSession(ctx context.Context, profile map[string]interface{}, initial bool, prior []interface{}) (string, error) {
@@ -837,6 +838,13 @@ func (m *mockMedAgentClient) PatientSay(ctx context.Context, sessionID string, m
 func (m *mockMedAgentClient) DrugInfo(ctx context.Context, sessionID string, infos []medagent.DrugInfo) (*medagent.Step, error) {
 	if m.drugInfoFunc != nil {
 		return m.drugInfoFunc(ctx, sessionID, infos)
+	}
+	return nil, nil
+}
+
+func (m *mockMedAgentClient) TestResults(ctx context.Context, sessionID string, results []medagent.TestResult) (*medagent.Step, error) {
+	if m.testResultsFunc != nil {
+		return m.testResultsFunc(ctx, sessionID, results)
 	}
 	return nil, nil
 }
