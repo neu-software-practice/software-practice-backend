@@ -673,15 +673,57 @@ func TestSubmitPayment_Lab_VisitUpdateFails(t *testing.T) {
 	svc := newSvc(mp, mv, mt, mf, ma)
 	ctx := context.Background()
 
-	// The update error is silently ignored; function should still succeed.
-	result, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+	// Visit update failure should now be propagated as an error.
+	_, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
 		SessionID: "s1", CardID: "f1", Purpose: "lab",
 	})
-	if err != nil {
-		t.Fatalf("SubmitPayment: %v", err)
+	if err == nil {
+		t.Fatal("expected error when visit update fails")
 	}
-	if result.Status != "diagnosis" {
-		t.Errorf("status = %s, want diagnosis", result.Status)
+}
+
+func TestSubmitPayment_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "payment", true)
+		card.TotalAmount = model.Float64Ptr(50.0)
+		card.Purpose = "lab"
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	// Flow card update failure should be propagated as an error.
+	_, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+		SessionID: "s1", CardID: "f1", Purpose: "lab",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails")
+	}
+}
+
+func TestSubmitPayment_Defer_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "payment", true)
+		card.TotalAmount = model.Float64Ptr(100.0)
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	// Deferred payment card update failure should be propagated as an error.
+	_, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+		SessionID: "s1", CardID: "f1", Purpose: "lab", Defer: true,
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on defer")
 	}
 }
 

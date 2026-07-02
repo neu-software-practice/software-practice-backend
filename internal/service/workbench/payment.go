@@ -25,7 +25,9 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 	if input.Defer {
 		// Defer payment
 		card.Status = string(model.FlowCardStatusPending)
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on defer: %w", err)
+		}
 
 		return &model.FlowActionResult{
 			SessionID: input.SessionID,
@@ -44,9 +46,11 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 	// Process payment
 	now := time.Now()
 	card.PaymentStatus = string(model.PaymentStatusPaid)
-	card.Status = string(model.FlowCardStatusCompleted)
+	card.Status = string(model.FlowCardStatusPaid)
 	card.HandledAt = &now
-	_ = s.flowCardRepo.Update(ctx, card)
+	if err := s.flowCardRepo.Update(ctx, card); err != nil {
+		return nil, fmt.Errorf("update flow card on payment: %w", err)
+	}
 
 	result := &model.FlowActionResult{
 		SessionID: input.SessionID,
@@ -70,7 +74,9 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		session.ActiveCardID = nil
 		session.UpdatedAt = now
 		session.LastActivityAt = &now
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after lab payment: %w", err)
+		}
 
 		// Auto-generate lab results
 		labResults := []struct {
@@ -94,7 +100,9 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		session.UpdatedAt = now
 		session.LastActivityAt = &now
 		session.Status = status
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after medication payment: %w", err)
+		}
 
 		result.Status = status
 		result.Message = "药费支付成功，请确认取药方式"
