@@ -102,6 +102,7 @@ type MockTimelineRepo struct {
 	FindLastStreamingMessageFunc func(ctx context.Context, sessionID string) (*model.TimelineItem, error)
 	UpdateStatusFunc             func(ctx context.Context, id, status string) error
 	UpdateContentFunc            func(ctx context.Context, id string, item *model.TimelineItem) error
+	FindFlowCardByCardIDFunc     func(ctx context.Context, sessionID, cardID string) (*model.TimelineItem, error)
 }
 
 func (m *MockTimelineRepo) Append(ctx context.Context, item *model.TimelineItem) error {
@@ -145,6 +146,12 @@ func (m *MockTimelineRepo) UpdateContent(ctx context.Context, id string, item *m
 		return m.UpdateContentFunc(ctx, id, item)
 	}
 	return ErrNotImplemented
+}
+func (m *MockTimelineRepo) FindFlowCardByCardID(ctx context.Context, sessionID, cardID string) (*model.TimelineItem, error) {
+	if m.FindFlowCardByCardIDFunc != nil {
+		return m.FindFlowCardByCardIDFunc(ctx, sessionID, cardID)
+	}
+	return nil, ErrNotImplemented
 }
 
 // MockFlowCardRepo is a shared mock implementation of FlowCardRepository.

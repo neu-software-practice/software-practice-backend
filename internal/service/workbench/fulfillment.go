@@ -58,6 +58,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	if err := s.flowCardRepo.Update(ctx, card); err != nil {
 		return nil, fmt.Errorf("update flow card on fulfillment: %w", err)
 	}
+	s.syncCardToTimeline(ctx, card)
 
 	modeText := "到院取药"
 	if input.Mode == "delivery" {

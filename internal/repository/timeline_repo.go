@@ -15,4 +15,5 @@ type TimelineRepository interface {
 	FindLastStreamingMessage(ctx context.Context, sessionID string) (*model.TimelineItem, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error
+	FindFlowCardByCardID(ctx context.Context, sessionID, cardID string) (*model.TimelineItem, error)
 }

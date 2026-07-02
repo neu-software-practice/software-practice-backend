@@ -185,6 +185,7 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 	if err := s.flowCardRepo.Update(ctx, card); err != nil {
 		return nil, fmt.Errorf("update flow card on ack advice: %w", err)
 	}
+	s.syncCardToTimeline(ctx, card)
 
 	// Complete session
 	reason := "completed"

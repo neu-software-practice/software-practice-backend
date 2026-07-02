@@ -93,6 +93,9 @@ func (m *mockTimelineRepo) FindLastStreamingMessage(ctx context.Context, session
 func (m *mockTimelineRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {
 	return nil
 }
+func (m *mockTimelineRepo) FindFlowCardByCardID(ctx context.Context, sessionID, cardID string) (*model.TimelineItem, error) {
+	return nil, nil
+}
 
 type mockFlowCardRepo struct {
 	createFunc       func(ctx context.Context, card *model.FlowCard) error

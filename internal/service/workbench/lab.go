@@ -42,6 +42,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on lab accepted: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		// Create payment card for lab tests
 		items := []model.PaymentLineItem{
@@ -90,6 +91,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on lab skipped: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		// Go straight to diagnosis
 		status := string(model.VisitStatusDiagnosis)
@@ -120,6 +122,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on lab vetoed: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		// Return to chatting
 		status := string(model.VisitStatusChatting)

@@ -460,6 +460,7 @@ func TestGetContext_WithPriorVisit(t *testing.T) {
 		t.Errorf("TreatmentSummary = %s, want %s", ctx2.PriorVisit.TreatmentSummary, treatmentSummary)
 	}
 }
+
 // TestGetContext_SkipsNonCompletedVisit verifies that the service passes the
 // completed status filter to the repository, which handles the filtering at
 // the query level. The mock simulates a repository that returns only completed visits.
@@ -485,104 +486,6 @@ func TestGetContext_SkipsNonCompletedVisit(t *testing.T) {
 	visitRepo := &mockVisitRepo{
 		listByPatientFunc: func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			// Verify status filter is passed correctly
-			if status != string(model.VisitStatusCompleted) {
-				t.Errorf("expected status=%q, got %q", model.VisitStatusCompleted, status)
-			}
-			return []model.VisitSessionSummary{
-				{
-					ID:        "v001",
-					PatientID: "p001",
-					Status:    "completed",
-					Summary: model.VisitSummary{
-						Diagnosis:        &completedDiagnosis,
-						TreatmentSummary: &completedTreatment,
-					},
-				},
-			}, nil, true, nil
-		},
-	}
-
-	svc := patient.NewService(patientRepo, visitRepo)
-
-	ctx2, err := svc.GetContext(ctx, "p001")
-	if err != nil {
-		t.Fatalf("GetContext: %v", err)
-	}
-	if ctx2.PriorVisit == nil {
-		t.Fatal("expected PriorVisit to be non-nil")
-	}
-	if ctx2.PriorVisit.SessionID != "v001" {
-		t.Errorf("SessionID = %s, want v001", ctx2.PriorVisit.SessionID)
-	}
-	if ctx2.PriorVisit.Diagnosis != completedDiagnosis {
-		t.Errorf("Diagnosis = %s, want %s", ctx2.PriorVisit.Diagnosis, completedDiagnosis)
-	}
-	if ctx2.PriorVisit.TreatmentSummary != completedTreatment {
-		t.Errorf("TreatmentSummary = %s, want %s", ctx2.PriorVisit.TreatmentSummary, completedTreatment)
-	}
-}
-
-func TestGetContext_AllVisitsNonCompleted(t *testing.T) {
-	ctx := context.Background()
-
-	patientRepo := &mockPatientRepo{
-		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
-			return &model.PatientProfile{
-				ID:                  "p001",
-				Name:                "张三",
-				Allergies:           []string{},
-				ChronicDiseases:     []string{},
-				LongTermMedications: []string{},
-				UpdatedAt:           time.Now(),
-			}, nil
-		},
-	}
-	// All visits are non-completed — the repository returns empty when
-	// filtered by completed status, so PriorVisit should be nil.
-	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
-			if status != string(model.VisitStatusCompleted) {
-				t.Errorf("expected status=%q, got %q", model.VisitStatusCompleted, status)
-			}
-			return []model.VisitSessionSummary{}, nil, false, nil
-		},
-	}
-
-	svc := patient.NewService(patientRepo, visitRepo)
-
-	ctx2, err := svc.GetContext(ctx, "p001")
-	if err != nil {
-		t.Fatalf("GetContext: %v", err)
-	}
-	if ctx2.PriorVisit != nil {
-		t.Errorf("expected PriorVisit to be nil when no completed visit exists, got SessionID=%s", ctx2.PriorVisit.SessionID)
-	}
-}
-
-// TestGetContext_SkipsNonCompletedVisit verifies that the service passes the
-// completed status filter to the repository, which handles the filtering at
-// the query level.
-func TestGetContext_SkipsNonCompletedVisit(t *testing.T) {
-	ctx := context.Background()
-
-	completedDiagnosis := "上呼吸道感染"
-	completedTreatment := "开具头孢类抗生素"
-
-	patientRepo := &mockPatientRepo{
-		findByIDFunc: func(ctx context.Context, id string) (*model.PatientProfile, error) {
-			return &model.PatientProfile{
-				ID:                  "p001",
-				Name:                "张三",
-				Allergies:           []string{},
-				ChronicDiseases:     []string{},
-				LongTermMedications: []string{},
-				UpdatedAt:           time.Now(),
-			}, nil
-		},
-	}
-	// Repository filters by completed status — only completed visits are returned.
-	visitRepo := &mockVisitRepo{
-		listByPatientFunc: func(ctx context.Context, patientID string, status string, cursor *string, pageSize int) ([]model.VisitSessionSummary, *string, bool, error) {
 			if status != string(model.VisitStatusCompleted) {
 				t.Errorf("expected status=%q, got %q", model.VisitStatusCompleted, status)
 			}

@@ -194,6 +194,29 @@ func (r *timelineMySQLRepo) FindLastStreamingMessage(ctx context.Context, sessio
 	return &item, nil
 }
 
+// FindFlowCardByCardID finds a flow_card-kind timeline item whose embedded card
+// has the given cardID. Returns nil, nil when no matching timeline item exists.
+func (r *timelineMySQLRepo) FindFlowCardByCardID(ctx context.Context, sessionID, cardID string) (*model.TimelineItem, error) {
+	var contentJSON string
+	var item model.TimelineItem
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, session_id, kind, status, content, created_at FROM timeline_items
+		WHERE session_id = ? AND kind = 'flow_card'
+		AND JSON_UNQUOTE(JSON_EXTRACT(content, '$.card.id')) = ? LIMIT 1`,
+		sessionID, cardID,
+	).Scan(&item.ID, &item.SessionID, &item.Kind, &item.Status, &contentJSON, &item.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find flow card timeline item by card id: %w", err)
+	}
+	if err := json.Unmarshal([]byte(contentJSON), &item); err != nil {
+		return nil, fmt.Errorf("unmarshal timeline item: %w", err)
+	}
+	return &item, nil
+}
+
 // UpdateContent updates the content JSON column of a timeline item.
 // This is used to update fields like InterruptedBy that are stored in the content JSON.
 func (r *timelineMySQLRepo) UpdateContent(ctx context.Context, id string, item *model.TimelineItem) error {

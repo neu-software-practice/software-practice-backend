@@ -29,6 +29,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on defer: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		return &model.FlowActionResult{
 			SessionID: input.SessionID,
@@ -52,6 +53,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 	if err := s.flowCardRepo.Update(ctx, card); err != nil {
 		return nil, fmt.Errorf("update flow card on payment: %w", err)
 	}
+	s.syncCardToTimeline(ctx, card)
 
 	result := &model.FlowActionResult{
 		SessionID: input.SessionID,
