@@ -2,6 +2,7 @@ package workbench
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
@@ -19,7 +20,9 @@ func (s *Service) PauseTimer(ctx context.Context, sessionID string) (*model.Visi
 	session.PausedAt = &now
 	session.UpdatedAt = now
 	session.LastActivityAt = &now
-	_ = s.visitRepo.Update(ctx, session)
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update session on pause timer: %w", err)
+	}
 
 	return session, nil
 }
@@ -36,7 +39,9 @@ func (s *Service) ResumeTimer(ctx context.Context, sessionID string) (*model.Vis
 	now := time.Now()
 	session.UpdatedAt = now
 	session.LastActivityAt = &now
-	_ = s.visitRepo.Update(ctx, session)
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update session on resume timer: %w", err)
+	}
 
 	return session, nil
 }

@@ -573,6 +573,120 @@ func TestSubmitLabResults_Empty(t *testing.T) {
 	}
 }
 
+func TestSubmitLabDecision_Accepted_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		return makeCard(id, "s1", "lab_decision", true), nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+		SessionID: "s1", CardID: "f1", Decision: "accepted",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on accepted")
+	}
+}
+
+func TestSubmitLabDecision_Accepted_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		return makeCard(id, "s1", "lab_decision", true), nil
+	}
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+		SessionID: "s1", CardID: "f1", Decision: "accepted",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on accepted")
+	}
+}
+
+func TestSubmitLabDecision_Skipped_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		return makeCard(id, "s1", "lab_decision", true), nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+		SessionID: "s1", CardID: "f1", Decision: "skipped",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on skipped")
+	}
+}
+
+func TestSubmitLabDecision_Skipped_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		return makeCard(id, "s1", "lab_decision", true), nil
+	}
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+		SessionID: "s1", CardID: "f1", Decision: "skipped",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on skipped")
+	}
+}
+
+func TestSubmitLabDecision_Vetoed_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		return makeCard(id, "s1", "lab_decision", true), nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+		SessionID: "s1", CardID: "f1", Decision: "vetoed",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on vetoed")
+	}
+}
+
+func TestSubmitLabDecision_Vetoed_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		return makeCard(id, "s1", "lab_decision", true), nil
+	}
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+		SessionID: "s1", CardID: "f1", Decision: "vetoed",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on vetoed")
+	}
+}
+
 // ============================================================
 //  payment.go — SubmitPayment
 // ============================================================
@@ -1099,6 +1213,102 @@ func TestSubmitTreatmentExecution_CardNotFound(t *testing.T) {
 	}
 }
 
+func TestSubmitTreatmentExecution_Schedule_UpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "s1", CardID: "f1", Action: "schedule",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on schedule")
+	}
+}
+
+func TestSubmitTreatmentExecution_Complete_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "s1", CardID: "f1", Action: "complete",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on complete")
+	}
+}
+
+func TestSubmitTreatmentExecution_Complete_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "s1", CardID: "f1", Action: "complete",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on complete")
+	}
+}
+
+func TestSubmitTreatmentExecution_Complete_FlowCardCreateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("create error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "s1", CardID: "f1", Action: "complete",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card create fails on complete")
+	}
+}
+
+func TestSubmitTreatmentExecution_Cancel_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "s1", CardID: "f1", Action: "cancel",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails on cancel")
+	}
+}
+
+func TestSubmitTreatmentExecution_Cancel_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+		SessionID: "s1", CardID: "f1", Action: "cancel",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on cancel")
+	}
+}
+
 func TestAckAdvice(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	svc := newSvc(mp, mv, mt, mf, ma)
@@ -1131,6 +1341,54 @@ func TestAckAdvice_CardNotFound(t *testing.T) {
 	})
 	if err != model.ErrCardNotFound {
 		t.Errorf("expected ErrCardNotFound, got %v", err)
+	}
+}
+
+func TestAckAdvice_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
+		SessionID: "s1", CardID: "f1",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails")
+	}
+}
+
+func TestAckAdvice_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
+		SessionID: "s1", CardID: "f1",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails")
+	}
+}
+
+func TestAckAdvice_FlowCardCreateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("create error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
+		SessionID: "s1", CardID: "f1",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card create fails")
 	}
 }
 
@@ -1283,6 +1541,80 @@ func TestExitVisit_DefaultCase(t *testing.T) {
 	}
 	if result.Consequence == nil || result.Consequence.Kind != "no_fee" {
 		t.Errorf("consequence = %v, want no_fee (default)", result.Consequence)
+	}
+}
+
+func TestExitVisit_UpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.ExitVisit(ctx, model.ExitVisitInput{SessionID: "s1", Reason: "patient_request"})
+	if err == nil {
+		t.Fatal("expected error when visit update fails")
+	}
+}
+
+func TestSubmitFulfillment_Pickup_FlowCardUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "medication_fulfillment", true)
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
+		SessionID: "s1", CardID: "f1", Mode: "pickup",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card update fails")
+	}
+}
+
+func TestSubmitFulfillment_Pickup_VisitUpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "medication_fulfillment", true)
+		return card, nil
+	}
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
+		SessionID: "s1", CardID: "f1", Mode: "pickup",
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails")
+	}
+}
+
+func TestSubmitFulfillment_Pickup_FlowCardCreateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "medication_fulfillment", true)
+		return card, nil
+	}
+	mf.createFunc = func(ctx context.Context, card *model.FlowCard) error {
+		return fmt.Errorf("create error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
+		SessionID: "s1", CardID: "f1", Mode: "pickup",
+	})
+	if err == nil {
+		t.Fatal("expected error when flow card create fails")
 	}
 }
 
@@ -1470,6 +1802,65 @@ func TestDismissEmergency_SessionNotFound(t *testing.T) {
 	})
 	if err != model.ErrSessionNotFound {
 		t.Errorf("expected ErrSessionNotFound, got %v", err)
+	}
+}
+
+func TestDismissEmergency_UpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, _, err := svc.DismissEmergency(ctx, wbsvc.DismissEmergencyInput{SessionID: "s1"})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on dismiss emergency")
+	}
+}
+
+func TestReportVitals_Critical_UpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	hr := 150
+	_, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
+		SessionID: "s1",
+		Vitals: &model.VitalsData{
+			HeartRate: &hr,
+		},
+		Symptoms: []string{"胸痛"},
+	})
+	if err == nil {
+		t.Fatal("expected error when visit update fails on critical vitals")
+	}
+}
+
+func TestReportVitals_Critical_FindSessionFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	// FindByID returns error — session termination cannot proceed, but vitals detection succeeds
+	mv.findByIDFunc = func(ctx context.Context, id string) (*model.VisitSession, error) {
+		return nil, fmt.Errorf("db error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	hr := 150
+	_, err := svc.ReportVitals(ctx, wbsvc.ReportVitalsInput{
+		SessionID: "s1",
+		Vitals: &model.VitalsData{
+			HeartRate: &hr,
+		},
+		Symptoms: []string{"胸痛"},
+	})
+	// HR 150 + 胸痛 triggers critical severity, but FindByID fails —
+	// the function should log a warning and return the emergency detection result without error.
+	if err != nil {
+		t.Fatalf("expected no error when FindSession fails during emergency detection, got: %v", err)
 	}
 }
 
@@ -1679,6 +2070,34 @@ func TestResumeTimer_NotFound(t *testing.T) {
 	_, err := svc.ResumeTimer(ctx, "bad-id")
 	if err != model.ErrSessionNotFound {
 		t.Errorf("expected ErrSessionNotFound, got %v", err)
+	}
+}
+
+func TestPauseTimer_UpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.PauseTimer(ctx, "s1")
+	if err == nil {
+		t.Fatal("expected error when visit update fails")
+	}
+}
+
+func TestResumeTimer_UpdateFails(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	mv.updateFunc = func(ctx context.Context, vs *model.VisitSession) error {
+		return fmt.Errorf("update error")
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.ResumeTimer(ctx, "s1")
+	if err == nil {
+		t.Fatal("expected error when visit update fails")
 	}
 }
 

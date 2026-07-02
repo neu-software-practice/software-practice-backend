@@ -469,7 +469,9 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 		return err
 	}
 	diagTL := adapter.BuildFlowCardTimelineItem(sessionID, diagCard)
-	_ = s.timelineRepo.Append(ctx, &diagTL)
+	if err := s.timelineRepo.Append(ctx, &diagTL); err != nil {
+		slog.Warn("failed to append diagnosis timeline", "session_id", sessionID, "error", err)
+	}
 
 	// 2. Send treatment plan card
 	planCard := adapter.BuildTreatmentPlanCard(sessionID, result)
@@ -505,7 +507,9 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 			return err
 		}
 		adviceTL := adapter.BuildFlowCardTimelineItem(sessionID, adviceCard)
-		_ = s.timelineRepo.Append(ctx, &adviceTL)
+		if err := s.timelineRepo.Append(ctx, &adviceTL); err != nil {
+			slog.Warn("failed to append advice timeline", "session_id", sessionID, "error", err)
+		}
 
 		cardID := adviceCard.ID
 		session.ActiveCardID = &cardID
@@ -535,7 +539,9 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 			return err
 		}
 		compTL := adapter.BuildFlowCardTimelineItem(sessionID, completedCard)
-		_ = s.timelineRepo.Append(ctx, &compTL)
+		if err := s.timelineRepo.Append(ctx, &compTL); err != nil {
+			slog.Warn("failed to append completed visit timeline", "session_id", sessionID, "error", err)
+		}
 
 		// Terminal - referral
 		termItem := adapter.BuildTerminalTimelineItem(sessionID,
@@ -543,7 +549,9 @@ func (s *Service) handleDone(ctx context.Context, sessionID, requestID string, s
 			"转诊",
 			result.Advice,
 		)
-		_ = s.timelineRepo.Append(ctx, &termItem)
+		if err := s.timelineRepo.Append(ctx, &termItem); err != nil {
+			slog.Warn("failed to append referral terminal timeline", "session_id", sessionID, "error", err)
+		}
 
 		now := time.Now()
 		reason := string(model.TerminalReasonReferral)

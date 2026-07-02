@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
@@ -39,7 +40,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		card.Status = string(model.FlowCardStatusProcessing)
 		future := now.Add(30 * time.Minute)
 		card.AppointmentAt = &future
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on schedule: %w", err)
+		}
 
 		result.Status = session.Status
 		result.Card = card
@@ -47,7 +50,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	case "confirm_arrival":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusArrived)
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on confirm arrival: %w", err)
+		}
 
 		result.Status = session.Status
 		result.Card = card
@@ -55,7 +60,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	case "start":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusInProgress)
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on start: %w", err)
+		}
 
 		result.Status = session.Status
 		result.Card = card
@@ -65,7 +72,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusCompleted)
 		card.Status = string(model.FlowCardStatusCompleted)
 		card.HandledAt = &now
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on complete: %w", err)
+		}
 
 		// Complete the session
 		reason := "completed"
@@ -78,7 +87,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		session.Summary.TreatmentSummary = &ts
 		session.UpdatedAt = now
 		session.LastActivityAt = &now
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after treatment complete: %w", err)
+		}
 
 		// Completed visit card
 		completedCard := &model.FlowCard{
@@ -92,14 +103,18 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 			CompletedAt:      now,
 			TreatmentSummary: "治疗完成",
 		}
-		_ = s.flowCardRepo.Create(ctx, completedCard)
+		if err := s.flowCardRepo.Create(ctx, completedCard); err != nil {
+			return nil, fmt.Errorf("create completed visit card: %w", err)
+		}
 
 		termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
 			"completed",
 			"治疗完成",
 			"治疗已全部完成，就诊结束",
 		)
-		_ = s.timelineRepo.Append(ctx, &termTL)
+		if err := s.timelineRepo.Append(ctx, &termTL); err != nil {
+			slog.Warn("failed to append terminal timeline on treatment complete", "session_id", input.SessionID, "error", err)
+		}
 
 		result.Status = string(model.VisitStatusCompleted)
 		result.Card = card
@@ -110,7 +125,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusCanceled)
 		card.Status = string(model.FlowCardStatusInvalidated)
 		card.HandledAt = &now
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on cancel: %w", err)
+		}
 
 		// Return to treatment decision
 		session.Status = string(model.VisitStatusTreatment)
@@ -118,7 +135,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		session.ActiveCardID = nil
 		session.UpdatedAt = now
 		session.LastActivityAt = &now
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after treatment cancel: %w", err)
+		}
 
 		result.Status = string(model.VisitStatusTreatment)
 		result.Card = card
@@ -134,7 +153,9 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 		"治疗进度",
 		fmt.Sprintf("操作：%s", input.Action),
 	)
-	_ = s.timelineRepo.Append(ctx, &actionTL)
+	if err := s.timelineRepo.Append(ctx, &actionTL); err != nil {
+		slog.Warn("failed to append treatment action timeline", "session_id", input.SessionID, "action", input.Action, "error", err)
+	}
 	result.TimelineItems = append(result.TimelineItems, actionTL)
 
 	return result, nil
@@ -161,7 +182,9 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 	now := time.Now()
 	card.Status = string(model.FlowCardStatusCompleted)
 	card.HandledAt = &now
-	_ = s.flowCardRepo.Update(ctx, card)
+	if err := s.flowCardRepo.Update(ctx, card); err != nil {
+		return nil, fmt.Errorf("update flow card on ack advice: %w", err)
+	}
 
 	// Complete session
 	reason := "completed"
@@ -172,7 +195,9 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 	session.ActiveCardID = nil
 	session.UpdatedAt = now
 	session.LastActivityAt = &now
-	_ = s.visitRepo.Update(ctx, session)
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update session after ack advice: %w", err)
+	}
 
 	// Completed visit card
 	completedCard := &model.FlowCard{
@@ -186,21 +211,27 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 		CompletedAt:      now,
 		TreatmentSummary: "医嘱确认完成",
 	}
-	_ = s.flowCardRepo.Create(ctx, completedCard)
+	if err := s.flowCardRepo.Create(ctx, completedCard); err != nil {
+		return nil, fmt.Errorf("create completed visit card: %w", err)
+	}
 
 	ackTL := adapter.BuildSystemEventTimelineItem(input.SessionID,
 		"advice_acknowledged",
 		"医嘱已确认",
 		"患者已确认医嘱",
 	)
-	_ = s.timelineRepo.Append(ctx, &ackTL)
+	if err := s.timelineRepo.Append(ctx, &ackTL); err != nil {
+		slog.Warn("failed to append advice ack timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
 		"completed",
 		"就诊完成",
 		"医嘱确认完成，就诊结束",
 	)
-	_ = s.timelineRepo.Append(ctx, &termTL)
+	if err := s.timelineRepo.Append(ctx, &termTL); err != nil {
+		slog.Warn("failed to append terminal timeline on ack advice", "session_id", input.SessionID, "error", err)
+	}
 
 	return &model.FlowActionResult{
 		SessionID:     input.SessionID,

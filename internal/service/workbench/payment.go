@@ -64,7 +64,9 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 		"支付成功",
 		fmt.Sprintf("%s 费用已支付 ¥%.2f", input.Purpose, model.DerefFloat64(card.TotalAmount)),
 	)
-	_ = s.timelineRepo.Append(ctx, &payTL)
+	if err := s.timelineRepo.Append(ctx, &payTL); err != nil {
+		slog.Warn("failed to append payment success timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	switch input.Purpose {
 	case "lab":
@@ -154,7 +156,9 @@ func (s *Service) applyMedAgentStep(ctx context.Context, session *model.VisitSes
 			return
 		}
 		tlItem := adapter.BuildFlowCardTimelineItem(session.ID, card)
-		_ = s.timelineRepo.Append(ctx, &tlItem)
+		if err := s.timelineRepo.Append(ctx, &tlItem); err != nil {
+			slog.Warn("failed to append need-tests card timeline", "session_id", session.ID, "error", err)
+		}
 		cardID := card.ID
 		session.Status = string(model.VisitStatusBlocked)
 		session.MachineState = string(model.VisitMachineStateLabDecision)
@@ -166,7 +170,9 @@ func (s *Service) applyMedAgentStep(ctx context.Context, session *model.VisitSes
 			"急症",
 			step.Emergency,
 		)
-		_ = s.timelineRepo.Append(ctx, &termItem)
+		if err := s.timelineRepo.Append(ctx, &termItem); err != nil {
+			slog.Warn("failed to append emergency terminal timeline", "session_id", session.ID, "error", err)
+		}
 		now := time.Now()
 		reason := string(model.TerminalReasonEmergency)
 		session.Status = string(model.VisitStatusEmergencyTerminated)
@@ -199,7 +205,9 @@ func (s *Service) applyDoneStep(ctx context.Context, session *model.VisitSession
 		slog.Warn("failed to create diagnosis card in payment flow", "session_id", session.ID, "error", err)
 	} else {
 		diagTL := adapter.BuildFlowCardTimelineItem(session.ID, diagCard)
-		_ = s.timelineRepo.Append(ctx, &diagTL)
+		if err := s.timelineRepo.Append(ctx, &diagTL); err != nil {
+			slog.Warn("failed to append diagnosis timeline in payment flow", "session_id", session.ID, "error", err)
+		}
 	}
 
 	// 2. Create treatment plan card
@@ -208,7 +216,9 @@ func (s *Service) applyDoneStep(ctx context.Context, session *model.VisitSession
 		slog.Warn("failed to create treatment plan card in payment flow", "session_id", session.ID, "error", err)
 	} else {
 		planTL := adapter.BuildFlowCardTimelineItem(session.ID, planCard)
-		_ = s.timelineRepo.Append(ctx, &planTL)
+		if err := s.timelineRepo.Append(ctx, &planTL); err != nil {
+			slog.Warn("failed to append treatment plan timeline in payment flow", "session_id", session.ID, "error", err)
+		}
 	}
 
 	// 3. Handle plan-specific state and cards
@@ -224,7 +234,9 @@ func (s *Service) applyDoneStep(ctx context.Context, session *model.VisitSession
 			slog.Warn("failed to create advice card in payment flow", "session_id", session.ID, "error", err)
 		} else {
 			adviceTL := adapter.BuildFlowCardTimelineItem(session.ID, adviceCard)
-			_ = s.timelineRepo.Append(ctx, &adviceTL)
+			if err := s.timelineRepo.Append(ctx, &adviceTL); err != nil {
+				slog.Warn("failed to append advice timeline in payment flow", "session_id", session.ID, "error", err)
+			}
 		}
 		cardID := adviceCard.ID
 		session.Status = string(model.VisitStatusBlocked)
@@ -237,14 +249,18 @@ func (s *Service) applyDoneStep(ctx context.Context, session *model.VisitSession
 			slog.Warn("failed to create completed visit card in payment flow", "session_id", session.ID, "error", err)
 		} else {
 			compTL := adapter.BuildFlowCardTimelineItem(session.ID, completedCard)
-			_ = s.timelineRepo.Append(ctx, &compTL)
+			if err := s.timelineRepo.Append(ctx, &compTL); err != nil {
+				slog.Warn("failed to append completed visit timeline in payment flow", "session_id", session.ID, "error", err)
+			}
 		}
 		termItem := adapter.BuildTerminalTimelineItem(session.ID,
 			string(model.TerminalReasonReferral),
 			"转诊",
 			result.Advice,
 		)
-		_ = s.timelineRepo.Append(ctx, &termItem)
+		if err := s.timelineRepo.Append(ctx, &termItem); err != nil {
+			slog.Warn("failed to append referral terminal timeline in payment flow", "session_id", session.ID, "error", err)
+		}
 		now := time.Now()
 		reason := string(model.TerminalReasonReferral)
 		session.Status = string(model.VisitStatusTransferred)

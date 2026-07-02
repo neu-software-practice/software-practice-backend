@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
@@ -40,7 +41,9 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 	session.EndedAt = &now
 	session.TerminalReason = &reason
 	session.UpdatedAt = now
-	_ = s.visitRepo.Update(ctx, session)
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update session on exit: %w", err)
+	}
 
 	// Create exit settlement timeline item
 	exitTL := adapter.BuildSystemEventTimelineItem(input.SessionID,
@@ -55,8 +58,12 @@ func (s *Service) ExitVisit(ctx context.Context, input model.ExitVisitInput) (*m
 		consequence.Text,
 	)
 
-	_ = s.timelineRepo.Append(ctx, &exitTL)
-	_ = s.timelineRepo.Append(ctx, &terminalTL)
+	if err := s.timelineRepo.Append(ctx, &exitTL); err != nil {
+		slog.Warn("failed to append exit settlement timeline", "session_id", input.SessionID, "error", err)
+	}
+	if err := s.timelineRepo.Append(ctx, &terminalTL); err != nil {
+		slog.Warn("failed to append terminal timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	return &model.ExitSettlementResult{
 		SessionID:      input.SessionID,

@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
@@ -38,7 +39,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 	switch input.Decision {
 	case "accepted":
 		card.Status = string(model.FlowCardStatusAccepted)
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on lab accepted: %w", err)
+		}
 
 		// Create payment card for lab tests
 		items := []model.PaymentLineItem{
@@ -57,7 +60,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		session.ActiveCardID = &cardID
 		session.UpdatedAt = now
 		session.LastActivityAt = &now
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after lab accepted: %w", err)
+		}
 
 		result.Status = status
 		result.ActiveCardID = &cardID
@@ -70,15 +75,21 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 			"检验决定",
 			fmt.Sprintf("患者选择：%s", input.Decision),
 		)
-		_ = s.timelineRepo.Append(ctx, &decisionTL)
+		if err := s.timelineRepo.Append(ctx, &decisionTL); err != nil {
+			slog.Warn("failed to append lab decision timeline", "session_id", input.SessionID, "error", err)
+		}
 
 		cardTL := adapter.BuildFlowCardTimelineItem(input.SessionID, paymentCard)
-		_ = s.timelineRepo.Append(ctx, &cardTL)
+		if err := s.timelineRepo.Append(ctx, &cardTL); err != nil {
+			slog.Warn("failed to append payment card timeline", "session_id", input.SessionID, "error", err)
+		}
 		result.TimelineItems = []model.TimelineItem{decisionTL, cardTL}
 
 	case "skipped":
 		card.Status = string(model.FlowCardStatusSkipped)
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on lab skipped: %w", err)
+		}
 
 		// Go straight to diagnosis
 		status := string(model.VisitStatusDiagnosis)
@@ -87,7 +98,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		session.UpdatedAt = now
 		session.LastActivityAt = &now
 		session.ActiveCardID = nil
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after lab skipped: %w", err)
+		}
 
 		result.Status = status
 		result.Message = "已跳过检验，进入诊断阶段"
@@ -97,12 +110,16 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 			"跳过检验",
 			"患者选择不进行检验",
 		)
-		_ = s.timelineRepo.Append(ctx, &skipTL)
+		if err := s.timelineRepo.Append(ctx, &skipTL); err != nil {
+			slog.Warn("failed to append lab skipped timeline", "session_id", input.SessionID, "error", err)
+		}
 		result.TimelineItems = []model.TimelineItem{skipTL}
 
 	case "vetoed":
 		card.Status = string(model.FlowCardStatusVetoed)
-		_ = s.flowCardRepo.Update(ctx, card)
+		if err := s.flowCardRepo.Update(ctx, card); err != nil {
+			return nil, fmt.Errorf("update flow card on lab vetoed: %w", err)
+		}
 
 		// Return to chatting
 		status := string(model.VisitStatusChatting)
@@ -111,7 +128,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 		session.LastActivityAt = &now
 		session.MachineState = string(model.VisitMachineStateChatting)
 		session.ActiveCardID = nil
-		_ = s.visitRepo.Update(ctx, session)
+		if err := s.visitRepo.Update(ctx, session); err != nil {
+			return nil, fmt.Errorf("update session after lab vetoed: %w", err)
+		}
 
 		result.Status = status
 		result.Message = "已暂不决定，回到问诊"
@@ -121,7 +140,9 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 			"暂不决定",
 			"患者选择暂不决定是否检验",
 		)
-		_ = s.timelineRepo.Append(ctx, &vetoTL)
+		if err := s.timelineRepo.Append(ctx, &vetoTL); err != nil {
+			slog.Warn("failed to append lab vetoed timeline", "session_id", input.SessionID, "error", err)
+		}
 		result.TimelineItems = []model.TimelineItem{vetoTL}
 
 	default:

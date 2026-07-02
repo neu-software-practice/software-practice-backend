@@ -2,6 +2,8 @@ package workbench
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -90,27 +92,35 @@ func (s *Service) ReportVitals(ctx context.Context, input ReportVitalsInput) (*E
 			"体征异常",
 			result.Message,
 		)
-		_ = s.timelineRepo.Append(ctx, &emergencyTL)
+		if err := s.timelineRepo.Append(ctx, &emergencyTL); err != nil {
+			slog.Warn("failed to append vitals emergency timeline", "session_id", input.SessionID, "error", err)
+		}
 
 		// Check if we should terminate
 		if severity == string(model.EmergencySeverityCritical) {
 			session, err := s.visitRepo.FindByID(ctx, input.SessionID)
-			if err == nil {
-				now := time.Now()
-				reason := string(model.TerminalReasonEmergency)
-				session.Status = string(model.VisitStatusEmergencyTerminated)
-				session.MachineState = string(model.VisitMachineStateEmergencyPending)
-				session.EndedAt = &now
-				session.TerminalReason = &reason
-				session.UpdatedAt = now
-				_ = s.visitRepo.Update(ctx, session)
+			if err != nil {
+				slog.Warn("failed to find session for emergency termination", "session_id", input.SessionID, "error", err)
+				return result, nil
+			}
+			now := time.Now()
+			reason := string(model.TerminalReasonEmergency)
+			session.Status = string(model.VisitStatusEmergencyTerminated)
+			session.MachineState = string(model.VisitMachineStateEmergencyPending)
+			session.EndedAt = &now
+			session.TerminalReason = &reason
+			session.UpdatedAt = now
+			if err := s.visitRepo.Update(ctx, session); err != nil {
+				return nil, fmt.Errorf("update session for emergency termination: %w", err)
+			}
 
-				termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
-					string(model.TerminalReasonEmergency),
-					"急症终止",
-					result.Message,
-				)
-				_ = s.timelineRepo.Append(ctx, &termTL)
+			termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
+				string(model.TerminalReasonEmergency),
+				"急症终止",
+				result.Message,
+			)
+			if err := s.timelineRepo.Append(ctx, &termTL); err != nil {
+				slog.Warn("failed to append emergency termination timeline", "session_id", input.SessionID, "error", err)
 			}
 		}
 
@@ -144,7 +154,9 @@ func (s *Service) DismissEmergency(ctx context.Context, input DismissEmergencyIn
 	session.TerminalReason = nil
 	session.UpdatedAt = time.Now()
 	session.EndedAt = nil
-	_ = s.visitRepo.Update(ctx, session)
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, nil, fmt.Errorf("update session on dismiss emergency: %w", err)
+	}
 
 	// Create dismissal timeline event
 	dismissTL := adapter.BuildSystemEventTimelineItem(input.SessionID,
@@ -152,7 +164,9 @@ func (s *Service) DismissEmergency(ctx context.Context, input DismissEmergencyIn
 		"急症已解除",
 		"误报申诉通过，急症态已解除",
 	)
-	_ = s.timelineRepo.Append(ctx, &dismissTL)
+	if err := s.timelineRepo.Append(ctx, &dismissTL); err != nil {
+		slog.Warn("failed to append dismiss emergency timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	return session, &dismissTL, nil
 }

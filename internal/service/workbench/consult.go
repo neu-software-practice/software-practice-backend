@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 
@@ -81,7 +82,9 @@ func (s *Service) StreamConsultationReply(ctx context.Context, sessionID, conten
 
 	// Create message item
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", reply)
-	_ = s.timelineRepo.Append(ctx, &msgItem)
+	if err := s.timelineRepo.Append(ctx, &msgItem); err != nil {
+		slog.Warn("failed to append consultation reply message", "session_id", sessionID, "error", err)
+	}
 
 	// Message final
 	if err := callback(model.AssistantStreamEvent{
@@ -126,7 +129,9 @@ func (s *Service) AskLockedQuestion(ctx context.Context, sessionID, cardID, cont
 	}
 
 	msgItem := adapter.BuildMessageTimelineItem(sessionID, "assistant", reply)
-	_ = s.timelineRepo.Append(ctx, &msgItem)
+	if err := s.timelineRepo.Append(ctx, &msgItem); err != nil {
+		slog.Warn("failed to append locked question message", "session_id", sessionID, "error", err)
+	}
 
 	if err := callback(model.AssistantStreamEvent{
 		Type:             "message_final",

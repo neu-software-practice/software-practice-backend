@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/adapter"
@@ -54,7 +55,9 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	card.FulfillmentStatus = model.MedicationFulfillmentStatusConfirmed
 	card.Status = string(model.FlowCardStatusCompleted)
 	card.HandledAt = &now
-	_ = s.flowCardRepo.Update(ctx, card)
+	if err := s.flowCardRepo.Update(ctx, card); err != nil {
+		return nil, fmt.Errorf("update flow card on fulfillment: %w", err)
+	}
 
 	modeText := "到院取药"
 	if input.Mode == "delivery" {
@@ -67,7 +70,9 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		"取药确认",
 		fmt.Sprintf("已确认%s", modeText),
 	)
-	_ = s.timelineRepo.Append(ctx, &drugTL)
+	if err := s.timelineRepo.Append(ctx, &drugTL); err != nil {
+		slog.Warn("failed to append drug purchased timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	// Complete the session
 	status := string(model.VisitStatusCompleted)
@@ -81,7 +86,9 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	session.Summary.TreatmentSummary = &ts
 	session.UpdatedAt = now
 	session.LastActivityAt = &now
-	_ = s.visitRepo.Update(ctx, session)
+	if err := s.visitRepo.Update(ctx, session); err != nil {
+		return nil, fmt.Errorf("update session after fulfillment: %w", err)
+	}
 
 	// Create completed visit card
 	completedCard := &model.FlowCard{
@@ -95,10 +102,14 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		CompletedAt:      now,
 		TreatmentSummary: "药物治疗完成",
 	}
-	_ = s.flowCardRepo.Create(ctx, completedCard)
+	if err := s.flowCardRepo.Create(ctx, completedCard); err != nil {
+		return nil, fmt.Errorf("create completed visit card: %w", err)
+	}
 
 	completedTL := adapter.BuildFlowCardTimelineItem(input.SessionID, completedCard)
-	_ = s.timelineRepo.Append(ctx, &completedTL)
+	if err := s.timelineRepo.Append(ctx, &completedTL); err != nil {
+		slog.Warn("failed to append completed visit timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	// Terminal timeline item
 	termTL := adapter.BuildTerminalTimelineItem(input.SessionID,
@@ -106,7 +117,9 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		"就诊完成",
 		fmt.Sprintf("已%s，就诊结束", modeText),
 	)
-	_ = s.timelineRepo.Append(ctx, &termTL)
+	if err := s.timelineRepo.Append(ctx, &termTL); err != nil {
+		slog.Warn("failed to append terminal timeline", "session_id", input.SessionID, "error", err)
+	}
 
 	return &model.FlowActionResult{
 		SessionID:     input.SessionID,
