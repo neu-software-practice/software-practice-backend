@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(dirname "$SCRIPT_DIR")"
-FRONTEND_DIR="$BACKEND_DIR/../neuhis-agent-front"
+FRONTEND_DIR="${FRONTEND_DIR:-$BACKEND_DIR/../neuhis-agent-front}"
 
 ROUND=0
 DRY=0

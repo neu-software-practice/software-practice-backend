@@ -2,8 +2,8 @@ repos:
   - repo: local
     hooks:
       - id: go-test
-        name: Go Test (local only, no Docker)
-        entry: go test -count=1 -short ./...
+        name: Go Coverage Gate
+        entry: bash scripts/precommit-check.sh
         language: system
         pass_filenames: false
         types: [go]
