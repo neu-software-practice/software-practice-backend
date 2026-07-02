@@ -31,3 +31,7 @@ medAgent/logs/
 docker-compose.override.yml
 server
 docker-compose.yml.local
+
+# Drift reports (generated artifacts)
+drift-report*.json
+backend-api.json
