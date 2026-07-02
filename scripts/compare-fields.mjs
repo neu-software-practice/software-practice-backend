@@ -313,9 +313,11 @@ function compareField(fieldName, zodField, goField, context) {
     };
   }
 
-  // --- NEW: Constraint comparison ---
-  const constraintDrift = compareConstraints(fieldName, zodField, goField, context);
-  if (constraintDrift) return constraintDrift;
+  // NOTE: Constraint comparison (Zod .min/.max/.positive vs Go binding tags)
+  // is intentionally SKIPPED for response field comparison. binding:"..." tags
+  // only take effect during request binding (c.ShouldBindJSON), not during
+  // response serialization (c.JSON). Comparing Zod schema constraints against
+  // Go binding tags on response structs would produce false positives.
 
   // --- Existing: omitempty checks ---
   // Zod REQUIRED + Go *Type + omitempty → silently dropped when nil
