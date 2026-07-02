@@ -63,7 +63,7 @@ type AdminLogoutResult struct {
 
 // AdminRefreshInput carries the refresh token for token rotation.
 type AdminRefreshInput struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
+	RefreshToken string `json:"refreshToken" binding:"required,min=1"`
 }
 
 // AdminRefreshResult is the response for a successful token refresh.

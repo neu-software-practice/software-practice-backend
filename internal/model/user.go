@@ -40,7 +40,7 @@ type LoginInput struct {
 
 // RefreshInput carries the refresh token for token rotation.
 type RefreshInput struct {
-	RefreshToken string `json:"refreshToken" binding:"required"`
+	RefreshToken string `json:"refreshToken" binding:"required,min=1"`
 }
 
 // LogoutInput carries the refresh token to invalidate.
