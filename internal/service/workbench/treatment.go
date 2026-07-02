@@ -38,11 +38,13 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 	case "schedule":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusScheduled)
 		card.Status = string(model.FlowCardStatusProcessing)
+		card.Blocking = false
 		future := now.Add(30 * time.Minute)
 		card.AppointmentAt = &future
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on schedule: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		result.Status = session.Status
 		result.Card = card
@@ -50,9 +52,11 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	case "confirm_arrival":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusArrived)
+		card.Blocking = false
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on confirm arrival: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		result.Status = session.Status
 		result.Card = card
@@ -60,9 +64,11 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 
 	case "start":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusInProgress)
+		card.Blocking = false
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on start: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		result.Status = session.Status
 		result.Card = card
@@ -71,10 +77,11 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 	case "complete":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusCompleted)
 		card.Status = string(model.FlowCardStatusCompleted)
-		card.HandledAt = &now
+		markCardProcessed(card, now)
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on complete: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		// Complete the session
 		reason := "completed"
@@ -124,10 +131,11 @@ func (s *Service) SubmitTreatmentExecution(ctx context.Context, input SubmitTrea
 	case "cancel":
 		card.ExecutionStatus = string(model.TreatmentExecutionStatusCanceled)
 		card.Status = string(model.FlowCardStatusInvalidated)
-		card.HandledAt = &now
+		markCardProcessed(card, now)
 		if err := s.flowCardRepo.Update(ctx, card); err != nil {
 			return nil, fmt.Errorf("update flow card on cancel: %w", err)
 		}
+		s.syncCardToTimeline(ctx, card)
 
 		// Return to treatment decision
 		session.Status = string(model.VisitStatusTreatment)
@@ -181,7 +189,7 @@ func (s *Service) AckAdvice(ctx context.Context, input AckAdviceInput) (*model.F
 
 	now := time.Now()
 	card.Status = string(model.FlowCardStatusCompleted)
-	card.HandledAt = &now
+	markCardProcessed(card, now)
 	if err := s.flowCardRepo.Update(ctx, card); err != nil {
 		return nil, fmt.Errorf("update flow card on ack advice: %w", err)
 	}

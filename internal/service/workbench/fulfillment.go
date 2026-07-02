@@ -54,7 +54,7 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 	card.SelectedMode = &input.Mode
 	card.FulfillmentStatus = model.MedicationFulfillmentStatusConfirmed
 	card.Status = string(model.FlowCardStatusCompleted)
-	card.HandledAt = &now
+	markCardProcessed(card, now)
 	if err := s.flowCardRepo.Update(ctx, card); err != nil {
 		return nil, fmt.Errorf("update flow card on fulfillment: %w", err)
 	}

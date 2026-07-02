@@ -35,7 +35,7 @@ func (s *Service) SubmitLabDecision(ctx context.Context, input SubmitLabDecision
 	}
 
 	now := time.Now()
-	card.HandledAt = &now
+	markCardProcessed(card, now)
 
 	switch input.Decision {
 	case "accepted":

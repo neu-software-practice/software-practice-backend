@@ -3,6 +3,7 @@ package workbench
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
@@ -91,4 +92,9 @@ func (s *Service) syncCardToTimeline(ctx context.Context, card *model.FlowCard) 
 	if err := s.timelineRepo.UpdateContent(ctx, tlItem.ID, tlItem); err != nil {
 		slog.Warn("failed to sync card to timeline", "card_id", card.ID, "error", err)
 	}
+}
+
+func markCardProcessed(card *model.FlowCard, now time.Time) {
+	card.Blocking = false
+	card.HandledAt = &now
 }

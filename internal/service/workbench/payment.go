@@ -49,7 +49,7 @@ func (s *Service) SubmitPayment(ctx context.Context, input model.SubmitPaymentIn
 	now := time.Now()
 	card.PaymentStatus = string(model.PaymentStatusPaid)
 	card.Status = string(model.FlowCardStatusPaid)
-	card.HandledAt = &now
+	markCardProcessed(card, now)
 	if err := s.flowCardRepo.Update(ctx, card); err != nil {
 		return nil, fmt.Errorf("update flow card on payment: %w", err)
 	}

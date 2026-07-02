@@ -135,8 +135,8 @@ func (r *flowCardMySQLRepo) Update(ctx context.Context, card *model.FlowCard) er
 	}
 
 	_, err = r.db.ExecContext(ctx,
-		`UPDATE flow_cards SET status=?, content=?, handled_at=? WHERE id=?`,
-		card.Status, string(contentJSON), card.HandledAt, card.ID,
+		`UPDATE flow_cards SET status=?, blocking=?, content=?, handled_at=? WHERE id=?`,
+		card.Status, card.Blocking, string(contentJSON), card.HandledAt, card.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update flow card: %w", err)

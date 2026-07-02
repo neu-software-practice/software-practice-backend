@@ -465,6 +465,155 @@ func TestSubmitLabDecision_Vetoed(t *testing.T) {
 	}
 }
 
+func TestProcessedFlowCardsClearBlocking(t *testing.T) {
+	tests := []struct {
+		name string
+		kind string
+		run  func(context.Context, *wbsvc.Service) error
+	}{
+		{
+			name: "lab accepted",
+			kind: string(model.FlowCardKindLabDecision),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+					SessionID: "s1", CardID: "f1", Decision: "accepted",
+				})
+				return err
+			},
+		},
+		{
+			name: "lab skipped",
+			kind: string(model.FlowCardKindLabDecision),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+					SessionID: "s1", CardID: "f1", Decision: "skipped",
+				})
+				return err
+			},
+		},
+		{
+			name: "lab vetoed",
+			kind: string(model.FlowCardKindLabDecision),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitLabDecision(ctx, wbsvc.SubmitLabDecisionInput{
+					SessionID: "s1", CardID: "f1", Decision: "vetoed",
+				})
+				return err
+			},
+		},
+		{
+			name: "payment paid",
+			kind: string(model.FlowCardKindPayment),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitPayment(ctx, model.SubmitPaymentInput{
+					SessionID: "s1", CardID: "f1", Purpose: "lab",
+				})
+				return err
+			},
+		},
+		{
+			name: "fulfillment",
+			kind: string(model.FlowCardKindMedicationFulfillment),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
+					SessionID: "s1", CardID: "f1", Mode: "pickup",
+				})
+				return err
+			},
+		},
+		{
+			name: "treatment schedule",
+			kind: string(model.FlowCardKindTreatmentExecution),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+					SessionID: "s1", CardID: "f1", Action: "schedule",
+				})
+				return err
+			},
+		},
+		{
+			name: "treatment confirm arrival",
+			kind: string(model.FlowCardKindTreatmentExecution),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+					SessionID: "s1", CardID: "f1", Action: "confirm_arrival",
+				})
+				return err
+			},
+		},
+		{
+			name: "treatment start",
+			kind: string(model.FlowCardKindTreatmentExecution),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+					SessionID: "s1", CardID: "f1", Action: "start",
+				})
+				return err
+			},
+		},
+		{
+			name: "treatment complete",
+			kind: string(model.FlowCardKindTreatmentExecution),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+					SessionID: "s1", CardID: "f1", Action: "complete",
+				})
+				return err
+			},
+		},
+		{
+			name: "treatment cancel",
+			kind: string(model.FlowCardKindTreatmentExecution),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.SubmitTreatmentExecution(ctx, wbsvc.SubmitTreatmentExecutionInput{
+					SessionID: "s1", CardID: "f1", Action: "cancel",
+				})
+				return err
+			},
+		},
+		{
+			name: "advice acknowledged",
+			kind: string(model.FlowCardKindAdviceOnly),
+			run: func(ctx context.Context, svc *wbsvc.Service) error {
+				_, err := svc.AckAdvice(ctx, wbsvc.AckAdviceInput{
+					SessionID: "s1", CardID: "f1",
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mp, mv, mt, mf, ma := newDefaultMocks()
+			mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+				card := makeCard(id, "s1", tt.kind, true)
+				card.TotalAmount = model.Float64Ptr(50.0)
+				card.Purpose = "lab"
+				return card, nil
+			}
+
+			var updated *model.FlowCard
+			mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+				copy := *card
+				updated = &copy
+				return nil
+			}
+
+			svc := newSvc(mp, mv, mt, mf, ma)
+			if err := tt.run(context.Background(), svc); err != nil {
+				t.Fatalf("action failed: %v", err)
+			}
+			if updated == nil {
+				t.Fatal("expected flow card update")
+			}
+			if updated.Blocking {
+				t.Fatalf("updated card blocking = true, want false")
+			}
+		})
+	}
+}
+
 func TestSubmitLabDecision_Invalid(t *testing.T) {
 	mp, mv, mt, mf, ma := newDefaultMocks()
 	svc := newSvc(mp, mv, mt, mf, ma)

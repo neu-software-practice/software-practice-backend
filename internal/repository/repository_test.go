@@ -760,6 +760,7 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 
 		// Modify and update
 		card.Status = string(model.FlowCardStatusAccepted)
+		card.Blocking = false
 		card.Diagnosis = "上呼吸道感染"
 		card.Confidence = string(model.DiagnosisConfidenceHigh)
 		now := time.Now()
@@ -776,6 +777,9 @@ func TestFlowCardRepo_CRUD(t *testing.T) {
 		}
 		if updated.Status != string(model.FlowCardStatusAccepted) {
 			t.Errorf("Status = %q, want %q", updated.Status, string(model.FlowCardStatusAccepted))
+		}
+		if updated.Blocking {
+			t.Error("Blocking = true, want false")
 		}
 		if updated.Diagnosis != "上呼吸道感染" {
 			t.Errorf("Diagnosis = %q, want %q", updated.Diagnosis, "上呼吸道感染")
