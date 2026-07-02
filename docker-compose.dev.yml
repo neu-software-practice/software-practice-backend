@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
 
   medagent-dev:
-    image: golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2
+    image: golang:1.25-bookworm@sha256:b96f24a8d7d010ea0acb9c3ba99064740f02b6b984612b28bd3c9c5ab9453e38
     container_name: neuhis-medagent-dev
     working_dir: /app
     volumes:
