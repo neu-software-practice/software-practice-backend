@@ -32,6 +32,63 @@ const backendFields = loadJSON(resolve(ROOT, 'backend-fields.json'));
 const docSnapshot = loadJSON(resolve(ROOT, 'doc-snapshot.json'));
 const DOC_ENDPOINTS = docSnapshot.endpoints || {};
 
+// ====== Frontend Envelope Expectation Detection ======
+
+/**
+ * Analyze frontend HTTP transport (client.ts) to determine whether the
+ * frontend expects the ApiResponse envelope or flat JSON.
+ *
+ * The ky library's .json<T>() returns the raw HTTP response body as-is.
+ * If the frontend transport does NOT extract .data from the response,
+ * then the frontend expects flat JSON (no envelope).
+ *
+ * We parse the request() function body looking for the .json<T>() call
+ * and check whether its return value passes through .data extraction.
+ *
+ * @returns {{ expectsEnvelope: boolean, evidence: string }}
+ */
+function detectFrontendEnvelopeExpectation() {
+  const clientTsPath = resolve(FE_DIR, 'src', 'lib', 'api', 'client.ts');
+  let expectsEnvelope = false;
+  let evidence = '';
+
+  try {
+    const source = readFileSync(clientTsPath, 'utf-8');
+
+    // Find the request() function body
+    const reqMatch = source.match(/async function request[\s\S]*?^function /m);
+    const requestBody = reqMatch ? reqMatch[0] : source;
+
+    // Check: is there .json<T>() directly returned, or is .data extracted?
+    // Pattern 1: .json<T>() followed by .then(r => r.data) → expects envelope
+    // Pattern 2: .json<T>() returned directly → expects flat JSON
+    const hasJsonCall = /\.json\s*<[^>]*>\s*\(\s*\)/.test(requestBody);
+    const hasDataUnwrap = /\.json\s*<[^>]*>\s*\(\s*\)[\s\S]{0,80}\.data\b/.test(requestBody) ||
+                          /\.then\s*\(\s*\(?\w+\)?\s*=>\s*\w+\.data\b/.test(requestBody);
+
+    if (hasJsonCall && !hasDataUnwrap) {
+      expectsEnvelope = false;
+      evidence = 'frontend client.ts uses .json<T>() directly without .data unwrapping — expects flat JSON';
+    } else if (hasDataUnwrap) {
+      expectsEnvelope = true;
+      evidence = 'frontend client.ts extracts .data from response — expects ApiResponse envelope';
+    } else {
+      expectsEnvelope = false;
+      evidence = 'unable to determine frontend envelope handling, assuming flat JSON';
+    }
+  } catch (err) {
+    expectsEnvelope = false;
+    evidence = `could not read client.ts: ${err.message}`;
+  }
+
+  return { expectsEnvelope, evidence };
+}
+
+const FE_ENVELOPE = detectFrontendEnvelopeExpectation();
+if (FE_ENVELOPE.evidence) {
+  console.error(`[ENVELOPE] ${FE_ENVELOPE.evidence}`);
+}
+
 const ZOD_SCHEMAS = frontendFields.schemas || {};
 const ZOD_UNIONS = frontendFields.unions || {};
 const ZOD_ENUMS = frontendFields.enums || {};
@@ -1252,9 +1309,31 @@ function main() {
   const errorDrifts = compareErrorFormats();
   driftItems.push(...errorDrifts);
 
-  // ======== 6. Response Envelope Check ========
+  // ======== 6. Response Envelope Check (Backend) ========
   const envelopeDrifts = checkResponseEnvelope();
   driftItems.push(...envelopeDrifts);
+
+  // ======== 6b. Frontend vs Backend Envelope Mismatch ========
+  // Detects: backend wraps in ApiResponse but frontend expects flat JSON (or vice versa)
+  if (!FE_ENVELOPE.expectsEnvelope) {
+    // Frontend expects flat JSON — flag every backend endpoint that uses ApiResponse
+    for (const ep of backendFields.endpoints || []) {
+      if (ep.usesEnvelope === true && !ep.isSSE && ep.statusCode !== 204) {
+        const sig = `${ep.method} ${normPath(ep.path)}`;
+        driftItems.push({
+          severity: 'CRITICAL',
+          category: 'envelope_frontend_backend_mismatch',
+          endpoint: sig,
+          field: 'response envelope',
+          expected: 'Frontend: flat JSON (no envelope) — client.ts .json<T>() returns raw body',
+          actual: 'Backend: ApiResponse envelope { success, data, error }',
+          description: `Backend wraps "${sig}" response in ApiResponse envelope but frontend transport does NOT unwrap it. Frontend code will receive {success,data,error} instead of the expected payload, causing undefined field access.`,
+          file: 'src/lib/api/client.ts (frontend) / internal/handler/ (backend)',
+          fixHint: 'Either (a) add .data unwrapping in frontend client.ts after .json<T>(), or (b) remove ApiResponse envelope from backend handler and return flat JSON.',
+        });
+      }
+    }
+  }
 
   // ======== 7. Discriminated Union Comparison ========
   const unionDrifts = compareDiscriminatedUnions();

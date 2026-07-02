@@ -12,21 +12,21 @@
       "description": "Simple health check, no ApiResponse wrapper. Returns { status: 'ok' }."
     },
     "POST /api/auth/register": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 201,
       "responseSchema": "AuthResponse",
       "requestSchema": "RegisterInput",
       "errorFormat": "ApiError"
     },
     "POST /api/auth/login": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AuthResponse",
       "requestSchema": "LoginInput",
       "errorFormat": "ApiError"
     },
     "POST /api/auth/refresh": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AuthResponse",
       "requestSchema": "RefreshInput",
@@ -41,70 +41,70 @@
       "description": "Logout returns 204 No Content with no response body."
     },
     "POST /api/patients/verify": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VerifyIdentityResult",
       "requestSchema": "VerifyIdentityInput",
       "errorFormat": "ApiError"
     },
     "GET /api/patients/:param/context": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "PatientContext",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "PATCH /api/patients/:param/profile": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "PatientProfile",
       "requestSchema": "ProfileUpdateInput",
       "errorFormat": "ApiError"
     },
     "GET /api/patients/:param/addresses": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AddressListResponse",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "POST /api/patients/:param/addresses": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 201,
       "responseSchema": "Address",
       "requestSchema": "CreateAddressInput",
       "errorFormat": "ApiError"
     },
     "PATCH /api/patients/:param/addresses/:param": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "Address",
       "requestSchema": "UpdateAddressInput",
       "errorFormat": "ApiError"
     },
     "DELETE /api/patients/:param/addresses/:param": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "DeleteAddressResponse",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "PUT /api/patients/:param/addresses/:param/default": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "Address",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "POST /api/visits": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "CreateSessionResult",
       "requestSchema": "CreateSessionInput",
       "errorFormat": "ApiError"
     },
     "GET /api/visits": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VisitSessionSummary",
       "requestSchema": null,
@@ -112,35 +112,35 @@
       "pagination": "cursor"
     },
     "GET /api/visits/:param": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VisitSession",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "GET /api/visits/:param/snapshot": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VisitSnapshot",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/follow-up": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "CreateSessionResult",
       "requestSchema": "CreateFollowUpInput",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/suspend": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VisitSession",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "GET /api/visits/:param/timeline": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "TimelineItem",
       "requestSchema": null,
@@ -148,7 +148,7 @@
       "pagination": "cursor"
     },
     "POST /api/visits/:param/messages": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "SendMessageResult",
       "requestSchema": "SendMessageRequest",
@@ -163,35 +163,35 @@
       "description": "SSE streaming endpoint. Returns text/event-stream, not JSON."
     },
     "POST /api/visits/:param/lab-decision": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "FlowActionResult",
       "requestSchema": "LabDecisionRequest",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/payments": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "FlowActionResult",
       "requestSchema": "SubmitPaymentInput",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/fulfillment": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "FlowActionResult",
       "requestSchema": "SubmitFulfillmentInput",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/treatment-execution": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "FlowActionResult",
       "requestSchema": "SubmitTreatmentExecutionInput",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/advice-ack": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "FlowActionResult",
       "requestSchema": "AckAdviceRequest",
@@ -206,7 +206,7 @@
       "description": "SSE streaming endpoint."
     },
     "POST /api/visits/:param/classify-intent": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "ClassifyIntentResult",
       "requestSchema": "ClassifyIntentRequest",
@@ -221,84 +221,84 @@
       "description": "SSE streaming endpoint."
     },
     "POST /api/visits/:param/vitals": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "EmergencyRecheckResult",
       "requestSchema": "VitalsRequest",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/exit": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "ExitSettlementResult",
       "requestSchema": "ExitVisitInput",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/timer": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VisitSession",
       "requestSchema": "TimerRequest",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/dismiss-emergency": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "DismissEmergencyResult",
       "requestSchema": "DismissEmergencyInput",
       "errorFormat": "ApiError"
     },
     "POST /api/visits/:param/generate-title": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "GenerateTitleResult",
       "requestSchema": "GenerateTitleRequest",
       "errorFormat": "ApiError"
     },
     "GET /api/billing/records": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "BillingRecordsResponse",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "GET /api/medical-orders": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "MedicalOrdersResponse",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "POST /admin/auth/login": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AdminLoginResult",
       "requestSchema": "AdminLoginInput",
       "errorFormat": "ApiError"
     },
     "POST /admin/auth/logout": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AdminLogoutResult",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "POST /admin/auth/refresh": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AdminRefreshResult",
       "requestSchema": "AdminRefreshInput",
       "errorFormat": "ApiError"
     },
     "GET /admin/dashboard/stats": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "DashboardStats",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "GET /admin/patients": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AdminPatientListResult",
       "requestSchema": null,
@@ -306,14 +306,14 @@
       "pagination": "offset"
     },
     "GET /admin/patients/:param": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "PatientProfile",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "GET /admin/sessions": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "AdminSessionListResult",
       "requestSchema": null,
@@ -321,21 +321,21 @@
       "pagination": "offset"
     },
     "GET /admin/sessions/:param": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "VisitSession",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "GET /admin/settings": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "SystemSettings",
       "requestSchema": null,
       "errorFormat": "ApiError"
     },
     "PUT /admin/settings": {
-      "envelope": "ApiResponse",
+      "envelope": "none",
       "statusCode": 200,
       "responseSchema": "SystemSettings",
       "requestSchema": "UpdateSystemSettingsInput",
@@ -344,17 +344,33 @@
   },
   "globalEnvelope": {
     "name": "ApiResponse",
-    "fields": ["success", "data", "error"],
+    "fields": [
+      "success",
+      "data",
+      "error"
+    ],
     "description": "All standard JSON responses are wrapped in an ApiResponse envelope. Exceptions: /api/health (raw gin.H), SSE streaming endpoints (text/event-stream), and 204 No Content responses."
   },
   "errorFormat": {
     "name": "ApiError",
-    "fields": ["code", "message", "status", "details", "retriable"],
+    "fields": [
+      "code",
+      "message",
+      "status",
+      "details",
+      "retriable"
+    ],
     "description": "All non-SSE errors use ApiError struct wrapped in ApiResponse.data with success=false."
   },
   "sseErrorFormat": {
     "name": "SSEEventError",
-    "fields": ["code", "message", "status", "details", "retriable"],
+    "fields": [
+      "code",
+      "message",
+      "status",
+      "details",
+      "retriable"
+    ],
     "description": "SSE errors are embedded in AssistantStreamEvent with type='error'."
   }
 }
