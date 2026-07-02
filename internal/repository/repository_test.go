@@ -2716,3 +2716,51 @@ func TestSettingsRepo_GetDefaults(t *testing.T) {
 		t.Error("EnableRegistration should be true")
 	}
 }
+
+func TestDrugRepo_CatalogAndStock(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	db, cleanup := setupDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	repo := repository.NewDrugRepository(db)
+
+	drug, err := repo.FindEnabledByNameOrAlias(ctx, "布洛芬片")
+	if err != nil {
+		t.Fatalf("FindEnabledByNameOrAlias exact: %v", err)
+	}
+	if drug.Spec == "" || drug.DefaultDosage == "" || drug.DefaultDays <= 0 || drug.UnitPrice <= 0 {
+		t.Fatalf("seed drug is not usable for medication card: %+v", drug)
+	}
+
+	aliasDrug, err := repo.FindEnabledByNameOrAlias(ctx, "布洛芬")
+	if err != nil {
+		t.Fatalf("FindEnabledByNameOrAlias alias: %v", err)
+	}
+	if aliasDrug.Name != "布洛芬片" {
+		t.Fatalf("alias resolved to %q, want 布洛芬片", aliasDrug.Name)
+	}
+
+	before := aliasDrug.StockQuantity
+	if err := repo.DecrementStock(ctx, aliasDrug.Name, 2); err != nil {
+		t.Fatalf("DecrementStock: %v", err)
+	}
+	after, err := repo.FindEnabledByNameOrAlias(ctx, aliasDrug.Name)
+	if err != nil {
+		t.Fatalf("refetch after decrement: %v", err)
+	}
+	if after.StockQuantity != before-2 {
+		t.Fatalf("stock after decrement = %d, want %d", after.StockQuantity, before-2)
+	}
+
+	err = repo.DecrementStock(ctx, aliasDrug.Name, after.StockQuantity+1)
+	if !errors.Is(err, model.ErrDrugStockInsufficient) {
+		t.Fatalf("DecrementStock insufficient err = %v, want ErrDrugStockInsufficient", err)
+	}
+
+	_, err = repo.FindEnabledByNameOrAlias(ctx, "不存在药品")
+	if !errors.Is(err, model.ErrDrugNotFound) {
+		t.Fatalf("FindEnabledByNameOrAlias missing err = %v, want ErrDrugNotFound", err)
+	}
+}

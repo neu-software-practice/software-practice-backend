@@ -97,17 +97,21 @@ func BuildTreatmentPlanCard(sessionID string, result *medagent.Result) *model.Fl
 }
 
 // BuildMedicationFulfillmentCard creates a medication_fulfillment FlowCard from a PURCHASE step.
-func BuildMedicationFulfillmentCard(sessionID string, step *medagent.Step) *model.FlowCard {
+func BuildMedicationFulfillmentCard(sessionID string, step *medagent.Step, resolvedMedications ...[]model.MedicationItem) *model.FlowCard {
 	card := newBaseCard(sessionID, model.FlowCardKindMedicationFulfillment, model.FlowCardStatusPending, "购药确认")
 	card.Blocking = true
 
-	for _, order := range step.Orders {
-		card.Medications = append(card.Medications, model.MedicationItem{
-			Name:     order.Name,
-			Quantity: order.Quantity,
-			Spec:     fmt.Sprintf("%d盒", order.Quantity),
-			Price:    0, // 价格由药房系统填充
-		})
+	if len(resolvedMedications) > 0 {
+		card.Medications = append(card.Medications, resolvedMedications[0]...)
+	} else {
+		for _, order := range step.Orders {
+			card.Medications = append(card.Medications, model.MedicationItem{
+				Name:     order.Name,
+				Quantity: order.Quantity,
+				Spec:     fmt.Sprintf("%d盒", order.Quantity),
+				Price:    0, // 价格由药房系统填充
+			})
+		}
 	}
 	card.AvailableModes = []string{"pickup", "delivery"}
 	card.FulfillmentStatus = model.MedicationFulfillmentStatusPending

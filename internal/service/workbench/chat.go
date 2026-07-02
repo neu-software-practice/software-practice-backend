@@ -343,9 +343,13 @@ func (s *Service) handleDrugQuery(ctx context.Context, sessionID, requestID, maS
 	// Auto-fill drug info with mock data and continue
 	infos := make([]medagent.DrugInfo, len(step.DrugNames))
 	for i, name := range step.DrugNames {
+		drug, err := s.lookupDrug(ctx, name)
+		if err != nil {
+			return fmt.Errorf("lookup drug %q: %w", name, err)
+		}
 		infos[i] = medagent.DrugInfo{
 			Name: name,
-			Spec: fmt.Sprintf("每盒24粒×0.3g (%s)", name),
+			Spec: drug.Spec,
 		}
 	}
 
@@ -361,7 +365,11 @@ func (s *Service) handleDrugQuery(ctx context.Context, sessionID, requestID, maS
 
 func (s *Service) handlePurchase(ctx context.Context, sessionID, requestID string, session *model.VisitSession, step *medagent.Step, callback StreamAssistantEventCallback) error {
 	// Build medication fulfillment card
-	card := adapter.BuildMedicationFulfillmentCard(sessionID, step)
+	medications, err := s.buildMedicationItems(ctx, step.Orders)
+	if err != nil {
+		return fmt.Errorf("build medication fulfillment items: %w", err)
+	}
+	card := adapter.BuildMedicationFulfillmentCard(sessionID, step, medications)
 	if err := s.flowCardRepo.Create(ctx, card); err != nil {
 		return fmt.Errorf("create medication card: %w", err)
 	}
@@ -407,6 +415,45 @@ func (s *Service) handlePurchase(ctx context.Context, sessionID, requestID strin
 	}
 
 	return nil
+}
+
+func (s *Service) lookupDrug(ctx context.Context, name string) (*model.Drug, error) {
+	if s.drugRepo == nil {
+		return nil, fmt.Errorf("%w: drug repository is not configured", model.ErrDrugNotFound)
+	}
+	drug, err := s.drugRepo.FindEnabledByNameOrAlias(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return drug, nil
+}
+
+func (s *Service) buildMedicationItems(ctx context.Context, orders []medagent.DrugOrder) ([]model.MedicationItem, error) {
+	if len(orders) == 0 {
+		return nil, fmt.Errorf("%w: medication orders are empty", model.ErrValidation)
+	}
+	medications := make([]model.MedicationItem, 0, len(orders))
+	for _, order := range orders {
+		if order.Quantity <= 0 {
+			return nil, fmt.Errorf("%w: drug quantity must be positive for %s", model.ErrValidation, order.Name)
+		}
+		drug, err := s.lookupDrug(ctx, order.Name)
+		if err != nil {
+			return nil, err
+		}
+		if drug.StockQuantity < order.Quantity {
+			return nil, fmt.Errorf("%w: %s", model.ErrDrugStockInsufficient, drug.Name)
+		}
+		medications = append(medications, model.MedicationItem{
+			Name:     drug.Name,
+			Spec:     drug.Spec,
+			Quantity: order.Quantity,
+			Dosage:   drug.DefaultDosage,
+			Days:     drug.DefaultDays,
+			Price:    drug.UnitPrice,
+		})
+	}
+	return medications, nil
 }
 
 func (s *Service) handleEmergency(ctx context.Context, sessionID, requestID string, session *model.VisitSession, step *medagent.Step, callback StreamAssistantEventCallback) error {

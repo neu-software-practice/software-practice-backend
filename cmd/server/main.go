@@ -70,6 +70,7 @@ func main() {
 	timelineRepo := repository.NewTimelineRepository(db)
 	flowCardRepo := repository.NewFlowCardRepository(db)
 	addressRepo := repository.NewAddressRepository(db)
+	drugRepo := repository.NewDrugRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
@@ -90,7 +91,7 @@ func main() {
 	visitSvc := visitsvc.NewService(visitRepo, timelineRepo, patientRepo)
 	workbenchSvc := wbsvc.NewService(
 		patientRepo, visitRepo, timelineRepo, flowCardRepo, addressRepo,
-		visitSvc, medAgentClient, cfg.MedAgentMode, llmClient,
+		visitSvc, medAgentClient, cfg.MedAgentMode, llmClient, drugRepo,
 	)
 	authSvc := authsvc.NewService(userRepo, refreshTokenRepo, patientRepo, cfg.JWTSecret)
 	addressSvc := addresssvc.NewService(addressRepo)

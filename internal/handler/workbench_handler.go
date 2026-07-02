@@ -144,6 +144,18 @@ func (h *WorkbenchHandler) StreamAssistantMessage(c *gin.Context) {
 				err.Error(),
 				http.StatusUnprocessableEntity,
 			))
+		} else if errors.Is(err, model.ErrDrugNotFound) {
+			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewApiError(
+				apperrors.CodeDrugNotFound,
+				err.Error(),
+				http.StatusUnprocessableEntity,
+			))
+		} else if errors.Is(err, model.ErrDrugStockInsufficient) {
+			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewApiError(
+				apperrors.CodeDrugStockInsufficient,
+				err.Error(),
+				http.StatusConflict,
+			))
 		} else {
 			writer.WriteError(input.SessionID, input.RequestID, apperrors.NewInternalError(err.Error()))
 		}
@@ -227,6 +239,10 @@ func (h *WorkbenchHandler) SubmitFulfillment(c *gin.Context) {
 			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeAddressRequired, err.Error(), http.StatusBadRequest))
 		case errors.Is(err, model.ErrAddressNotFound):
 			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeAddressNotFound, err.Error(), http.StatusNotFound))
+		case errors.Is(err, model.ErrDrugNotFound):
+			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeDrugNotFound, err.Error(), http.StatusUnprocessableEntity))
+		case errors.Is(err, model.ErrDrugStockInsufficient):
+			apperrors.WriteError(c, apperrors.NewApiError(apperrors.CodeDrugStockInsufficient, err.Error(), http.StatusConflict))
 		default:
 			apperrors.WriteError(c, apperrors.NewInternalError(err.Error()))
 		}

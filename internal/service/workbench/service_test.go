@@ -157,6 +157,19 @@ func (m *mockAddressRepo) SetDefault(ctx context.Context, id, patientID string) 
 	return m.setDefaultFunc(ctx, id, patientID)
 }
 
+type mockDrugRepo struct {
+	findFunc      func(ctx context.Context, name string) (*model.Drug, error)
+	decrementFunc func(ctx context.Context, name string, quantity int) error
+}
+
+func (m *mockDrugRepo) FindEnabledByNameOrAlias(ctx context.Context, name string) (*model.Drug, error) {
+	return m.findFunc(ctx, name)
+}
+
+func (m *mockDrugRepo) DecrementStock(ctx context.Context, name string, quantity int) error {
+	return m.decrementFunc(ctx, name, quantity)
+}
+
 // ---- Helpers ----
 
 func makeSession(patientID string) *model.VisitSession {
@@ -248,7 +261,48 @@ func newDefaultMocks() (*mockPatientRepo, *mockVisitRepo, *mockTimelineRepo, *mo
 
 func newSvc(p *mockPatientRepo, v *mockVisitRepo, t *mockTimelineRepo, f *mockFlowCardRepo, a *mockAddressRepo) *wbsvc.Service {
 	visitSvc := visitsvc.NewService(v, t, p)
-	return wbsvc.NewService(p, v, t, f, a, visitSvc, nil, "http", nil)
+	return wbsvc.NewService(p, v, t, f, a, visitSvc, nil, "http", nil, newDefaultMockDrugRepo())
+}
+
+func newDefaultMockDrugRepo() *mockDrugRepo {
+	catalog := map[string]*model.Drug{
+		"布洛芬缓释胶囊": {
+			ID: "d1", Name: "布洛芬缓释胶囊", Spec: "每盒24粒×0.3g",
+			DefaultDosage: "0.3g，每日2次，餐后服用", DefaultDays: 3,
+			UnitPrice: 18.5, StockQuantity: 100, Enabled: true,
+		},
+		"布洛芬片": {
+			ID: "d2", Name: "布洛芬片", Spec: "每盒24粒×0.3g",
+			DefaultDosage: "0.3g，每日2次，餐后服用", DefaultDays: 3,
+			UnitPrice: 18.5, StockQuantity: 100, Enabled: true,
+		},
+		"阿莫西林胶囊": {
+			ID: "d3", Name: "阿莫西林胶囊", Spec: "每盒24粒×0.25g",
+			DefaultDosage: "0.5g，每日3次，餐后服用", DefaultDays: 5,
+			UnitPrice: 26, StockQuantity: 100, Enabled: true,
+		},
+	}
+	return &mockDrugRepo{
+		findFunc: func(ctx context.Context, name string) (*model.Drug, error) {
+			drug, ok := catalog[name]
+			if !ok {
+				return nil, model.ErrDrugNotFound
+			}
+			cp := *drug
+			return &cp, nil
+		},
+		decrementFunc: func(ctx context.Context, name string, quantity int) error {
+			drug, ok := catalog[name]
+			if !ok {
+				return model.ErrDrugNotFound
+			}
+			if drug.StockQuantity < quantity {
+				return model.ErrDrugStockInsufficient
+			}
+			drug.StockQuantity -= quantity
+			return nil
+		},
+	}
 }
 
 // eventCollector collects SSE events for callback-based tests.
@@ -1217,6 +1271,34 @@ func TestSubmitFulfillment_Delivery(t *testing.T) {
 	}
 	if result.Message != "已确认配送到家，就诊完成" {
 		t.Errorf("message = %s", result.Message)
+	}
+}
+
+func TestSubmitFulfillment_InsufficientStock(t *testing.T) {
+	mp, mv, mt, mf, ma := newDefaultMocks()
+	updated := false
+	mf.findByIDFunc = func(ctx context.Context, id string) (*model.FlowCard, error) {
+		card := makeCard(id, "s1", "medication_fulfillment", true)
+		card.Medications = []model.MedicationItem{
+			{Name: "布洛芬缓释胶囊", Spec: "每盒24粒×0.3g", Quantity: 101, Dosage: "0.3g，每日2次", Days: 3, Price: 18.5},
+		}
+		return card, nil
+	}
+	mf.updateFunc = func(ctx context.Context, card *model.FlowCard) error {
+		updated = true
+		return nil
+	}
+	svc := newSvc(mp, mv, mt, mf, ma)
+	ctx := context.Background()
+
+	_, err := svc.SubmitFulfillment(ctx, wbsvc.SubmitFulfillmentInput{
+		SessionID: "s1", CardID: "f1", Mode: "pickup",
+	})
+	if err == nil || !containsStr(err.Error(), model.ErrDrugStockInsufficient.Error()) {
+		t.Fatalf("err = %v, want ErrDrugStockInsufficient", err)
+	}
+	if updated {
+		t.Fatal("flow card was updated despite insufficient stock")
 	}
 }
 
@@ -2319,7 +2401,7 @@ func newSvcWithMockMedAgent(t *testing.T, medAgentHandler func(method, path stri
 		deleteFunc: func(ctx context.Context, id string) error { return nil },
 	}
 	visitSvc := visitsvc.NewService(mv, mt, mp)
-	return wbsvc.NewService(mp, mv, mt, mf, ma, visitSvc, client, "http", nil), mp, mv, mt, mf, ma
+	return wbsvc.NewService(mp, mv, mt, mf, ma, visitSvc, client, "http", nil, newDefaultMockDrugRepo()), mp, mv, mt, mf, ma
 }
 
 func TestStreamAssistantMessage_Ask(t *testing.T) {
@@ -2488,14 +2570,51 @@ func TestStreamAssistantMessage_DrugQuery(t *testing.T) {
 		t.Fatalf("StreamAssistantMessage: %v", err)
 	}
 	// DrugQuery -> auto drug-info -> Purchase -> card event
-	hasCard := false
+	var medicationCard *model.FlowCard
 	for _, e := range ec.events {
 		if e.Type == "card" {
-			hasCard = true
+			medicationCard = e.Card
 		}
 	}
-	if !hasCard {
+	if medicationCard == nil {
 		t.Error("expected card event after drug query + purchase chain")
+		return
+	}
+	if len(medicationCard.Medications) != 1 {
+		t.Fatalf("medications length = %d, want 1", len(medicationCard.Medications))
+	}
+	med := medicationCard.Medications[0]
+	if med.Dosage == "" || med.Days <= 0 || med.Price <= 0 {
+		t.Errorf("medication not enriched from drug catalog: %+v", med)
+	}
+}
+
+func TestStreamAssistantMessage_DrugQuery_UnknownDrug(t *testing.T) {
+	svc, _, _, _, _, _ := newSvcWithMockMedAgent(t, func(method, path string, body []byte) (int, string) {
+		switch {
+		case path == "/sessions":
+			return 200, `{"session_id":"ma-001"}`
+		case containsStr(path, "/patient-say"):
+			return 200, `{"kind":"DRUG_QUERY","drug_names":["不存在药品"]}`
+		default:
+			return 404, `{"error":"not found"}`
+		}
+	})
+
+	ec := &eventCollector{}
+	err := svc.StreamAssistantMessage(context.Background(), wbsvc.StreamAssistantInput{
+		SessionID: "s1", RequestID: "r1",
+	}, ec.callback)
+	if err == nil {
+		t.Fatal("expected error for unknown drug")
+	}
+	if err != model.ErrDrugNotFound && !containsStr(err.Error(), model.ErrDrugNotFound.Error()) {
+		t.Fatalf("err = %v, want ErrDrugNotFound", err)
+	}
+	for _, e := range ec.events {
+		if e.Type == "card" {
+			t.Fatalf("unexpected medication card for unknown drug: %+v", e.Card)
+		}
 	}
 }
 

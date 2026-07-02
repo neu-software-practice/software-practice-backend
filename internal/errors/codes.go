@@ -25,6 +25,9 @@ const (
 	CodeAddressLimitExceeded = "ADDRESS_LIMIT_EXCEEDED"
 	CodeAddressRequired      = "ADDRESS_REQUIRED"
 
+	CodeDrugNotFound          = "DRUG_NOT_FOUND"
+	CodeDrugStockInsufficient = "DRUG_STOCK_INSUFFICIENT"
+
 	// Admin error codes
 	CodeAdminInvalidCredentials  = "INVALID_CREDENTIALS"   // #nosec G101
 	CodeAdminInvalidRefreshToken = "INVALID_REFRESH_TOKEN" // #nosec G101

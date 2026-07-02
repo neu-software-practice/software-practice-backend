@@ -31,6 +31,7 @@ type Service struct {
 	timelineRepo repository.TimelineRepository
 	flowCardRepo repository.FlowCardRepository
 	addressRepo  repository.AddressRepository
+	drugRepo     repository.DrugRepository
 	visitSvc     *visit.Service
 	maClient     medAgentClient
 	medAgentMode string
@@ -48,13 +49,19 @@ func NewService(
 	maClient medAgentClient,
 	medAgentMode string,
 	llmClient LLMClient,
+	drugRepos ...repository.DrugRepository,
 ) *Service {
+	var drugRepo repository.DrugRepository
+	if len(drugRepos) > 0 {
+		drugRepo = drugRepos[0]
+	}
 	return &Service{
 		patientRepo:  patientRepo,
 		visitRepo:    visitRepo,
 		timelineRepo: timelineRepo,
 		flowCardRepo: flowCardRepo,
 		addressRepo:  addressRepo,
+		drugRepo:     drugRepo,
 		visitSvc:     visitSvc,
 		maClient:     maClient,
 		medAgentMode: medAgentMode,

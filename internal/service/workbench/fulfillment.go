@@ -50,6 +50,10 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		}
 	}
 
+	if err := s.decrementMedicationStock(ctx, card.Medications); err != nil {
+		return nil, fmt.Errorf("decrement medication stock: %w", err)
+	}
+
 	now := time.Now()
 	card.SelectedMode = &input.Mode
 	card.FulfillmentStatus = model.MedicationFulfillmentStatusConfirmed
@@ -129,4 +133,19 @@ func (s *Service) SubmitFulfillment(ctx context.Context, input SubmitFulfillment
 		TimelineItems: []model.TimelineItem{drugTL, completedTL, termTL},
 		Message:       fmt.Sprintf("已确认%s，就诊完成", modeText),
 	}, nil
+}
+
+func (s *Service) decrementMedicationStock(ctx context.Context, medications []model.MedicationItem) error {
+	if s.drugRepo == nil || len(medications) == 0 {
+		return nil
+	}
+	for _, medication := range medications {
+		if medication.Quantity <= 0 {
+			return fmt.Errorf("%w: drug quantity must be positive for %s", model.ErrValidation, medication.Name)
+		}
+		if err := s.drugRepo.DecrementStock(ctx, medication.Name, medication.Quantity); err != nil {
+			return err
+		}
+	}
+	return nil
 }
