@@ -34,13 +34,13 @@ type RegisterInput struct {
 
 // LoginInput carries the fields for user login.
 type LoginInput struct {
-	Phone    string `json:"phone"`
-	Password string `json:"password"`
+	Phone    string `json:"phone" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 // RefreshInput carries the refresh token for token rotation.
 type RefreshInput struct {
-	RefreshToken string `json:"refreshToken"`
+	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
 // LogoutInput carries the refresh token to invalidate.

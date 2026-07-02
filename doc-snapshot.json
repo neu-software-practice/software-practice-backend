@@ -349,7 +349,7 @@
       "data",
       "error"
     ],
-    "description": "All standard JSON responses are wrapped in an ApiResponse envelope. Exceptions: /api/health (raw gin.H), SSE streaming endpoints (text/event-stream), and 204 No Content responses."
+    "description": "All responses return flat JSON (no ApiResponse envelope). WriteSuccess/WritePageResult call c.JSON directly. ApiResponse struct kept for reference/error compatibility."
   },
   "errorFormat": {
     "name": "ApiError",

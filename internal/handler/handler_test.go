@@ -105,10 +105,11 @@ func TestWriteSuccess(t *testing.T) {
 		t.Errorf("status = %d, want 200", w.Code)
 	}
 
-	var resp api.ApiResponse[map[string]interface{}]
+	// Response is flat JSON (no ApiResponse envelope)
+	var resp map[string]interface{}
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
-	if !resp.Success {
-		t.Error("expected success=true")
+	if resp["key"] != "value" {
+		t.Error("expected key=value in response")
 	}
 }
 
@@ -335,10 +336,10 @@ func TestWriteSuccess_StatusCode(t *testing.T) {
 				t.Errorf("status = %d, want %d", w.Code, tt.status)
 			}
 
-			var resp api.ApiResponse[map[string]interface{}]
+			var resp map[string]interface{}
 			_ = json.Unmarshal(w.Body.Bytes(), &resp)
-			if !resp.Success {
-				t.Error("expected success=true")
+			if resp["key"] != "value" {
+				t.Error("expected key=value in response")
 			}
 		})
 	}
@@ -357,18 +358,15 @@ func TestWritePageResult_NoMore(t *testing.T) {
 		t.Errorf("status = %d, want 200", w.Code)
 	}
 
-	var resp api.ApiResponse[api.PageResult[string]]
+	var resp api.PageResult[string]
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
-	if !resp.Success {
-		t.Error("expected success=true")
+	if len(resp.Items) != 2 {
+		t.Errorf("expected 2 items, got %d", len(resp.Items))
 	}
-	if resp.Data == nil {
-		t.Fatal("data should not be nil")
-	}
-	if resp.Data.HasMore {
+	if resp.HasMore {
 		t.Error("expected hasMore=false")
 	}
-	if resp.Data.NextCursor != nil {
+	if resp.NextCursor != nil {
 		t.Error("expected nextCursor=nil")
 	}
 }
@@ -3206,14 +3204,11 @@ func TestPatientHandler_GetContext_ValidFull(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	data, ok := resp["data"].(map[string]interface{})
-	if !ok {
-		t.Fatal("response data missing")
-	}
+	// Response is flat JSON (no ApiResponse envelope)
 	for _, field := range []string{"allergies", "medicalHistory", "longTermMedications"} {
-		arr, ok := data[field].([]interface{})
+		arr, ok := resp[field].([]interface{})
 		if !ok {
-			t.Errorf("field %q should be an array, got %T: %v", field, data[field], data[field])
+			t.Errorf("field %q should be an array, got %T: %v", field, resp[field], resp[field])
 		}
 		if len(arr) == 0 {
 			t.Errorf("field %q should not be empty", field)

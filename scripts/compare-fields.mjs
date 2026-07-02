@@ -896,42 +896,8 @@ function checkResponseEnvelope() {
   const driftItems = [];
   const beEndpoints = backendFields.endpoints || [];
 
-  // Verify ApiResponse struct exists globally (structural check)
-  const envelope = GO_STRUCTS['ApiResponse'];
-  if (!envelope) {
-    driftItems.push({
-      severity: 'HIGH',
-      category: 'envelope_struct_missing',
-      endpoint: 'all endpoints',
-      field: 'ApiResponse',
-      expected: 'ApiResponse[T] generic wrapper: { success, data, error }',
-      actual: 'NOT FOUND in Go structs',
-      description: 'Backend ApiResponse envelope struct not found. This is the standard wrapper for all JSON responses.',
-      file: 'pkg/api/response.go',
-      fixHint: 'Define ApiResponse[T] struct with Success, Data, Error fields.',
-    });
-    return driftItems; // Can't check further without the struct
-  }
-
-  // Verify envelope fields
-  const envFields = new Set(envelope.fields.map(f => f.jsonName));
-  for (const required of ['success', 'data', 'error']) {
-    if (!envFields.has(required)) {
-      driftItems.push({
-        severity: 'HIGH',
-        category: 'envelope_field_missing',
-        endpoint: 'all endpoints',
-        field: required,
-        expected: `ApiResponse must have "${required}" field`,
-        actual: `ApiResponse fields: [${[...envFields].join(', ')}]`,
-        description: `ApiResponse is missing the "${required}" field. Frontend expects { success, data, error } envelope.`,
-        file: 'pkg/api/response.go',
-        fixHint: `Ensure ApiResponse struct has "${required}" field.`,
-      });
-    }
-  }
-
-  // Per-endpoint envelope check
+  // Per-endpoint envelope check: flag any endpoint still using ApiResponse wrapping
+  // (Flat JSON is now the expected format after envelope removal fix)
   for (const ep of beEndpoints) {
     const sig = `${ep.method} ${normPath(ep.path)}`;
 
@@ -940,18 +906,18 @@ function checkResponseEnvelope() {
     if (ep.isSSE) continue;                          // SSE streaming — no JSON envelope
     if (ep.statusCode === 204) continue;             // 204 No Content — no body
 
-    // usesEnvelope === false means handler explicitly does NOT use envelope
-    if (ep.usesEnvelope === false) {
+    // usesEnvelope === true means handler still wraps in ApiResponse → anomaly
+    if (ep.usesEnvelope === true) {
       driftItems.push({
         severity: 'MEDIUM',
-        category: 'envelope_missing',
+        category: 'envelope_unexpected',
         endpoint: sig,
         field: 'response format',
-        expected: 'ApiResponse envelope: { success, data, error }',
-        actual: `No ApiResponse wrapper detected (handler source analysis)`,
-        description: `Endpoint "${sig}" does not wrap response in standard ApiResponse envelope. This may cause frontend parsing failures.`,
+        expected: 'Flat JSON (no ApiResponse wrapping)',
+        actual: 'ApiResponse envelope detected in handler',
+        description: `Endpoint "${sig}" still wraps response in ApiResponse envelope. Frontend expects flat JSON.`,
         file: 'internal/handler/',
-        fixHint: 'Use WriteSuccess() or api.SuccessResponse() to wrap the response body.',
+        fixHint: 'Change handler to return flat JSON via WriteSuccess() or c.JSON(status, data).',
       });
     }
   }

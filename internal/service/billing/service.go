@@ -7,6 +7,7 @@ import (
 
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
+	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
 // Service handles billing records business logic.
@@ -116,5 +117,6 @@ func (s *Service) ListBillingRecords(ctx context.Context, patientID string) (*mo
 		records = []model.BillingRecord{}
 	}
 
-	return &model.BillingRecordsResponse{Items: records}, nil
+	result := api.NewPageResult(records, nil, false)
+	return &result, nil
 }

@@ -2,12 +2,11 @@ package errors
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
 // WriteError sends the ApiError as a JSON response using the standard API envelope.
 func WriteError(c *gin.Context, err *ApiError) {
-	c.AbortWithStatusJSON(err.Status, api.ErrorResponse(err))
+	c.AbortWithStatusJSON(err.Status, err)
 }
 
 // WriteValidationError sends a 422 VALIDATION_ERROR response.

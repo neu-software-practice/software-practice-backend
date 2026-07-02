@@ -48,12 +48,12 @@ func ParseQueryInt(c *gin.Context, key string, defaultVal int) int {
 
 // WriteSuccess writes a success response using the unified envelope.
 func WriteSuccess[T any](c *gin.Context, status int, data T) {
-	c.JSON(status, api.SuccessResponse(data))
+	c.JSON(status, data)
 }
 
 // WritePageResult writes a paginated response.
 func WritePageResult[T any](c *gin.Context, page api.PageResult[T]) {
-	c.JSON(http.StatusOK, api.SuccessResponse(page))
+	c.JSON(http.StatusOK, page)
 }
 
 // GetPatientIDFromContext extracts the authenticated patient ID.

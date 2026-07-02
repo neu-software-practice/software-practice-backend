@@ -1,5 +1,7 @@
 package model
 
+import "github.com/neuhis/software-practice-backend/pkg/api"
+
 // MedicalOrderKind enumerates the kind of medical order record.
 type MedicalOrderKind string
 
@@ -33,6 +35,4 @@ type MedicalOrderRecord struct {
 }
 
 // MedicalOrdersResponse is the response for GET /medical-orders.
-type MedicalOrdersResponse struct {
-	Items []MedicalOrderRecord `json:"items"`
-}
+type MedicalOrdersResponse = api.PageResult[MedicalOrderRecord]

@@ -42,7 +42,7 @@ type AdminTokens struct {
 // AdminLoginInput carries the fields for admin login.
 type AdminLoginInput struct {
 	Username string `json:"username"`
-	Password string `json:"password"`
+	Password string `json:"password" binding:"required"`
 }
 
 // AdminLoginResult is the response for a successful admin login.
@@ -63,7 +63,7 @@ type AdminLogoutResult struct {
 
 // AdminRefreshInput carries the refresh token for token rotation.
 type AdminRefreshInput struct {
-	RefreshToken string `json:"refreshToken"`
+	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
 // AdminRefreshResult is the response for a successful token refresh.

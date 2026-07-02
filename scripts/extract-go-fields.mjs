@@ -52,15 +52,22 @@ function parseStructFields(body) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('//')) continue;
 
-    // Match: FieldName Type `json:"jsonName,omitempty" binding:"required,min=1,max=2000"`
-    const taggedMatch = trimmed.match(/^(\w+)\s+([^`]+?)\s+`(?:[^`]*json:"([^"]*)"[^`]*)?(?:[^`]*binding:"([^"]*)"[^`]*)?`/);
+    // Match: FieldName Type `rawTags`
+    const taggedMatch = trimmed.match(/^(\w+)\s+([^`]+?)\s+`([^`]*)`/);
     if (taggedMatch) {
       const goName = taggedMatch[1];
       if (goName[0] !== goName[0].toUpperCase()) continue; // unexported
 
       const goType = taggedMatch[2]?.trim() || 'unknown';
-      const jsonTag = taggedMatch[3] || '';
-      const bindingTag = taggedMatch[4] || '';
+      const rawTags = taggedMatch[3] || '';
+
+      // Parse json and binding tags separately from raw tag string
+      // This is more robust than trying to capture both in one regex
+      const jsonMatch = rawTags.match(/json:"([^"]*)"/);
+      const bindingMatch = rawTags.match(/binding:"([^"]*)"/);
+
+      const jsonTag = jsonMatch ? jsonMatch[1] : '';
+      const bindingTag = bindingMatch ? bindingMatch[1] : '';
 
       const parts = jsonTag.split(',');
       const jsonName = parts[0] || goName;
@@ -503,28 +510,33 @@ function parseHandlerResponseWrapper(source, domainPrefix) {
     }
 
     // Priority 3: Scan for success response patterns
-    // Pattern A: WriteSuccess / WritePageResult (via middleware.go helpers)
+    // Pattern A: WriteSuccess / WritePageResult — now flat JSON (envelope removed)
     const writeSuccessMatch = body.match(/WriteSuccess\s*\([^,]+,\s*([^,)]+)/);
     const writePageMatch = body.match(/WritePageResult\s*\(/);
 
-    // Pattern B: c.JSON with explicit api.SuccessResponse → envelope
+    // Pattern B: c.JSON with explicit api.SuccessResponse → still wrapped in envelope
     const explicitEnvMatch = body.match(/c\.JSON\s*\(\s*([^,]+),\s*api\.SuccessResponse\s*\(/);
 
-    // Pattern C: c.JSON with raw gin.H → no envelope
+    // Pattern C: c.JSON with gin.H or direct data → no envelope
     const rawJSONMatch = body.match(/c\.JSON\s*\(\s*([^,]+),\s*gin\.H\s*\{/);
+    // Pattern D: c.JSON with non-envelope data (variable, struct literal, etc.)
+    const plainJSONMatch = body.match(/c\.JSON\s*\(\s*([^,]+),\s*(?!gin\.H\b)(?!api\.SuccessResponse\b)/);
 
-    if (writeSuccessMatch) {
-      usesEnvelope = true;
+    if (explicitEnvMatch) {
+      usesEnvelope = true;  // Only api.SuccessResponse() still wraps
+      statusCode = extractStatusCode(explicitEnvMatch[1]);
+    } else if (writeSuccessMatch) {
+      usesEnvelope = false; // WriteSuccess now returns flat JSON
       statusCode = extractStatusCode(writeSuccessMatch[1]);
     } else if (writePageMatch) {
-      usesEnvelope = true;
-      statusCode = 200; // WritePageResult always uses http.StatusOK
-    } else if (explicitEnvMatch) {
-      usesEnvelope = true;
-      statusCode = extractStatusCode(explicitEnvMatch[1]);
+      usesEnvelope = false; // WritePageResult now returns flat JSON
+      statusCode = 200;
     } else if (rawJSONMatch) {
       usesEnvelope = false;
       statusCode = extractStatusCode(rawJSONMatch[1]);
+    } else if (plainJSONMatch) {
+      usesEnvelope = false;
+      statusCode = extractStatusCode(plainJSONMatch[1]);
     }
 
     results.set(fullHandlerName, { usesEnvelope, statusCode, isSSE });

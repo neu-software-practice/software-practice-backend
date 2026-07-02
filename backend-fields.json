@@ -1,6 +1,6 @@
 {
   "source": "go-backend-fields",
-  "extractedAt": "2026-07-02T02:50:59.085Z",
+  "extractedAt": "2026-07-02T03:14:05.411Z",
   "totalEndpoints": 47,
   "endpoints": [
     {
@@ -253,7 +253,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -364,9 +364,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         },
         {
           "jsonName": "password",
@@ -375,9 +377,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "requestFieldMap": {
@@ -388,9 +392,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         },
         "password": {
           "jsonName": "password",
@@ -399,9 +405,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       },
       "requestStructFound": true,
@@ -414,7 +422,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -525,9 +533,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "requestFieldMap": {
@@ -538,9 +548,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       },
       "requestStructFound": true,
@@ -553,7 +565,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -702,9 +714,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=4",
+          "constraints": {
+            "required": true,
+            "min": 4
+          }
         },
         {
           "jsonName": "name",
@@ -737,9 +752,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=4",
+          "constraints": {
+            "required": true,
+            "min": 4
+          }
         },
         "name": {
           "jsonName": "name",
@@ -763,7 +781,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -922,7 +940,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "PATCH",
@@ -1281,7 +1299,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -1371,8 +1389,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=2000",
+          "constraints": {
+            "required": false,
+            "max": 2000
+          }
         }
       ],
       "requestFieldMap": {
@@ -1406,8 +1427,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=2000",
+          "constraints": {
+            "required": false,
+            "max": 2000
+          }
         }
       },
       "requestStructFound": true,
@@ -1420,7 +1444,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -1510,8 +1534,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=2000",
+          "constraints": {
+            "required": false,
+            "max": 2000
+          }
         }
       ],
       "requestFieldMap": {
@@ -1545,8 +1572,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=2000",
+          "constraints": {
+            "required": false,
+            "max": 2000
+          }
         }
       },
       "requestStructFound": true,
@@ -1559,7 +1589,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -1850,7 +1880,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -2317,7 +2347,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -2432,7 +2462,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -2899,7 +2929,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -3256,7 +3286,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -3356,9 +3386,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=2000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 2000
+          }
         },
         {
           "jsonName": "clientMessageId",
@@ -3367,9 +3401,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1",
+          "constraints": {
+            "required": true,
+            "min": 1
+          }
         }
       ],
       "requestFieldMap": {
@@ -3391,9 +3428,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=2000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 2000
+          }
         },
         "clientMessageId": {
           "jsonName": "clientMessageId",
@@ -3402,9 +3443,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1",
+          "constraints": {
+            "required": true,
+            "min": 1
+          }
         }
       },
       "requestStructFound": true,
@@ -3417,7 +3461,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -3737,9 +3781,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1",
+          "constraints": {
+            "required": true,
+            "min": 1
+          }
         },
         {
           "jsonName": "clientMessageId",
@@ -3772,9 +3819,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1",
+          "constraints": {
+            "required": true,
+            "min": 1
+          }
         },
         "clientMessageId": {
           "jsonName": "clientMessageId",
@@ -4025,7 +4075,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -4318,7 +4368,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -4567,7 +4617,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -4794,7 +4844,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -4999,7 +5049,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -5330,9 +5380,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         },
         {
           "jsonName": "requestId",
@@ -5376,9 +5430,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         },
         "requestId": {
           "jsonName": "requestId",
@@ -5502,9 +5560,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         }
       ],
       "requestFieldMap": {
@@ -5526,9 +5588,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         }
       },
       "requestStructFound": true,
@@ -5541,7 +5607,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -5861,9 +5927,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         },
         {
           "jsonName": "requestId",
@@ -5896,9 +5966,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         },
         "requestId": {
           "jsonName": "requestId",
@@ -6105,7 +6179,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -6310,7 +6384,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -6823,7 +6897,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -6833,9 +6907,55 @@
       "responseType": "DismissEmergencyResult",
       "requestType": "DismissEmergencyInput",
       "statusCode": 200,
-      "responseFields": [],
-      "responseFieldMap": {},
-      "structFound": false,
+      "responseFields": [
+        {
+          "jsonName": "session",
+          "goName": "Session",
+          "goType": "*model.VisitSession",
+          "isPointer": true,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        },
+        {
+          "jsonName": "timelineItem",
+          "goName": "TimelineItem",
+          "goType": "*model.TimelineItem",
+          "isPointer": true,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        }
+      ],
+      "responseFieldMap": {
+        "session": {
+          "jsonName": "session",
+          "goName": "Session",
+          "goType": "*model.VisitSession",
+          "isPointer": true,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        },
+        "timelineItem": {
+          "jsonName": "timelineItem",
+          "goName": "TimelineItem",
+          "goType": "*model.TimelineItem",
+          "isPointer": true,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        }
+      },
+      "structFound": true,
       "requestFields": [
         {
           "jsonName": "SessionID",
@@ -6872,7 +6992,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -6882,9 +7002,55 @@
       "responseType": "GenerateTitleResult",
       "requestType": "GenerateTitleRequest",
       "statusCode": 200,
-      "responseFields": [],
-      "responseFieldMap": {},
-      "structFound": false,
+      "responseFields": [
+        {
+          "jsonName": "sessionId",
+          "goName": "SessionID",
+          "goType": "string",
+          "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        },
+        {
+          "jsonName": "title",
+          "goName": "Title",
+          "goType": "string",
+          "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        }
+      ],
+      "responseFieldMap": {
+        "sessionId": {
+          "jsonName": "sessionId",
+          "goName": "SessionID",
+          "goType": "string",
+          "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        },
+        "title": {
+          "jsonName": "title",
+          "goName": "Title",
+          "goType": "string",
+          "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        }
+      },
+      "structFound": true,
       "requestFields": [
         {
           "jsonName": "sessionId",
@@ -6921,7 +7087,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -6970,7 +7136,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -7346,8 +7512,11 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=20",
+          "constraints": {
+            "required": false,
+            "max": 20
+          }
         }
       ],
       "requestFieldMap": {
@@ -7447,8 +7616,11 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=20",
+          "constraints": {
+            "required": false,
+            "max": 20
+          }
         }
       },
       "requestStructFound": true,
@@ -7461,7 +7633,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "PATCH",
@@ -7826,8 +7998,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,max=20",
+          "constraints": {
+            "required": false,
+            "max": 20
+          }
         }
       ],
       "requestFieldMap": {
@@ -7916,8 +8091,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,max=20",
+          "constraints": {
+            "required": false,
+            "max": 20
+          }
         }
       },
       "requestStructFound": true,
@@ -7930,7 +8108,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "DELETE",
@@ -7979,7 +8157,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "PUT",
@@ -8270,7 +8448,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -8280,33 +8458,9 @@
       "responseType": "BillingRecordsResponse",
       "requestType": null,
       "statusCode": 200,
-      "responseFields": [
-        {
-          "jsonName": "items",
-          "goName": "Items",
-          "goType": "[]BillingRecord",
-          "isPointer": false,
-          "isSlice": true,
-          "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
-        }
-      ],
-      "responseFieldMap": {
-        "items": {
-          "jsonName": "items",
-          "goName": "Items",
-          "goType": "[]BillingRecord",
-          "isPointer": false,
-          "isSlice": true,
-          "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
-        }
-      },
-      "structFound": true,
+      "responseFields": [],
+      "responseFieldMap": {},
+      "structFound": false,
       "requestFields": [],
       "requestFieldMap": {},
       "requestStructFound": false,
@@ -8319,7 +8473,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -8329,33 +8483,9 @@
       "responseType": "MedicalOrdersResponse",
       "requestType": null,
       "statusCode": 200,
-      "responseFields": [
-        {
-          "jsonName": "items",
-          "goName": "Items",
-          "goType": "[]MedicalOrderRecord",
-          "isPointer": false,
-          "isSlice": true,
-          "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
-        }
-      ],
-      "responseFieldMap": {
-        "items": {
-          "jsonName": "items",
-          "goName": "Items",
-          "goType": "[]MedicalOrderRecord",
-          "isPointer": false,
-          "isSlice": true,
-          "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
-        }
-      },
-      "structFound": true,
+      "responseFields": [],
+      "responseFieldMap": {},
+      "structFound": false,
       "requestFields": [],
       "requestFieldMap": {},
       "requestStructFound": false,
@@ -8368,7 +8498,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -8446,9 +8576,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "requestFieldMap": {
@@ -8470,9 +8602,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       },
       "requestStructFound": true,
@@ -8485,7 +8619,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -8558,7 +8692,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "POST",
@@ -8603,9 +8737,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "requestFieldMap": {
@@ -8616,9 +8752,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       },
       "requestStructFound": true,
@@ -8631,7 +8769,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -8768,7 +8906,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -8883,7 +9021,7 @@
         "cursor"
       ],
       "paginationStyle": "offset",
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -9130,7 +9268,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -9245,7 +9383,7 @@
         "cursor"
       ],
       "paginationStyle": "offset",
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -9712,7 +9850,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "GET",
@@ -9827,7 +9965,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     },
     {
       "method": "PUT",
@@ -10032,7 +10170,7 @@
         "cursor"
       ],
       "paginationStyle": null,
-      "usesEnvelope": true
+      "usesEnvelope": false
     }
   ],
   "structs": {
@@ -10273,8 +10411,11 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=20",
+          "constraints": {
+            "required": false,
+            "max": 20
+          }
         }
       ],
       "file": "address.go"
@@ -10367,8 +10508,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,max=20",
+          "constraints": {
+            "required": false,
+            "max": 20
+          }
         }
       ],
       "file": "address.go"
@@ -10589,9 +10733,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "file": "admin.go"
@@ -10668,9 +10814,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "file": "admin.go"
@@ -11177,23 +11325,6 @@
           "isPointer": true,
           "isSlice": false,
           "hasOmitempty": true,
-          "required": false,
-          "binding": "",
-          "constraints": {}
-        }
-      ],
-      "file": "billing.go"
-    },
-    "BillingRecordsResponse": {
-      "name": "BillingRecordsResponse",
-      "fields": [
-        {
-          "jsonName": "items",
-          "goName": "Items",
-          "goType": "[]BillingRecord",
-          "isPointer": false,
-          "isSlice": true,
-          "hasOmitempty": false,
           "required": false,
           "binding": "",
           "constraints": {}
@@ -12073,23 +12204,6 @@
       ],
       "file": "medical_order.go"
     },
-    "MedicalOrdersResponse": {
-      "name": "MedicalOrdersResponse",
-      "fields": [
-        {
-          "jsonName": "items",
-          "goName": "Items",
-          "goType": "[]MedicalOrderRecord",
-          "isPointer": false,
-          "isSlice": true,
-          "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
-        }
-      ],
-      "file": "medical_order.go"
-    },
     "PatientProfile": {
       "name": "PatientProfile",
       "fields": [
@@ -12421,9 +12535,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=4",
+          "constraints": {
+            "required": true,
+            "min": 4
+          }
         },
         {
           "jsonName": "name",
@@ -13645,9 +13762,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         },
         {
           "jsonName": "password",
@@ -13656,9 +13775,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "file": "user.go"
@@ -13673,9 +13794,11 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required",
+          "constraints": {
+            "required": true
+          }
         }
       ],
       "file": "user.go"
@@ -14305,8 +14428,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=2000",
+          "constraints": {
+            "required": false,
+            "max": 2000
+          }
         }
       ],
       "file": "visit.go"
@@ -14344,8 +14470,11 @@
           "isSlice": false,
           "hasOmitempty": true,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "max=2000",
+          "constraints": {
+            "required": false,
+            "max": 2000
+          }
         }
       ],
       "file": "visit.go"
@@ -14400,8 +14529,11 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,gt=0",
+          "constraints": {
+            "required": false,
+            "gt": 0
+          }
         },
         {
           "jsonName": "systolicPressure",
@@ -14411,8 +14543,11 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,gt=0",
+          "constraints": {
+            "required": false,
+            "gt": 0
+          }
         },
         {
           "jsonName": "diastolicPressure",
@@ -14422,8 +14557,11 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,gt=0",
+          "constraints": {
+            "required": false,
+            "gt": 0
+          }
         },
         {
           "jsonName": "spo2",
@@ -14433,8 +14571,12 @@
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
-          "binding": "",
-          "constraints": {}
+          "binding": "omitempty,min=0,max=100",
+          "constraints": {
+            "required": false,
+            "min": 0,
+            "max": 100
+          }
         }
       ],
       "file": "vitals.go"
@@ -14686,9 +14828,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=2000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 2000
+          }
         },
         {
           "jsonName": "clientMessageId",
@@ -14697,9 +14843,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1",
+          "constraints": {
+            "required": true,
+            "min": 1
+          }
         }
       ],
       "file": "workbench_requests.go"
@@ -14725,9 +14874,12 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1",
+          "constraints": {
+            "required": true,
+            "min": 1
+          }
         },
         {
           "jsonName": "clientMessageId",
@@ -14831,9 +14983,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         }
       ],
       "file": "workbench_requests.go"
@@ -14948,9 +15104,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         },
         {
           "jsonName": "requestId",
@@ -14987,9 +15147,13 @@
           "isPointer": false,
           "isSlice": false,
           "hasOmitempty": false,
-          "required": false,
-          "binding": "",
-          "constraints": {}
+          "required": true,
+          "binding": "required,min=1,max=1000",
+          "constraints": {
+            "required": true,
+            "min": 1,
+            "max": 1000
+          }
         },
         {
           "jsonName": "requestId",
@@ -15013,6 +15177,62 @@
           "goName": "SessionID",
           "goType": "string",
           "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        }
+      ],
+      "file": "workbench_requests.go"
+    },
+    "GenerateTitleResult": {
+      "name": "GenerateTitleResult",
+      "fields": [
+        {
+          "jsonName": "sessionId",
+          "goName": "SessionID",
+          "goType": "string",
+          "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        },
+        {
+          "jsonName": "title",
+          "goName": "Title",
+          "goType": "string",
+          "isPointer": false,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        }
+      ],
+      "file": "workbench_requests.go"
+    },
+    "DismissEmergencyResult": {
+      "name": "DismissEmergencyResult",
+      "fields": [
+        {
+          "jsonName": "session",
+          "goName": "Session",
+          "goType": "*model.VisitSession",
+          "isPointer": true,
+          "isSlice": false,
+          "hasOmitempty": false,
+          "required": false,
+          "binding": "",
+          "constraints": {}
+        },
+        {
+          "jsonName": "timelineItem",
+          "goName": "TimelineItem",
+          "goType": "*model.TimelineItem",
+          "isPointer": true,
           "isSlice": false,
           "hasOmitempty": false,
           "required": false,
@@ -15794,9 +16014,6 @@
     "BillingRecord": {
       "items": "BillingLineItem"
     },
-    "BillingRecordsResponse": {
-      "items": "BillingRecord"
-    },
     "FlowCard": {
       "testItems": "TestItem",
       "items": "PaymentLineItem",
@@ -15806,9 +16023,6 @@
     "MedicalOrderRecord": {
       "medications": "MedicationItem",
       "deliveryAddress": "DeliveryAddress"
-    },
-    "MedicalOrdersResponse": {
-      "items": "MedicalOrderRecord"
     },
     "PatientContext": {
       "patient": "PatientProfile",
@@ -15869,6 +16083,10 @@
     },
     "VitalsRequest": {
       "vitals": "VitalsData"
+    },
+    "DismissEmergencyResult": {
+      "session": "VisitSession",
+      "timelineItem": "TimelineItem"
     },
     "SendMessageResult": {
       "session": "VisitSession",

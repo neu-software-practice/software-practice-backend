@@ -68,3 +68,15 @@ type ConsultRequest struct {
 type GenerateTitleRequest struct {
 	SessionID string `json:"sessionId"`
 }
+
+// GenerateTitleResult is the response for the auto-title generation endpoint.
+type GenerateTitleResult struct {
+	SessionID string `json:"sessionId"`
+	Title     string `json:"title"`
+}
+
+// DismissEmergencyResult is the response for the dismiss-emergency endpoint.
+type DismissEmergencyResult struct {
+	Session      *model.VisitSession `json:"session"`
+	TimelineItem *model.TimelineItem `json:"timelineItem"`
+}

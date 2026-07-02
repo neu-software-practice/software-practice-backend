@@ -429,9 +429,9 @@ func (h *WorkbenchHandler) DismissEmergency(c *gin.Context) {
 		return
 	}
 
-	WriteSuccess(c, http.StatusOK, gin.H{
-		"session":      result,
-		"timelineItem": tlItem,
+	WriteSuccess(c, http.StatusOK, DismissEmergencyResult{
+		Session:      result,
+		TimelineItem: tlItem,
 	})
 }
 
@@ -542,8 +542,8 @@ func (h *WorkbenchHandler) GenerateTitle(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, api.SuccessResponse(gin.H{
-		"sessionId": sessionID,
-		"title":     title,
-	}))
+	c.JSON(http.StatusOK, GenerateTitleResult{
+		SessionID: sessionID,
+		Title:     title,
+	})
 }

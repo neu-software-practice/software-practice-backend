@@ -1,5 +1,7 @@
 package model
 
+import "github.com/neuhis/software-practice-backend/pkg/api"
+
 // BillingRecord aggregates payment information across all sessions for a patient.
 type BillingRecord struct {
 	PaymentID       string            `json:"paymentId"`
@@ -22,6 +24,4 @@ type BillingLineItem struct {
 }
 
 // BillingRecordsResponse is the response for GET /billing/records.
-type BillingRecordsResponse struct {
-	Items []BillingRecord `json:"items"`
-}
+type BillingRecordsResponse = api.PageResult[BillingRecord]

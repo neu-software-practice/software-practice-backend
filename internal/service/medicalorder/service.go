@@ -8,6 +8,7 @@ import (
 
 	"github.com/neuhis/software-practice-backend/internal/model"
 	"github.com/neuhis/software-practice-backend/internal/repository"
+	"github.com/neuhis/software-practice-backend/pkg/api"
 )
 
 // Service handles medical order records business logic.
@@ -57,7 +58,8 @@ func (s *Service) ListMedicalOrders(ctx context.Context, patientID string) (*mod
 		records = []model.MedicalOrderRecord{}
 	}
 
-	return &model.MedicalOrdersResponse{Items: records}, nil
+	result := api.NewPageResult(records, nil, false)
+	return &result, nil
 }
 
 // buildSessionTitle builds a human-readable title for a visit session.
